@@ -105,6 +105,8 @@ pub struct BinRun {
     pub rope_damage: f64,
     pub brake_wear_mm: Vec<f64>,
     pub hoist_run_s: f64,
+    /// 사이클의 권상 전부하 환산 시간 (h) — 매 순간 실제 하중으로 가중
+    pub hoist_flh_h: f64,
     pub run_time_s: Vec<f64>,
     pub starts: Vec<u32>,
     pub max_residual_sway_mm: f64,
@@ -228,6 +230,7 @@ fn bin_run(spec: &CraneSpec, r: &CycleReport, fraction: f64, load_kg: f64, share
         rope_damage: r.rope.damage,
         brake_wear_mm: Axis::all().iter().map(|a| spec.drive(*a).brake.lining_new_mm - r.axes[a.index()].brake_lining_mm).collect(),
         hoist_run_s: r.axes[2].run_time_s,
+        hoist_flh_h: r.hoist_full_load_hours,
         run_time_s: r.axes.iter().map(|a| a.run_time_s).collect(),
         starts: r.axes.iter().map(|a| a.starts).collect(),
         max_residual_sway_mm: r.moves.iter().map(|m| m.residual_sway_mm).fold(0.0, f64::max),
@@ -246,7 +249,6 @@ pub fn run(base: &Scenario, cfg: &DutyConfig) -> Result<DutyReport, String> {
     }
     let mut notes = Vec::new();
     let rated = spec.structure.rated_load_kg;
-    let hook = spec.structure.hook_mass_kg;
     let amb = base.env.ambient_c;
     let tdt = cfg.thermal_dt_s.clamp(0.05, 5.0);
 
@@ -301,7 +303,6 @@ pub fn run(base: &Scenario, cfg: &DutyConfig) -> Result<DutyReport, String> {
     let mut max_w = vec![amb; 3];
     let mut run_sum = vec![0.0; 3];
     let mut starts_sum = vec![0.0; 3];
-    let p_max = rated + hook;
 
     for idx in 0..n_cycles {
         let bi = pick(rng.next_f64());
@@ -337,7 +338,7 @@ pub fn run(base: &Scenario, cfg: &DutyConfig) -> Result<DutyReport, String> {
         rope_damage += b.rope_damage;
         energy += b.energy_kwh;
         regen += b.regen_kwh;
-        flh += b.hoist_run_s / 3600.0 * ((b.load_kg + hook) / p_max).powi(3);
+        flh += b.hoist_flh_h;
         rows.push(DutyRow {
             index: idx,
             t_end_h: t_s / 3600.0,

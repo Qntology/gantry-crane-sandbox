@@ -171,6 +171,8 @@ pub struct Aux {
     /// 축 가속도 [ẍ, ÿ, l̈]
     pub acc: [f64; 3],
     pub wind: [f64; 2],
+    /// 잠긴 축을 붙잡는 데 필요한 힘 크기 (N) — [주행, 횡행, 권상]. 브레이크 용량을 넘으면 미끄러진다
+    pub hold_force: [f64; 3],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -277,15 +279,21 @@ impl<'a> Plant<'a> {
             a_ext[2] - tension * un[2] / m,
         ];
 
-        // 편행 회전
-        let iz = st.bridge_mass_kg * span * span / 12.0 + (st.trolley_mass_kg + m) * (y - 0.5 * span).powi(2) + 1.0;
+        // 편행 회전: 갠트리 강체 보 + 트롤리(보 위 d = y − S/2 에 붙은 질점). 하중은 로프 장력으로만 작용한다.
+        // 운동 에너지 ½·M·ẋ² + ½·I_b·ψ̇² + ½·m_t·(ẋ − d·ψ̇)² 에서 ψ 식: I_z·ψ̈ = M_z + m_t·d·ẍ.
+        // 트롤리 위치에서 받는 로프 수평력 T·u_x 는 모멘트 −T·u_x·d 를 만든다.
+        let d_t = y - 0.5 * span;
+        let m_t = st.trolley_mass_kg;
+        let iz = st.bridge_mass_kg * span * span / 12.0 + m_t * d_t * d_t + 1.0;
         let delta = s[IPSI] * span;
         let guide = if delta.abs() > st.skew_gap_m {
             -st.skew_stiffness_n_per_m * (delta.abs() - st.skew_gap_m) * delta.signum()
         } else {
             0.0
         };
-        let moment = (u.f_travel_left + fric_l - u.f_travel_right - fric_r) * 0.5 * span + guide * 0.5 * span - st.skew_damping * s[IVPSI];
+        let moment = (u.f_travel_left + fric_l - u.f_travel_right - fric_r) * 0.5 * span + guide * 0.5 * span - st.skew_damping * s[IVPSI]
+            - tension * un[0] * d_t
+            + m_t * d_t * ax;
         let apsi = if u.locked[0] { 0.0 } else { moment / iz };
 
         let mut d = [0.0; NS];
@@ -301,7 +309,12 @@ impl<'a> Plant<'a> {
         }
         d[IPSI] = if u.locked[0] { 0.0 } else { s[IVPSI] };
         d[IVPSI] = apsi;
-        (d, Aux { tension_n: tension, slack, acc: [ax, ay, al], wind })
+        let hold_force = [
+            if u.locked[0] { (fx + tension * un[0]).abs() } else { 0.0 },
+            if u.locked[1] { (fy + tension * un[1]).abs() } else { 0.0 },
+            if u.locked[2] { (tension - fh).abs() } else { 0.0 },
+        ];
+        (d, Aux { tension_n: tension, slack, acc: [ax, ay, al], wind, hold_force })
     }
 
     /// 고전 RK4 한 스텝 + 구속 투영. 스텝 끝 상태의 보조값을 돌려준다.
@@ -486,5 +499,22 @@ mod tests {
         }
         let e1 = plant.energy(&st);
         assert!((e1 - e0).abs() / e0.abs().max(1.0) < 1e-6, "{e0} → {e1}");
+    }
+
+    #[test]
+    fn off_centre_trolley_couples_travel_acceleration_into_skew() {
+        // 같은 양쪽 구동력, 트롤리가 중앙에서 벗어남 → 트롤리 관성 때문에 갠트리가 돈다
+        let spec = crate::crane_profile::preset("gantry_10t_20m").unwrap();
+        let env = Environment::default();
+        let plant = Plant { spec: &spec, env: &env, load_kg: 8000.0, load_cd_area: 0.0 };
+        let span = spec.structure.span_m;
+        let st = PhysState::hanging(5.0, 0.2 * span, 6.0);
+        let u = Inputs { f_travel_left: 20_000.0, f_travel_right: 20_000.0, ..Default::default() };
+        let (d, _) = plant.deriv(0.0, &st.s, &u);
+        // 트롤리가 왼쪽(y 작음, d < 0)에 있으면 왼쪽 끝이 뒤처진다 → ψ̈ < 0
+        assert!(d[IVPSI] < 0.0, "ψ̈ = {}", d[IVPSI]);
+        let st_c = PhysState::hanging(5.0, 0.5 * span, 6.0);
+        let (dc, _) = plant.deriv(0.0, &st_c.s, &u);
+        assert!(dc[IVPSI].abs() < 1e-3 * d[IVPSI].abs().max(1e-9) + 1e-9);
     }
 }

@@ -480,9 +480,18 @@ pub fn evaluate(inp: &DecisionInput) -> DecisionReport {
         let closed = inp.antisway_mode == AntiSwayMode::ClosedLoop;
         let done: Vec<&crate::cyclesim::MoveMetrics> = c.moves.iter().filter(|m| !m.aborted).collect();
         let worst = done.iter().map(|m| if closed { m.final_sway_mm } else { m.residual_sway_mm }).fold(0.0, f64::max);
-        let wind_note = if c.max_wind_mps > 3.0 { format!(", 바람 최대 {:.1} m/s 의 편향 포함", c.max_wind_mps) } else { String::new() };
+        let wind_note = if c.max_wind_mps > 3.0 { format!(", 바람 최대 {:.1} m/s (평형점 둘레 흔들림, 정적 편향 제외)", c.max_wind_mps) } else { String::new() };
         let sev = sev_ge(worst, &[(tol, 1), (2.0 * tol, 2)]);
-        let act = if inp.antisway_mode == AntiSwayMode::Off { Action::EnableAntiSway } else { Action::ReduceAcceleration };
+        // 바람이 운전 허용 풍속의 절반 이상이면 남은 흔들림은 돌풍이 만든 것이라 가감속을 바꿔도 줄지 않는다
+        // → 정밀 적재는 바람이 잦아질 때까지 보류(계류)
+        let wind_driven = c.max_wind_mps >= 0.5 * lim.wind_in_service_mps;
+        let act = if inp.antisway_mode == AntiSwayMode::Off {
+            Action::EnableAntiSway
+        } else if wind_driven {
+            Action::Park
+        } else {
+            Action::ReduceAcceleration
+        };
         gates.push(gate(
             "sway",
             "잔류 흔들림",
@@ -564,8 +573,12 @@ pub fn evaluate(inp: &DecisionInput) -> DecisionReport {
                 1.0 + spec.limits.resonance_band,
                 "×",
                 sev,
-                Action::ReduceSpeed,
-                format!("로프 {:.1}–{:.1} m 에서 {:.2}–{:.2} Hz, 거더 {:.2} Hz (같아지는 로프 길이 {:.1} m)", l_min, l_max, f_lo, f_hi, fg, l_star),
+                // 상하 진동수는 속도로 바뀌지 않는다: 그 로프 길이 근처에서 권상 가감속을 부드럽게
+                Action::ReduceAcceleration,
+                format!(
+                    "로프 {:.1}–{:.1} m 에서 {:.2}–{:.2} Hz, 거더 {:.2} Hz — 로프 {:.1} m 근처에서 권상 시작 · 정지를 부드럽게",
+                    l_min, l_max, f_lo, f_hi, fg, l_star
+                ),
                 "로프 EA·줄 수 기준 상하 진동, 거더 측정 고유진동수",
             ));
         }
@@ -679,17 +692,23 @@ pub fn evaluate(inp: &DecisionInput) -> DecisionReport {
         }
     }
 
-    // 규칙 판단
-    let failing: Vec<&Gate> = gates.iter().filter(|g| g.severity > 0).collect();
-    let rule_action = failing.iter().map(|g| g.action).max_by_key(|a| (a.conservativeness(), *a)).unwrap_or(Action::Continue);
-    let mut reasons: Vec<String> = failing
+    // 규칙 판단: 초과(2) · 위험(3) 게이트만 조치를 정한다. 관찰(1) 게이트는 조언으로만 이유에 붙인다
+    // (예: 브레이크 여유 30% = 정비 계획, 15% = 점검).
+    let binding: Vec<&Gate> = gates.iter().filter(|g| g.severity >= 2).collect();
+    let rule_action = binding.iter().map(|g| g.action).max_by_key(|a| (a.conservativeness(), *a)).unwrap_or(Action::Continue);
+    let mut reasons: Vec<String> = binding
         .iter()
-        .filter(|g| g.action == rule_action || g.severity >= 2)
         .map(|g| format!("{}: {:.3} {} (한계 {:.3}) — {}", g.label, g.value, g.unit, g.limit, g.message))
         .collect();
+    reasons.extend(
+        gates
+            .iter()
+            .filter(|g| g.severity == 1)
+            .map(|g| format!("(관찰) {}: {:.3} {} (한계 {:.3}) — {} → 권장: {}", g.label, g.value, g.unit, g.limit, g.message, g.action.label())),
+    );
     reasons.dedup();
-    let speed_scale = if gates.iter().any(|g| g.severity > 0 && g.action == Action::ReduceSpeed) { Some(0.8) } else { None };
-    let accel_scale = if gates.iter().any(|g| g.severity > 0 && g.action == Action::ReduceAcceleration) { Some(0.7) } else { None };
+    let speed_scale = if binding.iter().any(|g| g.action == Action::ReduceSpeed) { Some(0.8) } else { None };
+    let accel_scale = if binding.iter().any(|g| g.action == Action::ReduceAcceleration) { Some(0.7) } else { None };
     if inp.cycle.is_none() && inp.duty.is_none() {
         notes.push("사이클 · 듀티 결과 없이 판정했습니다".into());
     }
@@ -925,6 +944,21 @@ mod tests {
         assert!(rep.rule_action.conservativeness() <= 1, "{:?} {:?}", rep.rule_action, rep.rule_reasons);
         let windy = decide(&c, &spec, AntiSwayMode::Zvd, Some(22.0));
         assert_eq!(windy.rule_action, Action::Park);
+    }
+
+    #[test]
+    fn watch_level_gates_advise_but_do_not_bind() {
+        // 정격 하중의 천장 크레인: 공진 관찰 게이트가 걸려도 규칙 판단은 '계속 운전'
+        let sc = demo_scenario("overhead_5t_16m", 5000.0, AntiSwayMode::Zvd);
+        let spec = sc.crane.resolve().unwrap();
+        let c = cyclesim::simulate(&sc).unwrap();
+        let rep = decide(&c, &spec, AntiSwayMode::Zvd, None);
+        assert!(rep.gates.iter().all(|g| g.severity < 2), "{:?}", rep.rule_reasons);
+        assert_eq!(rep.rule_action, Action::Continue);
+        assert!(operator_can_choose(&rep, Action::Continue));
+        if rep.gates.iter().any(|g| g.severity == 1) {
+            assert!(rep.rule_reasons.iter().any(|r| r.starts_with("(관찰)")));
+        }
     }
 
     #[test]
