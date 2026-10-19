@@ -1,0 +1,12 @@
+[package]
+name = "crane_mbd"
+version = "0.1.0"
+edition = "2021"
+description = "Lumped-mass rope / hook / load multibody solver for cross-checking the analytic crane pendulum model"
+license = "Apache-2.0"
+
+[dependencies]
+
+[[bin]]
+name = "mbdsway"
+path = "src/bin/mbdsway.rs"

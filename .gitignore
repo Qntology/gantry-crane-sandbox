@@ -1,0 +1,10 @@
+/target
+/crates/crane_mbd/target
+/src-tauri/target
+/node_modules
+/dist
+/out
+*.db
+/tools
+/models
+/test_logs

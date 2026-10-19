@@ -1,0 +1,52 @@
+[package]
+name = "crane_sandbox"
+version = "0.1.0"
+edition = "2021"
+description = "Gantry crane dynamics, drive/motor, anti-sway, wear and decision sandbox (ported from endmill-sandbox)"
+license = "Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+crane_mbd = { path = "crates/crane_mbd" }
+# 시계열(TTM-R3) · 결정 조언(LAYA) 모델 — endmill-sandbox 와 같은 candle 포크를 쓴다
+candle-core = { version = "0.11.0", optional = true }
+candle-nn = { version = "0.11.0", optional = true }
+candle-rocm = { git = "https://github.com/Qntology/candle-rocm-vulkan.git", optional = true }
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"], optional = true }
+# 실행 기록 저장소 (SQLite)
+rusqlite = { version = "0.40", features = ["bundled"], optional = true }
+
+[dev-dependencies]
+
+[features]
+default = ["ml", "store"]
+# 물리 엔진만 빠르게 빌드하려면 --no-default-features
+ml = ["dep:candle-core", "dep:candle-nn", "dep:tokenizers"]
+store = ["dep:rusqlite"]
+cuda = ["ml", "candle-core/cuda", "candle-nn/cuda"]
+rocm = ["ml", "dep:candle-rocm", "candle-core/rocm", "candle-nn/rocm"]
+vulkan = ["ml", "candle-core/vulkan", "candle-nn/vulkan"]
+
+[patch.crates-io]
+candle-core = { git = "https://github.com/Qntology/candle-rocm-vulkan.git" }
+candle-nn = { git = "https://github.com/Qntology/candle-rocm-vulkan.git" }
+
+[lib]
+name = "crane_model"
+path = "src/lib.rs"
+
+[[bin]]
+name = "crane_demo"
+path = "src/bin/main.rs"
+
+# 정밀 로프 해석기는 반복 계산이 많아 개발 빌드에서도 최적화한다
+[profile.dev.package.crane_mbd]
+opt-level = 3
+
+# 시뮬레이션 테스트가 디버그 빌드에서도 빠르게 돌도록
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2

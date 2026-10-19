@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gantry Crane Sandbox</title>
+<style>
+:root {
+  --bg: #0f1216; --bg-panel: #161b22; --bg-raise: #1d242d; --bg-plot: #11161c;
+  --line: #2a323d; --plot-grid: #222a33; --plot-grid-strong: #313b47;
+  --text: #e6e9ee; --text-dim: #a7b0bc; --text-muted: #77818e;
+  --accent: #4aa3ff; --violet: #b18cff; --teal: #3fc9b0; --amber: #f2b35a;
+  --danger: #ff6b6b; --warning: #f2b35a; --success: #57c27a;
+  --font-sans: "Pretendard", "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Consolas", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font-sans); }
+header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--bg-panel); }
+header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+header .src { color: var(--text-muted); font-size: 12px; }
+header .spacer { flex: 1; }
+.layout { display: grid; grid-template-columns: 280px 1fr; height: calc(100% - 43px); }
+aside { border-right: 1px solid var(--line); background: var(--bg-panel); padding: 12px; overflow: auto; }
+main { overflow: auto; padding: 12px; display: grid; grid-template-rows: auto auto 1fr; gap: 12px; min-width: 0; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 8px 10px 10px; }
+legend { color: var(--text-dim); padding: 0 4px; font-size: 12px; }
+label { display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 6px; margin: 6px 0; color: var(--text-dim); }
+input, select { width: 100%; background: var(--bg-raise); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; }
+button { background: var(--bg-raise); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #06111e; font-weight: 600; }
+button:disabled { opacity: .5; cursor: default; }
+.btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.card { background: var(--bg-panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-width: 0; }
+.card h2 { margin: 0 0 8px; font-size: 13px; color: var(--text-dim); font-weight: 600; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.kpi { background: var(--bg-panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.kpi .v { font: 600 18px var(--font-mono); }
+.kpi .k { color: var(--text-muted); font-size: 12px; }
+.kpi.bad .v { color: var(--danger); } .kpi.warn .v { color: var(--warning); } .kpi.good .v { color: var(--success); }
+.view { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; }
+canvas { width: 100%; display: block; background: var(--bg-plot); border-radius: 8px; }
+#scene { height: 380px; cursor: grab; }
+.play { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.play input[type=range] { flex: 1; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 10px; flex-wrap: wrap; }
+.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-dim); }
+.tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.tab { display: none; } .tab.on { display: block; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
+.charts canvas { height: 220px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--text-muted); font-weight: 500; }
+td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+.sev { display: inline-block; min-width: 38px; text-align: center; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+.sev0 { background: #1d3a28; color: var(--success); } .sev1 { background: #3b3020; color: var(--warning); }
+.sev2 { background: #45241f; color: #ff9b7a; } .sev3 { background: #551d24; color: var(--danger); }
+.choice { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.choice button.rec { border-color: var(--accent); }
+.choice button.chosen { background: var(--accent); color: #06111e; }
+.muted { color: var(--text-muted); }
+.note { color: var(--text-dim); font-size: 12px; margin: 4px 0; }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+.legend i { display: inline-block; width: 10px; height: 3px; margin-right: 4px; vertical-align: middle; }
+#drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; text-align: center; color: var(--text-muted); }
+.empty { color: var(--text-muted); padding: 30px; text-align: center; }
+@media (max-width: 1100px) { .view { grid-template-columns: 1fr; } .layout { grid-template-columns: 1fr; } aside { border-right: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Gantry Crane Sandbox</h1>
+  <span class="src" id="src">파일 모드</span>
+  <span class="spacer"></span>
+  <span class="muted" id="status"></span>
+</header>
+<div class="layout">
+<aside>
+  <fieldset>
+    <legend>시나리오</legend>
+    <label>크레인 <select id="crane"><option value="gantry_10t_20m">갠트리 10 t × 20 m</option><option value="overhead_5t_16m">천장 5 t × 16 m</option></select></label>
+    <label>하중 (kg) <input id="load" type="number" value="8000" step="500"></label>
+    <label>흔들림 억제 <select id="mode"><option value="off">없음</option><option value="zv">ZV</option><option value="zvd" selected>ZVD</option><option value="ei">EI</option><option value="closed_loop">각도 궤환 (LQR)</option></select></label>
+    <label>평균 풍속 (m/s) <input id="wind" type="number" value="0" step="1"></label>
+    <label>돌풍 진폭 (m/s) <input id="gust" type="number" value="0" step="1"></label>
+    <label>이동 방식 <select id="movemode"><option value="sequential">순차 (올림→이동→내림)</option><option value="simultaneous">동시</option></select></label>
+  </fieldset>
+  <fieldset>
+    <legend>근무 · 예측</legend>
+    <label>근무 시간 (h) <input id="hours" type="number" value="8" step="1"></label>
+    <label>시간당 사이클 <input id="cph" type="number" value="6" step="1"></label>
+    <label>예측 수평선 (h) <input id="fh" type="number" value="8" step="1"></label>
+  </fieldset>
+  <div class="btnrow">
+    <button class="primary" id="run">실행</button>
+    <button id="cmp">방식 비교</button>
+  </div>
+  <fieldset style="margin-top:12px">
+    <legend>모델 (TTM-R3 · LAYA)</legend>
+    <label>폴더 <input id="mroot" placeholder="models 폴더 경로"></label>
+    <div class="btnrow"><button id="mload">불러오기</button></div>
+    <div class="note" id="mstatus">모델 없이 Holt 예측 · 규칙 판정만 씁니다.</div>
+  </fieldset>
+  <fieldset>
+    <legend>결과 파일 열기</legend>
+    <div id="drop">crane_demo pipeline 이 저장한<br><b>pipeline.json</b> (+ compare.json)<br>을 끌어다 놓거나 고르세요<br><input type="file" id="file" accept=".json" multiple style="margin-top:8px"></div>
+  </fieldset>
+  <fieldset>
+    <legend>내보내기</legend>
+    <div class="btnrow"><button id="exCsv">샘플 CSV</button><button id="exProg">속도 프로파일</button><button id="exJson">전체 JSON</button></div>
+  </fieldset>
+</aside>
+<main>
+  <section class="kpis" id="kpis"><div class="empty">실행하거나 결과 파일을 여세요.</div></section>
+  <section class="view">
+    <div class="card">
+      <h2>3D 보기 <span class="muted" id="sceneInfo"></span></h2>
+      <canvas id="scene"></canvas>
+      <div class="play">
+        <button id="playBtn">재생</button>
+        <select id="speed"><option value="1">×1</option><option value="5">×5</option><option value="20" selected>×20</option><option value="60">×60</option></select>
+        <input type="range" id="slider" min="0" max="1000" value="0">
+        <span class="muted" id="tLabel">0.0 s</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>판정</h2>
+      <div id="decision" class="muted">—</div>
+    </div>
+  </section>
+  <section class="card">
+    <div class="tabs" id="tabs">
+      <button data-t="sway" class="on">흔들림</button>
+      <button data-t="motor">모터</button>
+      <button data-t="gates">게이트</button>
+      <button data-t="duty">근무 · 예측</button>
+      <button data-t="compare">방식 비교</button>
+      <button data-t="xcheck">교차검증</button>
+    </div>
+    <div class="tab on" id="t-sway">
+      <div class="charts">
+        <div><canvas id="cSway"></canvas><div class="legend" id="lSway"></div></div>
+        <div><canvas id="cRope"></canvas><div class="legend" id="lRope"></div></div>
+      </div>
+      <h2 style="margin-top:12px">이동</h2>
+      <table id="moves"></table>
+    </div>
+    <div class="tab" id="t-motor">
+      <div class="charts">
+        <div><canvas id="cCur"></canvas><div class="legend" id="lCur"></div></div>
+        <div><canvas id="cTemp"></canvas><div class="legend" id="lTemp"></div></div>
+        <div><canvas id="cVel"></canvas><div class="legend" id="lVel"></div></div>
+        <div><canvas id="cPow"></canvas><div class="legend" id="lPow"></div></div>
+      </div>
+      <table id="axes" style="margin-top:12px"></table>
+    </div>
+    <div class="tab" id="t-gates"><table id="gates"></table></div>
+    <div class="tab" id="t-duty">
+      <div id="dutySum" class="note"></div>
+      <div class="charts" id="fcCharts"></div>
+    </div>
+    <div class="tab" id="t-compare"><canvas id="cCmp" style="height:240px"></canvas><table id="cmpTable" style="margin-top:10px"></table></div>
+    <div class="tab" id="t-xcheck"><div id="xcheck" class="muted">—</div></div>
+  </section>
+</main>
+</div>
+<script>
+const TAURI = window.__TAURI__ && (window.__TAURI__.invoke || (window.__TAURI__.tauri && window.__TAURI__.tauri.invoke));
+const invoke = TAURI ? (cmd, args) => TAURI(cmd, args) : null;
+const $ = id => document.getElementById(id);
+const UI = (() => { const cs = getComputedStyle(document.documentElement); const v = n => cs.getPropertyValue(n).trim();
+  return { plot: v('--bg-plot'), grid: v('--plot-grid'), gridStrong: v('--plot-grid-strong'), text: v('--text'), dim: v('--text-dim'), muted: v('--text-muted'),
+    accent: v('--accent'), violet: v('--violet'), teal: v('--teal'), amber: v('--amber'), danger: v('--danger'), success: v('--success'), mono: v('--font-mono'), sans: v('--font-sans') }; })();
+const AXES = [['travel', '주행'], ['trolley', '횡행'], ['hoist', '권상']];
+const AX_COL = [UI.accent, UI.teal, UI.amber];
+const SEV = ['통과', '관찰', '초과', '위험'];
+let REPORT = null, COMPARE = null, play = { on: false, t: 0, last: 0 };
+let view = { yaw: -0.65, pitch: 0.42, dist: 1.0, dragging: false, px: 0, py: 0 };
+
+function setStatus(s) { $('status').textContent = s || ''; }
+function fmt(v, d = 1) { return (v === null || v === undefined || !isFinite(v)) ? '—' : Number(v).toFixed(d); }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// ---------- 캔버스 공통 ----------
+function prep(c) {
+  const ctx = c.getContext && c.getContext('2d');
+  if (!ctx) return null;
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth || 600, h = c.clientHeight || 220;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h); ctx.fillStyle = UI.plot; ctx.fillRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function niceTicks(lo, hi, n = 5) {
+  if (!isFinite(lo) || !isFinite(hi)) return [];
+  if (hi - lo < 1e-12) { hi = lo + 1; }
+  const raw = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), r = raw / mag;
+  const step = (r < 1.5 ? 1 : r < 3 ? 2 : r < 7 ? 5 : 10) * mag, out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+// opts: {title, xLabel, yLabel, series:[{name,x,y,color,dash,width}], bands:[{x,lo,hi,color}], hlines:[{y,label,color}], vlines:[{x,color}], xMin,xMax,yMin,yMax}
+function chart(c, opts, legendEl) {
+  const P = prep(c); if (!P) return; const { ctx, w, h } = P;
+  const m = { l: 52, r: 12, t: 22, b: 30 };
+  let xs = [], ys = [];
+  for (const s of opts.series || []) { for (let i = 0; i < s.x.length; i += Math.max(1, Math.floor(s.x.length / 4000))) { if (isFinite(s.y[i])) { xs.push(s.x[i]); ys.push(s.y[i]); } } }
+  for (const b of opts.bands || []) { xs.push(...b.x); ys.push(...b.lo.filter(isFinite), ...b.hi.filter(isFinite)); }
+  for (const l of opts.hlines || []) ys.push(l.y);
+  if (!xs.length) { ctx.fillStyle = UI.muted; ctx.font = `12px ${UI.sans}`; ctx.fillText('데이터 없음', 12, 24); return; }
+  let x0 = opts.xMin ?? Math.min(...xs), x1 = opts.xMax ?? Math.max(...xs), y0 = opts.yMin ?? Math.min(...ys), y1 = opts.yMax ?? Math.max(...ys);
+  if (x1 - x0 < 1e-12) x1 = x0 + 1; if (y1 - y0 < 1e-12) { y1 += 1; y0 -= 1; }
+  const pad = (y1 - y0) * 0.06; y0 -= pad; y1 += pad;
+  const X = v => m.l + (v - x0) / (x1 - x0) * (w - m.l - m.r), Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
+  ctx.font = `11px ${UI.mono}`; ctx.lineWidth = 1;
+  for (const v of niceTicks(y0, y1)) { ctx.strokeStyle = UI.grid; ctx.beginPath(); ctx.moveTo(m.l, Y(v)); ctx.lineTo(w - m.r, Y(v)); ctx.stroke(); ctx.fillStyle = UI.muted; ctx.textAlign = 'right'; ctx.fillText(String(v), m.l - 6, Y(v) + 4); }
+  for (const v of niceTicks(x0, x1, 6)) { ctx.strokeStyle = UI.grid; ctx.beginPath(); ctx.moveTo(X(v), m.t); ctx.lineTo(X(v), h - m.b); ctx.stroke(); ctx.fillStyle = UI.muted; ctx.textAlign = 'center'; ctx.fillText(String(v), X(v), h - m.b + 14); }
+  ctx.strokeStyle = UI.gridStrong; ctx.strokeRect(m.l, m.t, w - m.l - m.r, h - m.t - m.b);
+  for (const b of opts.bands || []) {
+    ctx.fillStyle = b.color; ctx.globalAlpha = 0.22; ctx.beginPath();
+    b.x.forEach((v, i) => i ? ctx.lineTo(X(v), Y(b.hi[i])) : ctx.moveTo(X(v), Y(b.hi[i])));
+    for (let i = b.x.length - 1; i >= 0; i--) ctx.lineTo(X(b.x[i]), Y(b.lo[i]));
+    ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  for (const l of opts.hlines || []) { ctx.strokeStyle = l.color || UI.danger; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(m.l, Y(l.y)); ctx.lineTo(w - m.r, Y(l.y)); ctx.stroke(); ctx.setLineDash([]); if (l.label) { ctx.fillStyle = l.color || UI.danger; ctx.textAlign = 'right'; ctx.fillText(l.label, w - m.r - 4, Y(l.y) - 4); } }
+  for (const l of opts.vlines || []) { ctx.strokeStyle = l.color || UI.muted; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(l.x), m.t); ctx.lineTo(X(l.x), h - m.b); ctx.stroke(); ctx.setLineDash([]); }
+  for (const s of opts.series || []) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.5; if (s.dash) ctx.setLineDash(s.dash);
+    ctx.beginPath(); let started = false; const step = Math.max(1, Math.floor(s.x.length / 3000));
+    for (let i = 0; i < s.x.length; i += step) { const yy = s.y[i]; if (!isFinite(yy)) { started = false; continue; } if (!started) { ctx.moveTo(X(s.x[i]), Y(yy)); started = true; } else ctx.lineTo(X(s.x[i]), Y(yy)); }
+    ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+  }
+  ctx.fillStyle = UI.dim; ctx.textAlign = 'left'; ctx.font = `12px ${UI.sans}`; if (opts.title) ctx.fillText(opts.title, m.l, 14);
+  ctx.fillStyle = UI.muted; ctx.font = `11px ${UI.sans}`; if (opts.yLabel) { ctx.save(); ctx.translate(12, h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(opts.yLabel, 0, 0); ctx.restore(); }
+  if (opts.xLabel) { ctx.textAlign = 'right'; ctx.fillText(opts.xLabel, w - m.r, h - 4); }
+  if (legendEl) legendEl.innerHTML = (opts.series || []).filter(s => s.name).map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('');
+}
+
+// ---------- 3D ----------
+function project(p, W, H, spec) {
+  const s = spec.structure, cx = s.runway_m / 2, cy = s.span_m / 2, cz = s.suspension_height_m / 2;
+  let x = p[0] - cx, y = p[1] - cy, z = p[2] - cz;
+  const cyw = Math.cos(view.yaw), syw = Math.sin(view.yaw), cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+  let x1 = x * cyw - y * syw, y1 = x * syw + y * cyw;
+  let y2 = y1 * cp - z * sp, z2 = y1 * sp + z * cp;
+  const scale = Math.min(W, H) / (Math.max(s.runway_m, s.span_m) * 0.9) * view.dist, depth = 1 / (1 + y2 * 0.012);
+  return [W / 2 + x1 * scale * depth, H / 2 - z2 * scale * depth];
+}
+function drawScene() {
+  const c = $('scene'), P = prep(c); if (!P) return; const { ctx, w, h } = P;
+  if (!REPORT) { ctx.fillStyle = UI.muted; ctx.font = `12px ${UI.sans}`; ctx.fillText('결과가 없습니다', 14, 22); return; }
+  const spec = REPORT.crane, s = spec.structure, S = REPORT.cycle.samples, n = S.t.length;
+  const i = Math.min(n - 1, Math.max(0, idxAt(play.t)));
+  const P3 = p => project(p, w, h, spec);
+  const line = (a, b, col, wdt = 1) => { const A = P3(a), B = P3(b); ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); };
+  for (let gx = 0; gx <= s.runway_m + 1e-9; gx += s.runway_m / 10) line([gx, 0, 0], [gx, s.span_m, 0], UI.grid);
+  for (let gy = 0; gy <= s.span_m + 1e-9; gy += s.span_m / 5) line([0, gy, 0], [s.runway_m, gy, 0], UI.grid);
+  line([0, 0, 0], [s.runway_m, 0, 0], UI.gridStrong, 2); line([0, s.span_m, 0], [s.runway_m, s.span_m, 0], UI.gridStrong, 2);
+  ctx.strokeStyle = UI.violet; ctx.globalAlpha = 0.55; ctx.beginPath();
+  for (let k = 0; k <= i; k += 5) { const q = P3([S.load_x[k], S.load_y[k], S.load_z[k]]); k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+  ctx.stroke(); ctx.globalAlpha = 1;
+  const x = S.x[i], y = S.y[i], H0 = s.suspension_height_m, skew = (S.skew_mm[i] || 0) / 1000;
+  const xl = x + skew / 2, xr = x - skew / 2;
+  line([xl, 0, 0], [xl, 0, H0], UI.dim, 3); line([xr, s.span_m, 0], [xr, s.span_m, H0], UI.dim, 3);
+  line([xl, 0, H0], [xr, s.span_m, H0], UI.text, 4);
+  const lp = [S.load_x[i], S.load_y[i], S.load_z[i]];
+  line([x, y, H0], lp, UI.dim, 1.5);
+  const T = P3([x, y, H0]); ctx.fillStyle = UI.accent; ctx.fillRect(T[0] - 7, T[1] - 5, 14, 10);
+  const L = P3(lp), loaded = (S.load_kg[i] || 0) > 0, sz = loaded ? 9 : 5;
+  ctx.fillStyle = loaded ? UI.amber : UI.muted; ctx.fillRect(L[0] - sz, L[1] - sz * 0.7, sz * 2, sz * 1.4);
+  const sw = S.sway_mm[i] || 0;
+  $('sceneInfo').textContent = `t ${fmt(S.t[i], 1)} s · 주행 ${fmt(x, 2)} m · 횡행 ${fmt(y, 2)} m · 로프 ${fmt(S.l[i], 2)} m · 흔들림 ${fmt(sw, 0)} mm · 장력 ${fmt(S.tension_kn[i], 1)} kN`;
+  $('tLabel').textContent = `${fmt(S.t[i], 1)} s`;
+}
+function idxAt(t) { const S = REPORT.cycle.samples; if (!S.t.length) return 0; const dt = (S.t[S.t.length - 1] - S.t[0]) / Math.max(1, S.t.length - 1); return Math.round((t - S.t[0]) / Math.max(dt, 1e-9)); }
+function tick(ts) {
+  if (play.on && REPORT) {
+    const S = REPORT.cycle.samples, T = S.t[S.t.length - 1];
+    if (play.last) play.t += (ts - play.last) / 1000 * Number($('speed').value);
+    if (play.t >= T) { play.t = T; play.on = false; $('playBtn').textContent = '재생'; }
+    $('slider').value = Math.round(play.t / T * 1000);
+    drawScene();
+  }
+  play.last = ts; requestAnimationFrame(tick);
+}
+$('playBtn').onclick = () => { if (!REPORT) return; const T = REPORT.cycle.samples.t.at(-1); if (play.t >= T) play.t = 0; play.on = !play.on; $('playBtn').textContent = play.on ? '정지' : '재생'; };
+$('slider').oninput = e => { if (!REPORT) return; play.t = e.target.value / 1000 * REPORT.cycle.samples.t.at(-1); drawScene(); };
+const sc = $('scene');
+sc.onmousedown = e => { view.dragging = true; view.px = e.clientX; view.py = e.clientY; sc.style.cursor = 'grabbing'; };
+window.addEventListener('mouseup', () => { view.dragging = false; sc.style.cursor = 'grab'; });
+window.addEventListener('mousemove', e => { if (!view.dragging) return; view.yaw += (e.clientX - view.px) * 0.008; view.pitch = Math.max(-0.2, Math.min(1.4, view.pitch + (e.clientY - view.py) * 0.006)); view.px = e.clientX; view.py = e.clientY; drawScene(); });
+sc.onwheel = e => { e.preventDefault(); view.dist = Math.max(0.4, Math.min(3, view.dist * (e.deltaY < 0 ? 1.1 : 0.9))); drawScene(); };
+
+// ---------- 렌더 ----------
+function renderKpis() {
+  const r = REPORT, c = r.cycle, d = r.decision, du = r.duty;
+  const worst = Math.max(0, ...c.moves.filter(m => !m.aborted).map(m => c.antisway === 'closed_loop' ? m.final_sway_mm : m.residual_sway_mm));
+  const energy = c.axes.reduce((a, b) => a + b.energy_in_kwh, 0);
+  const k = (label, value, cls = '') => `<div class="kpi ${cls}"><div class="v">${value}</div><div class="k">${label}</div></div>`;
+  const cons = { continue: 0, reduce_speed: 1, reduce_acceleration: 1, enable_anti_sway: 1, cool_down: 2, inspect: 2, limit_load: 3, park: 3, stop: 4 }[d.final_action] ?? 0;
+  $('kpis').innerHTML = [
+    k('최종 판정', esc(d.final_action_label), cons >= 3 ? 'bad' : cons >= 1 ? 'warn' : 'good'),
+    k('사이클 시간', `${fmt(c.cycle_time_s, 0)} s`),
+    k('잔류 흔들림 (최대)', `${fmt(worst, 0)} mm`, worst > r.crane.limits.sway_tolerance_mm ? 'warn' : 'good'),
+    k('사이클 에너지', `${fmt(energy, 3)} kWh`),
+    k('권상 권선 최고', `${fmt(du ? Math.max(du.max_winding_c[2], c.axes[2].peak_winding_c) : c.axes[2].peak_winding_c, 1)} °C`),
+    k('로프 손상 (근무)', du ? du.rope_damage.toExponential(2) : c.rope.damage.toExponential(2)),
+    k('흔들림 억제', esc(c.antisway)),
+  ].join('');
+}
+function renderDecision() {
+  const d = REPORT.decision, ch = d.choice;
+  let html = `<div><b>${esc(d.final_action_label)}</b> <span class="muted">(규칙: ${esc(d.rule_action_label)}${d.escalated_by_advisor ? ' → LAYA 상향' : ''})</span></div>`;
+  if (d.rule_reasons && d.rule_reasons.length) html += '<ul class="note">' + d.rule_reasons.slice(0, 6).map(r => `<li>${esc(r)}</li>`).join('') + '</ul>';
+  else html += '<div class="note">통과하지 못한 게이트가 없습니다.</div>';
+  if (ch) {
+    html += `<div class="note">${esc(ch.question)} ${ch.attention.map(a => `· ${esc(a)}`).join(' ')}</div><div class="choice">`;
+    for (const o of ch.options) html += `<button data-a="${esc(o.key)}" class="${o.recommended ? 'rec' : ''} ${o.chosen ? 'chosen' : ''}" ${o.enabled ? '' : 'disabled'} title="${esc(o.detail)}${o.blocked_by.length ? ' — 막음: ' + esc(o.blocked_by.join(', ')) : ''}">${esc(o.label)}${o.advisor_probability != null ? ` <span class="muted">${fmt(o.advisor_probability * 100, 0)}%</span>` : ''}</button>`;
+    html += `</div><div class="note">${esc(ch.advisor_note)}</div>`;
+  }
+  $('decision').innerHTML = html;
+  $('decision').querySelectorAll('button[data-a]').forEach(b => b.onclick = async () => {
+    if (!invoke) { setStatus('작업자 선택은 데스크톱 앱에서 기록됩니다'); return; }
+    try { REPORT.decision = await invoke('choose_action', { action: b.dataset.a }); renderDecision(); renderKpis(); } catch (e) { setStatus(String(e)); }
+  });
+}
+function renderSway() {
+  const S = REPORT.cycle.samples;
+  chart($('cSway'), { title: '흔들림 (하중 수평 변위)', xLabel: 's', yLabel: 'mm', series: [{ name: '흔들림 mm', x: S.t, y: S.sway_mm, color: UI.violet }], hlines: [{ y: REPORT.crane.limits.sway_tolerance_mm, label: '허용', color: UI.amber }], vlines: REPORT.cycle.moves.map(m => ({ x: m.end_s })) }, $('lSway'));
+  chart($('cRope'), { title: '로프 길이 · 장력', xLabel: 's', series: [{ name: '로프 길이 m', x: S.t, y: S.l, color: UI.teal }, { name: '장력 kN ÷ 10', x: S.t, y: S.tension_kn.map(v => v / 10), color: UI.amber }] }, $('lRope'));
+  const rows = REPORT.cycle.moves.map(m => `<tr><td>${esc(m.label)}${m.aborted ? ' <span class="sev sev2">중단</span>' : ''}</td><td class="num">${fmt(m.duration_s, 1)}</td><td class="num">${fmt(m.rope_length_m, 2)}</td><td>${esc(m.shaper ?? '—')}${m.shaper_freq_hz ? ` ${fmt(m.shaper_freq_hz, 3)} Hz` : ''}</td><td class="num">${fmt(m.max_sway_mm, 0)}</td><td class="num">${fmt(m.residual_sway_mm, 0)}</td><td class="num">${fmt(m.final_sway_mm, 0)}</td><td class="num">${fmt(m.settle_time_s, 1)}</td><td class="num">${fmt(m.position_error_mm, 0)}</td></tr>`).join('');
+  $('moves').innerHTML = `<tr><th>이동</th><th>시간 s</th><th>설계 로프 m</th><th>셰이퍼</th><th>최대 mm</th><th>잔류 mm</th><th>끝 mm</th><th>안정 s</th><th>위치 오차 mm</th></tr>${rows}`;
+}
+function renderMotor() {
+  const S = REPORT.cycle.samples;
+  const ser = (key, f = v => v) => S.axes.map((a, k) => ({ name: AXES[k][1], x: S.t, y: a[key].map(f), color: AX_COL[k] }));
+  chart($('cCur'), { title: '모터 전류 (1대)', xLabel: 's', yLabel: 'A', series: ser('current_a') }, $('lCur'));
+  chart($('cTemp'), { title: '권선 온도', xLabel: 's', yLabel: '°C', series: ser('winding_c') }, $('lTemp'));
+  chart($('cVel'), { title: '기준 속도(점선) · 실제 속도', xLabel: 's', yLabel: 'm/s', series: [...S.axes.map((a, k) => ({ x: S.t, y: a.v_ref, color: AX_COL[k], dash: [4, 3], width: 1 })), ...ser('v')] }, $('lVel'));
+  chart($('cPow'), { title: '축 전력 (음수 = 회생)', xLabel: 's', yLabel: 'kW', series: ser('power_kw') }, $('lPow'));
+  const rows = REPORT.cycle.axes.map(a => `<tr><td>${AXES.find(x => x[0] === a.axis)?.[1] ?? a.axis}</td><td>${esc(a.motor)} ×${a.motors}</td><td class="num">${fmt(a.peak_torque_nm, 1)} / ${fmt(a.rated_torque_nm, 1)}</td><td class="num">${fmt(a.peak_torque_ratio, 2)}</td><td class="num">${fmt(a.peak_current_a, 1)}</td><td class="num">${fmt(a.rms_current_a, 1)}</td><td class="num">${fmt(a.energy_in_kwh, 3)}</td><td class="num">${fmt(a.energy_regen_kwh, 3)}</td><td class="num">${fmt(a.peak_winding_c, 1)}</td><td class="num">${fmt(a.brake_lining_remaining * 100, 1)}%</td></tr>`).join('');
+  $('axes').innerHTML = `<tr><th>축</th><th>모터</th><th>최대/정격 토크 Nm</th><th>토크 사용률</th><th>피크 A</th><th>RMS A</th><th>kWh</th><th>회생 kWh</th><th>권선 최고 °C</th><th>라이닝 여유</th></tr>${rows}`;
+}
+function renderGates() {
+  const g = REPORT.decision.gates.slice().sort((a, b) => b.severity - a.severity);
+  $('gates').innerHTML = `<tr><th>상태</th><th>게이트</th><th>값</th><th>한계</th><th>조치</th><th>내용</th><th>근거</th></tr>` + g.map(x => `<tr><td><span class="sev sev${x.severity}">${SEV[Math.min(3, x.severity)]}</span></td><td>${esc(x.label)}</td><td class="num">${fmt(x.value, 3)} ${esc(x.unit)}</td><td class="num">${fmt(x.limit, 3)}</td><td>${esc(x.action)}</td><td>${esc(x.message)}</td><td class="muted">${esc(x.basis)}</td></tr>`).join('');
+}
+function renderDuty() {
+  const du = REPORT.duty, box = $('fcCharts');
+  if (!du) { $('dutySum').textContent = '근무 시뮬레이션 결과가 없습니다.'; box.innerHTML = ''; return; }
+  $('dutySum').innerHTML = `근무 ${fmt(du.hours, 1)} h · ${du.cycles} 사이클 · 하중 스펙트럼 Kp ${fmt(du.kp, 3)} (${esc(du.spectrum_class)}) · 에너지 ${fmt(du.energy_kwh, 2)} kWh (회생 ${fmt(du.regen_kwh, 2)}) · 전부하 환산 ${fmt(du.full_load_hours, 2)} h / 설계 ${fmt(du.design_full_load_hours, 0)} h · 운전율 [${du.mean_cdf.map(v => fmt(v * 100, 0) + '%').join(', ')}]`;
+  box.innerHTML = '';
+  for (const f of REPORT.forecasts || []) {
+    const wrap = document.createElement('div'), cv = document.createElement('canvas'), lg = document.createElement('div'); lg.className = 'legend';
+    wrap.appendChild(cv); wrap.appendChild(lg); box.appendChild(wrap);
+    const qi = l => f.quantile_levels.findIndex(q => Math.abs(q - l) < 1e-6);
+    const lo = f.quantiles[qi(0.1)] || f.point, hi = f.quantiles[qi(0.9)] || f.point;
+    const series = [{ name: '이력', x: f.history_t, y: f.history_y, color: UI.accent }, { name: `예측 (${f.method})`, x: f.t_future, y: f.point, color: UI.violet }];
+    if (f.prior_future && f.prior_future.length) series.push({ name: '물리 사전값', x: f.t_future, y: f.prior_future, color: UI.muted, dash: [3, 3], width: 1 });
+    const hl = f.threshold ? [{ y: f.threshold.limit, label: '임계', color: UI.danger }] : [];
+    requestAnimationFrame(() => chart(cv, { title: `${f.key} ${f.unit ? '(' + f.unit + ')' : ''}`, xLabel: f.t_unit, series, bands: [{ x: f.t_future, lo, hi, color: UI.violet }], hlines: hl }, lg));
+  }
+}
+function renderCompare() {
+  const rows = COMPARE;
+  if (!rows || !rows.length) { $('cmpTable').innerHTML = '<tr><td class="muted">방식 비교를 실행하거나 compare.json 을 여세요.</td></tr>'; prep($('cCmp')); return; }
+  const P = prep($('cCmp')); if (P) {
+    const { ctx, w, h } = P, m = { l: 50, r: 12, t: 22, b: 34 }, max = Math.max(1, ...rows.map(r => r.max_residual_sway_mm)), bw = (w - m.l - m.r) / rows.length;
+    ctx.fillStyle = UI.dim; ctx.font = `12px ${UI.sans}`; ctx.fillText('방식별 최대 잔류 흔들림 (mm) — 막대 위: 사이클 시간', m.l, 14);
+    rows.forEach((r, i) => { const x = m.l + i * bw + bw * 0.2, bh = (r.max_residual_sway_mm / max) * (h - m.t - m.b), y = h - m.b - bh;
+      ctx.fillStyle = r.mode === 'off' ? UI.danger : UI.accent; ctx.fillRect(x, y, bw * 0.6, bh);
+      ctx.fillStyle = UI.text; ctx.textAlign = 'center'; ctx.font = `11px ${UI.mono}`; ctx.fillText(`${fmt(r.max_residual_sway_mm, 0)} mm`, x + bw * 0.3, y - 14); ctx.fillStyle = UI.muted; ctx.fillText(`${fmt(r.cycle_time_s, 0)} s`, x + bw * 0.3, y - 3);
+      ctx.fillStyle = UI.dim; ctx.fillText(r.mode, x + bw * 0.3, h - m.b + 14); });
+  }
+  $('cmpTable').innerHTML = `<tr><th>방식</th><th>사이클 s</th><th>잔류 mm</th><th>끝 mm</th><th>안정 s</th><th>kWh</th><th>권상 피크 A</th><th>주행 토크 사용률</th></tr>` + rows.map(r => `<tr><td>${esc(r.mode)}</td><td class="num">${fmt(r.cycle_time_s, 1)}</td><td class="num">${fmt(r.max_residual_sway_mm, 0)}</td><td class="num">${fmt(r.max_final_sway_mm, 0)}</td><td class="num">${fmt(r.max_settle_time_s, 1)}</td><td class="num">${fmt(r.energy_kwh, 3)}</td><td class="num">${fmt(r.hoist_peak_current_a, 1)}</td><td class="num">${fmt(r.travel_peak_torque_ratio, 2)}</td></tr>`).join('');
+}
+function renderXcheck() {
+  const c = REPORT.crosscheck;
+  if (!c) { $('xcheck').textContent = '교차검증 결과가 없습니다.'; return; }
+  $('xcheck').innerHTML = `<table><tr><th>항목</th><th>값</th></tr>
+    <tr><td>로프 길이 · 슬링</td><td class="num">${fmt(c.rope_length_m, 2)} m · ${fmt(c.sling_length_m, 2)} m</td></tr>
+    <tr><td>앱 모델 (단진자) 흔들림 진동수</td><td class="num">${fmt(c.analytic_freq_hz, 4)} Hz</td></tr>
+    <tr><td>정밀 해석 (질점 로프 · 이중 진자) 1차 모드</td><td class="num">${fmt(c.mbd_freq_hz, 4)} Hz</td></tr>
+    <tr><td>비 (정밀 / 앱)</td><td class="num">${fmt(c.freq_ratio, 4)}</td></tr>
+    <tr><td>하중 상하 진동 (로프 탄성)</td><td class="num">${fmt(c.bounce_freq_hz, 2)} Hz</td></tr>
+    <tr><td>정적 늘음</td><td class="num">${fmt(c.static_stretch_mm, 1)} mm</td></tr>
+    <tr><td>셰이퍼 설계 진동수 보정 제안 (freq_error)</td><td class="num">${fmt(c.suggested_freq_error, 4)}</td></tr></table>
+    <div class="note">기본은 적용하지 않습니다 (validated = false). ${c.notes.map(esc).join(' ')}</div>`;
+}
+function renderAll() {
+  if (!REPORT) return;
+  renderKpis(); renderDecision(); renderSway(); renderMotor(); renderGates(); renderDuty(); renderCompare(); renderXcheck();
+  play.t = 0; play.on = false; $('playBtn').textContent = '재생'; drawScene();
+  if (REPORT.models) $('mstatus').textContent = (REPORT.models.notes || []).join(' · ') || $('mstatus').textContent;
+}
+$('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 't-' + b.dataset.t)); if (REPORT) { renderSway(); renderMotor(); renderDuty(); renderCompare(); } };
+window.addEventListener('resize', () => { if (REPORT) { drawScene(); renderSway(); renderMotor(); renderDuty(); renderCompare(); } });
+
+// ---------- 실행 · 파일 ----------
+async function buildScenario() {
+  const sc = await invoke('demo_scenario', { crane: $('crane').value, load: Number($('load').value), mode: $('mode').value });
+  sc.env.wind_mean_mps = [Number($('wind').value) || 0, 0]; sc.env.gust_amp_mps = Number($('gust').value) || 0;
+  for (const wp of sc.waypoints) wp.mode = $('movemode').value;
+  return sc;
+}
+$('run').onclick = async () => {
+  if (!invoke) { setStatus('파일 모드: crane_demo pipeline 결과를 여세요'); return; }
+  try {
+    setStatus('계산 중…'); $('run').disabled = true;
+    const scenario = await buildScenario();
+    const config = { duty: { cycles_per_hour: Number($('cph').value), hours: Number($('hours').value), spectrum: [{ fraction: 1.0, share: 0.1 }, { fraction: 0.6, share: 0.3 }, { fraction: 0.3, share: 0.4 }, { fraction: 0.1, share: 0.2 }] }, forecast_hours: Number($('fh').value) };
+    REPORT = await invoke('run_pipeline', { scenario, config }); renderAll(); setStatus('완료');
+  } catch (e) { setStatus('오류: ' + e); } finally { $('run').disabled = false; }
+};
+$('cmp').onclick = async () => {
+  if (!invoke) { setStatus('파일 모드: compare.json 을 여세요'); return; }
+  try { setStatus('비교 중…'); COMPARE = await invoke('compare', { scenario: await buildScenario() }); renderCompare(); document.querySelector('#tabs button[data-t=compare]').click(); setStatus('완료'); } catch (e) { setStatus('오류: ' + e); }
+};
+$('mload').onclick = async () => {
+  if (!invoke) { setStatus('모델은 데스크톱 앱에서 불러옵니다'); return; }
+  try { const s = await invoke('models_load', { root: $('mroot').value }); $('mstatus').textContent = `TTM ${s.ttm ? '있음' : '없음'} · LAYA ${s.advisor ? '있음' : '없음'} · ${s.notes.join(' · ')}`; } catch (e) { setStatus('오류: ' + e); }
+};
+async function openFiles(files) {
+  for (const f of files) {
+    try { const j = JSON.parse(await f.text());
+      if (Array.isArray(j) && j.length && 'max_residual_sway_mm' in j[0]) { COMPARE = j; renderCompare(); }
+      else if (j.cycle && j.decision) { REPORT = j; renderAll(); }
+      else if (j.samples && j.moves) { REPORT = { crane: null, cycle: j, decision: { gates: [], rule_reasons: [], final_action: 'continue', final_action_label: '판정 없음', rule_action_label: '—' }, forecasts: [] }; setStatus('cycle.json 은 크레인 제원이 없어 pipeline.json 을 권장합니다'); }
+      else setStatus(`${f.name}: 알 수 없는 형식`);
+    } catch (e) { setStatus(`${f.name}: ${e}`); }
+  }
+  if (REPORT && REPORT.crane) setStatus(`불러옴: ${REPORT.cycle.scenario}`);
+}
+$('file').onchange = e => openFiles(e.target.files);
+const drop = $('drop');
+drop.ondragover = e => { e.preventDefault(); drop.style.borderColor = UI.accent; };
+drop.ondragleave = () => drop.style.borderColor = '';
+drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = ''; openFiles(e.dataTransfer.files); };
+function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+function samplesCsv() {
+  const S = REPORT.cycle.samples, cols = ['t', 'x', 'y', 'l', 'theta_x_deg', 'theta_y_deg', 'sway_mm', 'tension_kn', 'wind_mps', 'skew_mm', 'load_kg'];
+  const head = [...cols, ...AXES.flatMap(([k]) => ['v_ref', 'v', 'rpm', 'torque_nm', 'current_a', 'power_kw', 'winding_c', 'brake'].map(c => `${k}_${c}`))];
+  const lines = [head.join(',')];
+  for (let i = 0; i < S.t.length; i++) lines.push([...cols.map(c => S[c][i]), ...S.axes.flatMap(a => [a.v_ref[i], a.v[i], a.rpm[i], a.torque_nm[i], a.current_a[i], a.power_kw[i], a.winding_c[i], a.brake[i]])].join(','));
+  return lines.join('\n');
+}
+$('exCsv').onclick = () => REPORT && download('samples.csv', samplesCsv());
+$('exProg').onclick = () => REPORT && download('motion_program.json', JSON.stringify(REPORT.cycle.program, null, 2));
+$('exJson').onclick = () => REPORT && download('pipeline.json', JSON.stringify(REPORT));
+
+(async function init() {
+  if (invoke) {
+    $('src').textContent = '데스크톱 (Tauri)';
+    try { const s = await invoke('models_status'); if (s && (s.ttm || s.advisor)) $('mstatus').textContent = s.notes.join(' · '); } catch (_) {}
+  } else {
+    $('run').title = '데스크톱 앱에서만 실행됩니다'; $('cmp').title = '데스크톱 앱에서만 실행됩니다';
+  }
+  drawScene(); renderCompare();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

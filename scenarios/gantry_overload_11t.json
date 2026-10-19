@@ -1,0 +1,84 @@
+{
+  "name": "gantry_overload_11t",
+  "crane": "gantry_10t_20m",
+  "start": {
+    "x": 2.0,
+    "y": 4.0,
+    "l": 3.0,
+    "load_kg": 0.0
+  },
+  "waypoints": [
+    {
+      "label": "하중 걸기",
+      "x": null,
+      "y": null,
+      "l": 9.0,
+      "mode": "sequential",
+      "dwell_s": 5.0,
+      "set_load_kg": 11500.0
+    },
+    {
+      "label": "들어 옮기기",
+      "x": 30.0,
+      "y": 16.0,
+      "l": 3.0,
+      "mode": "sequential",
+      "dwell_s": 0.0,
+      "set_load_kg": null
+    },
+    {
+      "label": "내려놓기",
+      "x": null,
+      "y": null,
+      "l": 9.0,
+      "mode": "sequential",
+      "dwell_s": 5.0,
+      "set_load_kg": 0.0
+    },
+    {
+      "label": "복귀",
+      "x": 2.0,
+      "y": 4.0,
+      "l": 3.0,
+      "mode": "sequential",
+      "dwell_s": 0.0,
+      "set_load_kg": null
+    }
+  ],
+  "antisway": {
+    "mode": "zvd",
+    "zeta": 0.0,
+    "freq_error": 0.0,
+    "ei_vtol": 0.05,
+    "lqr_q": [
+      10.0,
+      1.0,
+      1000.0,
+      100.0
+    ],
+    "lqr_r": 1.0
+  },
+  "env": {
+    "ambient_c": 25.0,
+    "air_density_kg_m3": 1.2,
+    "wind_mean_mps": [
+      0.0,
+      0.0
+    ],
+    "gust_amp_mps": 0.0,
+    "gust_period_s": 8.0
+  },
+  "sim": {
+    "dt": 0.002,
+    "sample_dt": 0.02,
+    "settle_s": 4.0,
+    "hold_before_brake_s": 0.3,
+    "max_phase_s": 900.0
+  },
+  "load": {
+    "cd_area_m2": null
+  },
+  "speed_scale": 1.0,
+  "accel_scale": 1.0,
+  "events": []
+}
