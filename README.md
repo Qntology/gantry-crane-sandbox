@@ -10,7 +10,8 @@ Rust 샌드박스. [endmill-sandbox](https://github.com/sungu-che/endmill-sandbo
 보정 명령으로 연결한다. 실데이터 출처는 [docs/data-sources.md](docs/data-sources.md),
 식 · 기본값 출처 · 검증은 [docs/physics-and-validation.md](docs/physics-and-validation.md),
 **현장 운영 · 내구도 · 사고 예방 결정과 실데이터 보정 결과**는 [docs/site-operation.md](docs/site-operation.md),
-포팅 기획은 [docs/plan.md](docs/plan.md) 에 있다.
+**염해 부식 · 화물 시나리오 · 절차별 결정 · 시계열 예측 점수**는 [docs/marine-and-prognostics.md](docs/marine-and-prognostics.md),
+포팅 기획은 [docs/plan.md](docs/plan.md) · [docs/plan-stage2.md](docs/plan-stage2.md) 에 있다.
 
 ## 무엇을 하나
 
@@ -27,16 +28,20 @@ Rust 샌드박스. [endmill-sandbox](https://github.com/sungu-che/endmill-sandbo
 | 원장 · 저장 | SDS 원장(Welford + 링버퍼 드리프트, 보정 수축), SQLite 실행 기록 |
 | 보정 · 교차검증 | 진자 · 굴러가기 · 권선 열 · Kaggle 모터 온도 · S3 표 보정, 질점 로프 · 이중 진자 해석기와 비교 |
 | 현장 프리셋 | 물량 · 하중 스펙트럼 · 환경(부식성 · 분진 · 실내 열원 · 고도) · 기후 · 운영(교대 · 숙련 · 신호수 · 출입 통제 · 정비 · 법정 검사) 묶음. 내장 6곳(컨테이너 RMG · 코일 창고 · 프리캐스트 · 조선소 골리앗 · 기계 공장 · 야적장), 바꿔서 저장 |
-| 날씨 | 기상청 1991–2020 평년값 6개 지점 → 시간별 날씨 (바람 · 돌풍 · 비 · 눈 · 결빙 · 뇌전 · 안개 · 체감온도) + 순위값으로 맞춘 태풍 · 강풍 사건 + 예보 오차 |
+| 날씨 | 기상청 1991–2020 평년값 6개 지점 → 시간별 날씨 (바람 · 돌풍 · 비 · 눈 · 결빙 · 뇌전 · 안개 · 체감온도 · 바람 방향) + 순위값으로 맞춘 태풍 · 강풍 사건 + 예보 오차 |
+| 날씨 API · 세계 항만 | Open-Meteo ERA5 · CAMS SO₂ · 파고로 국내외 항만 20곳 기후 (오프라인 통계 파일), 기상청 6개 지점 지점 하나 빼기 교차검증으로 보정 |
+| 염해 부식 | 해안 거리 · 바다 방위 · 해안 형태 · 국내 비래염분 27곳 · 높이 · 바다 바람 → 날마다 염분 → ISO 9223/9224 → 노출 · 차폐 · 밀폐 표면 → 도장 Ri · 국부 손실 · 통로 아연 · 모터 절연 · 전장 ISA 등급 · 감속기 수분 · 로프. 염해 방지 프리셋 4종 |
+| 화물 시나리오 | 화물 13종(무게 분포 · 풍압 허용 풍속 · 시험 인양 · 위험물 · 신고 오차) × 시나리오 6가지(월 · 요일 · 선박 집중일) → 하중 스펙트럼 · 바람 보류 · 무게 재확인 |
 | 현장 운영 | 한 시간 단위로 며칠 · 몇 년: 날씨 → 알림 · 결정 → 처리량 · 정지 사유 · 부품 사용량 · 위험(사고율) · 폭풍 일주 |
-| 내구도 원장 | 부품 16개(로프 · 브레이크 · 모터 · 감속기 · 차륜 · 거더 · 훅 · 도장 · 레일 클램프)의 수명 사용 · 남은 일 · 교체 · 안정성 여유를 자산별 파일로 계속 저장 |
-| 사고 예방 결정 | 바람 · 태풍 · 낙뢰 · 시정 · 결빙 · 폭염 · 중량물 · 부품 · 점검 · 연장 근무 알림, Claude Code 식 결정 카드(권장 맨 앞 · 막힌 선택지 · 예상 손실 · 예상 사고) |
-| 실데이터 보정 | 기상청 일수 · 순위값, ABB 출력 감소표, 야드 · 코일 크레인 처리량, 로프 · 브레이크 교체 주기와 비교해 계수를 맞춤 (맞춘 항목 평균 오차 28.7% → 3.4%) |
+| 내구도 원장 | 부품 18개(로프 · 브레이크 · 모터 · 감속기 · 차륜 · 거더 · 훅 · 도장 · 레일 클램프 · 전장 · 통로)의 수명 사용 · 남은 일 · 교체 · 안정성 여유 · 염해 상태를 자산별 파일로 계속 저장 |
+| 시계열 열화 · 예측 | 물리 증분 × 감마 과정 × 개체 차이 = 참 상태, 점검 · 센서 관측 → v4 예측(생존 조건 베이즈 · 계절 투영 · 부품별 PIT 재보정)으로 건강 점수 · 남은 수명 P10–P90 · 7/30/90일 고장 확률. 현장 하나 빼기 백테스트: CRPS v0 대비 −55 %, 80 % 구간 적중 0.80, PIT KS 0.027 |
+| 사고 예방 결정 | 바람 · 태풍 · 낙뢰 · 시정 · 결빙 · 폭염 · 중량물 · 화물 · 위험물 · 염해 · 부품 · 점검 · 연장 근무 알림, Claude Code 식 결정 카드 — 절차(작업 전 점검 · 줄걸이 · 시험 인양 · 인양 · 이동 · 착지 · 작업 후 · 정비)마다 안전 · 진행 · 위험 · 중단 선택지와 예상 결과 |
+| 실데이터 보정 | 기상청 일수 · 순위값 · ERA5 젖음 시간, ABB 출력 감소표, 처리량, 로프 · 브레이크 교체 주기, NIMS 차폐 비와 비교해 계수를 맞춤 (맞춘 항목 평균 오차 25.8% → 3.2%), 실측 부식 12곳 · KDS · 가용률 · VGM 은 확인 |
 
 ## 빠른 시작
 
 ```bash
-# 테스트 (단위 103 + 시나리오 3, 약 15초)
+# 테스트 (단위 131 + 시나리오 3, 약 20초)
 cargo test
 (cd crates/crane_mbd && cargo test --release)
 
@@ -56,8 +61,18 @@ cargo run --release --bin crane_demo -- operate --site busan_newport_rmg --days 
 cargo run --release --bin crane_demo -- health show RMG-01
 # 값을 바꿔 내 현장으로 저장
 cargo run --release --bin crane_demo -- site save my_yard --from incheon_steel_stockyard --set throughput.moves_per_hour=10
-# 실데이터 대조 · 보정 표 (약 3분, --quick 은 짧은 표본)
+# 실데이터 대조 · 보정 표 (약 4분, --quick 은 짧은 표본)
 cargo run --release --bin crane_demo -- fieldcal
+# 염해: 현장별 기준값 · 방지 프리셋 · 15년 진행 (점검 · 보수 포함)
+cargo run --release --bin crane_demo -- marine sites
+cargo run --release --bin crane_demo -- marine show --site ulsan_shipyard_goliath --years 15 --maintain
+# 화물 시나리오 · 허용 풍속 · 하중 스펙트럼
+cargo run --release --bin crane_demo -- cargo show --id busan_transship --crane rmg_41t_30m
+# 부품 예측 점수 백테스트 (3개 현장 · 3년 · 현장 하나 빼기, 약 20초)
+cargo run --release --bin crane_demo -- prognostics
+# ERA5 항만 기후 요약 · 기상청 교차검증 (인터넷 없이 저장된 통계로)
+cargo run --release --bin crane_demo -- weather ports
+cargo run --release --bin crane_demo -- weather check
 # 브라우저 화면 + API (http://localhost:8765)
 cargo run --release --bin crane_demo -- serve
 ```
@@ -71,7 +86,9 @@ cargo run --release --bin crane_demo -- serve
 - **브라우저 (파일 모드)**: `npm run dev` 로 `index.html` 을 열고 `crane_demo pipeline … --compare` 가 저장한
   `out/pipeline.json` · `out/compare.json`, `crane_demo operate` 의 `operation.json`, `crane_demo fieldcal` 의 `fieldcal.json` 을
   끌어다 놓는다. 3D 재생, 흔들림 · 모터 차트, 게이트, 근무 예측 띠, 방식 비교, 교차검증, **현장 운영 · 내구도**(알림 · 결정 기록 ·
-  부품 수명 · 안정성 여유), **실데이터 보정** 탭이 있다. 현장 운영 칸에서 프리셋을 바꿔 저장하고, 결정 카드는 버튼 · 숫자 키로 고른다.
+  부품 수명 · 건강 점수 · 예측 남은 일 · 30일 고장 확률 · 염해), **염해 · 예측 점수**(방지 프리셋 비교 · v0–v4 점수 · PIT ·
+  신뢰도), **실데이터 보정**(ERA5 교차검증 포함) 탭이 있다. 현장 운영 칸에서 프리셋(해안 노출 · 염해 방지 · 화물 시나리오 포함)을
+  바꿔 저장하고, 결정 카드는 버튼 · 숫자 키로 고른다 (선택지마다 안전 · 진행 · 위험 · 중단 배지).
 
 ## 시나리오
 
@@ -116,8 +133,13 @@ src/
   calib.rs ingest.rs      보정 · 로그 읽기 · 교차검증
   site.rs site_presets.rs 현장 프리셋 · 저장소 · 내장 현장 6곳
   weather.rs climate_data.rs rng.rs   기상청 평년값 · 시간별 날씨 생성 · 예보 · 체감온도
+  weather_api.rs ports.rs era5cal.rs  Open-Meteo ERA5 · 항만 20곳 기후 (data/climate) · 기상청 교차검증
+  marine.rs               해안 염분 · ISO 9223/9224 부식 · 표면 · 부품 영향 · 염해 방지 프리셋
+  cargo.rs                화물 종류 · 시나리오 · 허용 풍속 · 하중 스펙트럼
   operation.rs            현장 운영 시뮬레이션 (알림 · 결정 카드 · 처리량 · 위험 · 원장)
   health.rs               부품 내구도 · 안정성 원장
+  degradation.rs          감마 과정 열화 · 관측 · 예측 (v0–v4)
+  scoring.rs prognostics.rs   확률 예측 점수 · 백테스트 · 현장 하나 빼기 (data/reference/prognostics_report.*)
   alerts.rs field_constants.rs   알림 문턱 · 위험 모델 · 출처가 붙은 상수
   fieldcal.rs             실데이터 대조 · 보정 (data/reference/fieldcal_report.*)
   backend.rs              데스크톱 · `crane_demo serve` 공용 명령
@@ -134,6 +156,7 @@ scenarios/ data/sample/ docs/ examples/ tests/ scripts/
 
 기본 크레인 제원은 예시다. 하중은 질점이고 거더 탄성 결합은 없다. Feyrer 식의 항 배치는 원서 확인이 필요하다.
 현장 운영의 사고 기준율 · 일부 위험 배수 · 차륜 마모율 등은 가정이다 (docs/site-operation.md 의 가정 절).
+염해의 높이 감쇠 · 세척 효율 · 일부 부품 배수와 예측 점수의 참 상태는 시뮬레이션 값이다 (docs/marine-and-prognostics.md 8절).
 TTM-R3 · LAYA 는 이식 후 빌드만 확인했다. 데스크톱 셸은 리눅스에서 타입 검사만 했다. 자세한 내용은
 [docs/physics-and-validation.md](docs/physics-and-validation.md) 의 한계 절.
 
@@ -148,9 +171,16 @@ input shaping and LQR anti-sway, transport-cycle and shift-duty simulation, phys
 (TTM-R3 or Holt), 40+ deterministic safety gates with an escalation-only LAYA advisor, an SDS drift ledger, SQLite run
 store, calibration tools for real logs, and a lumped-mass rope solver for cross-checks. Site operation: presets that
 bundle throughput, load spectrum, environment, KMA 1991–2020 climate and operating conditions; an hourly multi-day
-simulator with accident-prevention alerts and Claude-Code-style decision cards; a persistent per-asset durability and
-stability ledger for 16 components; and a field calibration against KMA statistics, ABB derating tables, crane
-throughput and replacement-interval data (mean error on tuned items 28.7% → 3.4%). CLI: `crane_demo`; desktop:
+simulator with accident-prevention alerts and Claude-Code-style decision cards whose options carry a safe / proceed /
+danger / stop stance per work procedure; a persistent per-asset durability and stability ledger for 18 components;
+coastal salt-spray corrosion (Korean airborne-salt surveys, ISO 9223/9224 dose-response, exposed / sheltered /
+enclosed surfaces, coating Ri, motor insulation, ISA-71.04 electronics, gearbox moisture) with four protection presets;
+cargo scenarios (weight distributions, wind-area limits, test lifts, dangerous goods, VGM errors); ERA5 port climates
+from Open-Meteo cross-validated against KMA stations; gamma-process degradation with noisy inspections and a v4
+prognostic (survival-conditioned Bayes, seasonal dose projection, per-component PIT recalibration) scored by
+leave-one-site-out backtests (CRPS −55% vs the ledger baseline, 80% interval coverage 0.80, PIT KS 0.027); and a
+field calibration against KMA statistics, ERA5 time-of-wetness, ABB derating tables, crane throughput,
+replacement intervals and NIMS sheltered/open corrosion (mean error on tuned items 25.8% → 3.2%). CLI: `crane_demo`; desktop:
 Tauri v1 + single-file `index.html`; browser: `crane_demo serve`. Defaults that come from literature or standards are listed with sources in
 `docs/physics-and-validation.md`; real-data sources are in `docs/data-sources.md`.
 

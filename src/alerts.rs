@@ -57,6 +57,9 @@ pub struct Alert {
     /// 이 알림으로 결정 카드가 열렸는가
     #[serde(default)]
     pub decision_id: Option<String>,
+    /// 작업 절차 (작업 전 점검 · 줄걸이 · 시험 인양 · 인양 · 이동 · 착지 · 작업 후 · 정비 · 점검)
+    #[serde(default)]
+    pub procedure: String,
 }
 
 /// 알림 문턱
@@ -143,6 +146,9 @@ pub struct RiskModel {
     pub icy: f64,
     pub fog: f64,
     pub dense_fog: f64,
+    /// 시야 제한 (200 m 이상 · 시정 주의 문턱 500 m 미만)
+    #[serde(default = "default_haze")]
+    pub haze: f64,
     pub lightning: f64,
     /// 폭염 단계(주의 · 경고 · 위험)에서 휴식 없이 일할 때
     pub heat: Vec<f64>,
@@ -173,6 +179,10 @@ impl Default for RiskModel {
     fn default() -> Self {
         crate::field_constants::risk_model()
     }
+}
+
+fn default_haze() -> f64 {
+    1.2
 }
 
 /// 한 시간 운전 조건 — 위험 지수 계산 입력
@@ -244,10 +254,15 @@ impl RiskModel {
         } else if r.wet {
             push("젖은 레일", self.wet);
         }
+        // 시야: 감속 운전(신호수 · 감속)은 바람과 같이 배수의 초과분을 속도 비율만큼 줄인다 (반응 · 정지 거리)
+        let slow = r.speed_scale.clamp(0.3, 1.0);
+        let vis = |k: f64| 1.0 + (k - 1.0) * slow;
         if r.visibility_m < 50.0 {
-            push("짙은 안개", self.dense_fog);
+            push("짙은 안개", vis(self.dense_fog));
         } else if r.visibility_m < 200.0 {
-            push("시정 저하", self.fog);
+            push("시정 저하", vis(self.fog));
+        } else if r.visibility_m < 500.0 {
+            push("시야 제한", vis(self.haze));
         }
         if let Some(d) = r.thunder_km {
             if d <= r.lightning_km {

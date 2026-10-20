@@ -14,10 +14,14 @@ use crane_model::climate_data;
 use crane_model::fieldcal;
 use crane_model::health::{self, HealthStore};
 use crane_model::ingest;
+use crane_model::marine;
 use crane_model::motor;
 use crane_model::operation::{self, DecisionPolicy, OpSim, OperationConfig, OperationReport, StepOutcome};
 use crane_model::site::{self, SiteStore};
+use crane_model::ports;
+use crane_model::prognostics;
 use crane_model::weather;
+use crane_model::weather_api;
 use std::collections::HashMap;
 use std::io::{BufRead, Read, Write as IoWrite};
 use std::path::{Path, PathBuf};
@@ -48,8 +52,19 @@ crane_demo — 갠트리 크레인 샌드박스
                                                       값을 바꿔 사용자 프리셋으로 저장 (예: --set throughput.moves_per_hour=25)
   crane_demo site delete <id>
   crane_demo climate list | show <id> | check <id> [--years N]   기후 프리셋 · 생성 날씨 vs 평년값
+  crane_demo prognostics [--sites id,id] [--days N] [--replicas R] [--every D] [--seed N] [--out DIR]
+                                                      부품 예측 점수 백테스트 (v0 물리 · v1 Holt · v2 감마 베이즈 · v3 보정, 현장 하나 빼기)
+  crane_demo cargo [scenarios | types [--hook T] | show --id ID [--crane NAME] [--wind M/S]]   화물 시나리오 · 종류 · 허용 풍속
+  crane_demo marine sites                             현장별 염해 기준값 (비래염분 · 부식 속도 · 범주 · 도장 수명)
+  crane_demo marine protections                       염해 방지 프리셋
+  crane_demo marine show --site <id> [--protection ID] [--years N] [--maintain]   염해만 N 년 진행 (연별 표)
+  crane_demo weather ports                            세계 항만 · 해안 위치와 ERA5 통계 요약
+  crane_demo weather fetch --lat Y --lon X [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--cache DIR] [--offline]
+                                                      Open-Meteo ERA5 시간별 실제 날씨 조회 · 저장 (curl, 키 없음)
+  crane_demo weather build [--only id,id] [--file data/climate/ports.json] [--cache DIR] [--offline]
+                                                      위치 목록의 ERA5 일별 · 시간별 · SO₂ · 파고 → 통계 파일
   crane_demo operate --site <id> [--asset 이름] [--days N] [--start MM-DD] [--seed N]
-                     [--policy ask|recommended|conservative|risky] [--ledger DIR] [--fresh] [--no-incidents] [--out DIR]
+                     [--policy ask|recommended|conservative|risky] [--ledger DIR] [--fresh] [--no-incidents] [--deterministic] [--out DIR]
                                                       현장 운영 시뮬레이션 (ask: 결정 카드마다 묻는다)
   crane_demo health list | show <asset> | replace <asset> <부품> | delete <asset> [--ledger DIR]
   crane_demo fieldcal [--out DIR]                     실데이터 대조 · 오차 표
@@ -367,6 +382,10 @@ fn run() -> Result<(), String> {
         "calibrate" => cmd_calibrate(&a),
         "site" => cmd_site(&a),
         "climate" => cmd_climate(&a),
+        "weather" => cmd_weather(&a),
+        "marine" => cmd_marine(&a),
+        "cargo" => cmd_cargo(&a),
+        "prognostics" => cmd_prognostics(&a, &out),
         "operate" => cmd_operate(&a, &out),
         "health" => cmd_health(&a),
         "fieldcal" => cmd_fieldcal(&a, &out),
@@ -486,20 +505,322 @@ fn cmd_climate(a: &Args) -> Result<(), String> {
     }
 }
 
+fn print_scores(rows: &[prognostics::MethodScore]) {
+    println!("  {:<34} {:>6} {:>8} {:>8} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7}", "방식", "건수", "CRPS일", "중앙MAE", "80%적중", "50%적중", "PIT KS", "α±20%", "BSS30", "현재80%");
+    for m in rows {
+        println!(
+            "  {:<34} {:>6} {:>8.1} {:>8.1} {:>7.2} {:>7.2} {:>7.3} {:>7.2} {:>7.3} {:>7.2}",
+            m.label, m.n_rul, m.crps, m.mae_median, m.coverage80, m.coverage50, m.pit_ks, m.alpha_acc, m.brier.skill, m.nowcast_cov80
+        );
+    }
+}
+
+fn cmd_prognostics(a: &Args, out: &Path) -> Result<(), String> {
+    let store = SiteStore::new(&presets_dir(a));
+    let ids: Vec<String> = a.s("sites").unwrap_or("busan_newport_rmg,gwangyang_coil_warehouse,ulsan_shipyard_goliath").split(',').map(|s| s.trim().to_string()).collect();
+    let sites: Vec<site::SitePreset> = ids.iter().map(|i| store.get(i)).collect::<Result<_, _>>()?;
+    let days = a.f("days").unwrap_or(1095.0).clamp(120.0, 3650.0) as u32;
+    let replicas = a.f("replicas").unwrap_or(10.0).clamp(1.0, 200.0) as u32;
+    let every = a.f("every").unwrap_or(30.0).clamp(7.0, 365.0) as u32;
+    let seed = a.f("seed").unwrap_or(2026.0) as u64;
+    println!("현장 {} · {days} 일 · 복제 {replicas} · {every} 일마다 예측 — 수집 중 …", ids.join(", "));
+    let rep = prognostics::run(&sites, days, replicas, every, seed)?;
+    println!("\n■ 전체 (v3 는 현장 하나 빼기로 맞춘 퍼짐 배수, 평균 {:.2})", rep.overall.last().map(|m| m.spread).unwrap_or(1.0));
+    print_scores(&rep.overall);
+    println!("\n■ 현장 하나 빼기 (v3)");
+    for f in rep.folds.iter() {
+        println!("  뺀 현장 {:<26} 퍼짐 {:.2} · CRPS {:.1} · 80% 적중 {:.2} · PIT KS {:.3} · BSS {:.3}", f.held_out, f.spread, f.score.crps, f.score.coverage80, f.score.pit_ks, f.score.brier.skill);
+        if let Some(v4) = &f.recal {
+            println!("  {:<34} v4 재보정 · CRPS {:.1} · 80% 적중 {:.2} · PIT KS {:.3} · BSS {:.3}", "", v4.crps, v4.coverage80, v4.pit_ks, v4.brier.skill);
+        }
+    }
+    println!("\n■ 부품 종류별");
+    for k in rep.by_kind.iter() {
+        println!("  [{}] 가속 ×{:.1}", k.kind, k.accel);
+        print_scores(&k.methods);
+    }
+    println!("\n모든 현장으로 맞춘 퍼짐 배수 {:.2} · v4 재보정 {}", rep.spread_all, if rep.recal_adopted { "채택" } else { "채택 안 함" });
+    for (k, rc) in rep.recal.iter() {
+        let kn: Vec<String> = rc.knots.iter().map(|x| format!("{x:.3}")).collect();
+        println!("  재보정 {k:<11} n {:>5}  G⁻¹ [{}]", rc.n, kn.join(", "));
+    }
+    for n in rep.notes.iter() {
+        println!("· {n}");
+    }
+    let p = write(out, "prognostics.json", &serde_json::to_string_pretty(&rep).unwrap())?;
+    println!("저장: {}", p.display());
+    Ok(())
+}
+
+fn cmd_cargo(a: &Args) -> Result<(), String> {
+    use crane_model::cargo;
+    match a.pos.get(1).map(|s| s.as_str()).unwrap_or("scenarios") {
+        "types" => {
+            let limit = a.f("wind").unwrap_or(20.0);
+            let hook = a.f("hook").unwrap_or(0.0);
+            println!("{:<12} {:<10} {:>7} {:>7} {:>5} {:>9} {:>7} {:>6} {:>6}  이름", "id", "종류", "평균 t", "면적 m²", "cD", "허용 m/s", "추가 s", "시험 m", "위험물");
+            for t in cargo::types() {
+                println!(
+                    "{:<12} {:<10} {:>7.1} {:>7.1} {:>5.2} {:>9.1} {:>7.0} {:>6.2} {:>6}  {}",
+                    t.id,
+                    t.category,
+                    t.mean_t(),
+                    t.area_m2,
+                    t.drag_cd,
+                    t.wind_limit(limit, hook),
+                    t.extra_handling_s,
+                    t.test_lift_m,
+                    if t.imdg_class.is_empty() { "-".to_string() } else { t.imdg_class.clone() },
+                    t.name
+                );
+            }
+            println!("\n허용 풍속: EN 13000 비례식 v = {limit:.0} m/s · √(1.2 / (A·cD/m)) (크레인 한계를 넘지 않음). 매단 질량에 훅 · 스프레더 {hook:.1} t 포함 (--hook t)");
+            Ok(())
+        }
+        "scenarios" => {
+            for sc in cargo::scenarios() {
+                let mix: Vec<String> = sc.mix.iter().map(|(id, f)| format!("{id} {:.0}%", f * 100.0)).collect();
+                println!("{:<16} {}", sc.id, sc.name);
+                println!("    구성: {}", mix.join(" · "));
+                if sc.peak_day_prob > 0.0 {
+                    println!("    선박 집중일: 하루 확률 {:.2} · 수요 ×{:.2}", sc.peak_day_prob, sc.peak_factor);
+                }
+                println!("    {}", sc.description);
+            }
+            Ok(())
+        }
+        "show" => {
+            let id = a.s("id").ok_or("--id 가 필요합니다 (crane_demo cargo scenarios)")?;
+            let sc = cargo::scenario(id).ok_or(format!("화물 시나리오 '{id}' 이 없습니다"))?;
+            let crane = crane_profile::preset(a.s("crane").unwrap_or("rmg_41t_30m")).ok_or("크레인 프리셋이 없습니다")?;
+            let rated = crane.structure.rated_load_kg;
+            let wind = a.f("wind").unwrap_or(20.0);
+            let ctx = cargo::context(&sc, wind, crane.structure.hook_mass_kg / 1000.0)?;
+            println!("{} — 크레인 {} (정격 {:.0} t, 운전 한계 {wind:.0} m/s)", sc.name, crane.name, rated / 1000.0);
+            println!("{:<12} {:>6} {:>7} {:>9} {:>9} {:>7} {:>8}  이름", "id", "비율", "평균 t", "m²/t", "허용 m/s", "추가 s", "재확인");
+            for l in ctx.lanes.iter() {
+                println!("{:<12} {:>5.0}% {:>7.1} {:>9.2} {:>9.1} {:>7.0} {:>7.1}%  {}", l.id, l.share * 100.0, l.mean_t, l.area_per_t, l.wind_limit_mps, l.extra_handling_s, l.recheck_share * 100.0, l.name);
+            }
+            let sp = sc.spectrum(rated)?;
+            let bins: Vec<String> = sp.iter().map(|b| format!("{:.2}:{:.3}", b.fraction, b.share)).collect();
+            println!("하중 스펙트럼 (정격 대비 : 비중): {}", bins.join(", "));
+            println!("정격 초과 섞임 (신고 오차 포함): {:.4} · 위험물 비율 {:.1}%", sc.overweight_share(rated)?, ctx.dg_share() * 100.0);
+            Ok(())
+        }
+        other => Err(format!("cargo 다음에 scenarios | types | show 중 하나를 주세요 ({other})")),
+    }
+}
+
+fn cmd_marine(a: &Args) -> Result<(), String> {
+    let store = SiteStore::new(&presets_dir(a));
+    match a.pos.get(1).map(|s| s.as_str()).unwrap_or("sites") {
+        "protections" => {
+            println!("{:<14} {:<4} {:<3} {:>6} {:>6} {:<5} {:>5} {:>6} {:>6}  이름", "id", "도장", "내구", "이중µm", "통로µm", "모터", "히터", "세척일", "윤활일");
+            for p in marine::protection_presets() {
+                println!(
+                    "{:<14} {:<4} {:<3} {:>6.0} {:>6.0} {:<5} {:>5} {:>6.0} {:>6.0}  {}",
+                    p.id, p.coating_category, p.coating_durability, p.duplex_hdg_um, p.access_hdg_um, p.motor_ip, if p.motor_heaters { "예" } else { "아니오" }, p.washing_days, p.rope_relube_days, p.name
+                );
+            }
+            Ok(())
+        }
+        "sites" => {
+            println!("{:<26} {:<14} {:>7} {:>7} {:>5} {:>7} {:>7} {:>5} {:>7} {:>7}", "현장", "방지", "거리m", "Cl mg", "등급", "탄소강", "차폐", "범주", "도장년", "아연µm");
+            for s in store.list() {
+                let site = store.get(&s.id)?;
+                let Some(exp) = site.environment.coastal.clone() else {
+                    println!("{:<26} (해안 노출 설정 없음)", s.id);
+                    continue;
+                };
+                let prot = site.environment.protection()?;
+                let m = marine::setup_for_site(&site, &prot)?;
+                println!(
+                    "{:<26} {:<14} {:>7.0} {:>7.0} {:>5} {:>7.1} {:>7.1} {:>5} {:>7.1} {:>7.2}",
+                    s.id, prot.id, exp.distance_to_sea_m, m.sd_annual, m.chloride_class, m.r_steel[0], m.r_steel[1], m.category, m.coat_life_years[1], m.r_zinc
+                );
+            }
+            println!("\n탄소강 · 차폐: ISO 9223 첫해 부식 속도 (µm/년), 도장년: 차폐면 도장 첫 대보수까지 (ISO 12944 내구성 × 환경 불일치)");
+            Ok(())
+        }
+        "show" => {
+            let id = a.s("site").ok_or("--site 가 필요합니다")?;
+            let site = store.get(id)?;
+            let prot = match a.s("protection") {
+                Some(p) => marine::protection_preset(p).ok_or(format!("염해 방지 프리셋 '{p}' 이 없습니다"))?,
+                None => site.environment.protection()?,
+            };
+            let years = a.f("years").unwrap_or(10.0).clamp(1.0, 60.0) as u32;
+            let p = marine::project(&site, &prot, years, a.f("seed").unwrap_or(1.0) as u64, a.s("maintain").is_some())?;
+            for n in p.setup.notes.iter() {
+                println!("· {n}");
+            }
+            println!("· 방지: {} — 도장 수명 노출 {:.1} · 차폐 {:.1} · 밀폐 {:.1} 년, 통로 {:.1} 년", prot.name, p.setup.coat_life_years[0], p.setup.coat_life_years[1], p.setup.coat_life_years[2], p.setup.access_life_years);
+            println!("{:>3} {:>8} {:>7} {:>8} {:>6} {:>6} {:>7} {:>3} {:>8} {:>6} {:>6} {:>4} {:>5}", "년", "Cl mg", "젖음h", "강 µm/년", "도장노", "도장차", "녹 %", "Ri", "손실 µm", "통로", "ppm", "ISA", "보수");
+            for r in p.rows.iter() {
+                println!(
+                    "{:>3} {:>8.0} {:>7.0} {:>8.1} {:>6.2} {:>6.2} {:>7.3} {:>3} {:>8.0} {:>6.2} {:>6.0} {:>4} {:>2}/{:>2}",
+                    r.year, r.sd_mean, r.tow_h, r.steel_um_y, r.coat_exposed, r.coat_sheltered, r.rust_area_pct, r.ri, r.local_loss_um, r.access_used, r.gear_ppm, ["G1", "G2", "G3", "GX"][r.isa_level.min(3) as usize], r.touch_ups, r.repaints
+                );
+            }
+            Ok(())
+        }
+        other => Err(format!("marine 다음에 sites | protections | show 중 하나를 주세요 ({other})")),
+    }
+}
+
+/// 1970-01-01 부터 날 수 → (년, 월, 일) (Hinnant 의 civil_from_days)
+fn civil_from_days(z: i64) -> (i64, u32, u32) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    (yoe + era * 400 + if m <= 2 { 1 } else { 0 }, m, d)
+}
+
+fn today() -> String {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    let (y, m, d) = civil_from_days(secs.div_euclid(86_400));
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+fn cmd_weather(a: &Args) -> Result<(), String> {
+    let cache = PathBuf::from(a.s("cache").unwrap_or("out/weather_cache"));
+    let mut f = weather_api::Fetcher::new(&cache);
+    f.offline = a.s("offline").is_some();
+    match a.pos.get(1).map(|s| s.as_str()).unwrap_or("ports") {
+        "ports" | "list" => {
+            println!("{:<22} {:<3} {:<7} {:>6} {:>5} {:>6} {:>5} {:>6} {:>6} {:>6}  이름", "id", "국가", "해안", "기온°C", "RH%", "젖음h", "풍속", "폭풍/년", "SO₂", "파고m");
+            for s in ports::sites() {
+                let st = ports::stats(&s.id);
+                match st {
+                    Some(st) => {
+                        let so2: Vec<f64> = st.months.iter().filter_map(|m| m.so2_ug_m3).collect();
+                        let wv: Vec<f64> = st.months.iter().filter_map(|m| m.wave_mean_m).collect();
+                        let mean = |v: &[f64]| if v.is_empty() { f64::NAN } else { v.iter().sum::<f64>() / v.len() as f64 };
+                        let wind = st.months.iter().map(|m| m.wind_mean_mps).sum::<f64>() / 12.0;
+                        println!(
+                            "{:<22} {:<3} {:<7} {:>6.1} {:>5.0} {:>6.0} {:>5.1} {:>6.2} {:>6.1} {:>6.2}  {}",
+                            s.id,
+                            s.country,
+                            s.coast_type,
+                            st.annual_mean_temp(),
+                            st.annual_mean_rh(),
+                            st.tow_h(),
+                            wind,
+                            st.storm_peaks.iter().filter(|p| p.1 >= 25.0).count() as f64 / st.years.max(1.0),
+                            mean(&so2),
+                            mean(&wv),
+                            s.name
+                        );
+                    }
+                    None => println!("{:<22} {:<3} {:<7} (통계 없음 — crane_demo weather build)  {}", s.id, s.country, s.coast_type, s.name),
+                }
+            }
+            println!("\n{}", weather_api::ATTRIBUTION);
+            Ok(())
+        }
+        "fetch" => {
+            let lat = a.f("lat").ok_or("--lat 이 필요합니다")?;
+            let lon = a.f("lon").ok_or("--lon 이 필요합니다")?;
+            let from = a.s("from").unwrap_or("2023-01-01");
+            let to = a.s("to").unwrap_or("2023-12-31");
+            let h = f.hourly(lat, lon, from, to)?;
+            let n = h.len().max(1) as f64;
+            let tow = (0..h.len()).filter(|&i| h.rh_pct[i] > weather_api::TOW_RH && h.temp_c[i] > 0.0).count() as f64;
+            println!("격자 {:.3}, {:.3} (해발 {:.0} m, {}) · {} 시간 · 빈 값 {}", h.lat, h.lon, h.elevation_m, h.timezone, h.len(), h.gaps);
+            println!(
+                "평균 기온 {:.1} °C · 습도 {:.0}% · 풍속 {:.1} m/s · 최대 순간 {:.1} m/s · 강수 {:.0} mm · 젖음 시간 {:.0} h ({:.0}%)",
+                h.temp_c.iter().sum::<f64>() / n,
+                h.rh_pct.iter().sum::<f64>() / n,
+                h.wind_mps.iter().sum::<f64>() / n,
+                h.gust_mps.iter().cloned().fold(0.0, f64::max),
+                h.precip_mm.iter().sum::<f64>(),
+                tow,
+                100.0 * tow / n
+            );
+            println!("캐시: {}", f.cache_path("hourly-era5", lat, lon, from, to).display());
+            println!("{}", weather_api::ATTRIBUTION);
+            Ok(())
+        }
+        "build" => {
+            let only: Option<Vec<String>> = a.s("only").map(|o| o.split(',').map(|x| x.trim().to_string()).collect());
+            let sel: Vec<ports::PortSite> = ports::sites().into_iter().filter(|s| only.as_ref().map(|o| o.contains(&s.id)).unwrap_or(true)).collect();
+            let mut file = ports::build(&f, &sel, &mut |m| println!("{m}"));
+            let path = PathBuf::from(a.s("file").unwrap_or("data/climate/ports.json"));
+            // 일부만 다시 만들면 나머지는 기존 파일에서 그대로 둔다
+            if only.is_some() {
+                if let Ok(t) = std::fs::read_to_string(&path) {
+                    if let Ok(old) = serde_json::from_str::<ports::PortsFile>(&t) {
+                        for s in old.sites {
+                            if !file.sites.iter().any(|x| x.id == s.id) {
+                                file.sites.push(s);
+                            }
+                        }
+                    }
+                }
+            }
+            let order: Vec<String> = ports::sites().into_iter().map(|s| s.id).collect();
+            file.sites.sort_by_key(|s| order.iter().position(|x| *x == s.id).unwrap_or(usize::MAX));
+            file.built = today();
+            // 위치마다 한 줄 (diff 가 읽히게)
+            let mut txt = format!("{{\n  \"note\": {},\n  \"built\": {},\n  \"sites\": [\n", serde_json::to_string(&file.note).unwrap(), serde_json::to_string(&file.built).unwrap());
+            for (k, s) in file.sites.iter().enumerate() {
+                txt.push_str("    ");
+                txt.push_str(&serde_json::to_string(s).unwrap());
+                txt.push_str(if k + 1 < file.sites.len() { ",\n" } else { "\n" });
+            }
+            txt.push_str("  ]\n}\n");
+            std::fs::write(&path, txt).map_err(|e| format!("{}: {e}", path.display()))?;
+            println!("저장: {} ({} 위치) — 다시 빌드해야 기본 기후에 들어갑니다", path.display(), file.sites.len());
+            Ok(())
+        }
+        "check" => {
+            let r = crane_model::era5cal::run();
+            println!("ERA5 ↔ 기상청 ({} 지점) — 평균 절대 오차: 보정 전 → 지점 하나 빼기 (전체 맞춤)", r.stations.len());
+            for it in r.items.iter() {
+                println!("  {:<24} 기상청 평균 {:>8.1} {:<4} | {:>7.2} → {:>7.2} ({:>6.2})", it.name, it.kma_mean, it.unit, it.mae_before, it.mae_loso, it.mae_all);
+            }
+            if let Some(a) = &r.adjust {
+                println!("
+전체 맞춤 계수: {}", serde_json::to_string(a).unwrap());
+            }
+            for (id, a) in r.folds.iter() {
+                println!("  {id:<8} 빼고 맞춤: 풍속 ×{:.2} · 순간 ×{:.2} · 기온 {:+.2} · 습도 {:+.1} · 강수일 {:.2} mm · 안개 RH {:.1} · 뇌전 {:.1} mm/h", a.wind_scale, a.gust_scale, a.temp_offset_c, a.rh_offset_pct, a.rain_day_mm, a.fog_rh_pct, a.thunder_mm_h);
+            }
+            for n in r.notes.iter() {
+                println!("· {n}");
+            }
+            Ok(())
+        }
+        other => Err(format!("weather 다음에 ports | fetch | build | check 중 하나를 주세요 ({other})")),
+    }
+}
+
 fn print_card(d: &operation::OpDecision) {
     let p = &d.prompt;
-    println!("\n┌─ [{}] {} ───────────────────────────────", p.header, d.at);
+    let proc_ = if p.procedure.is_empty() { String::new() } else { format!(" · 절차 {}", p.procedure) };
+    let sit = if p.situation.is_empty() { String::new() } else { format!(" · 지금 상황 {}", crane_model::choice::stance_label(&p.situation)) };
+    println!("\n┌─ [{}] {}{}{} ───────────────────────────────", p.header, d.at, proc_, sit);
     println!("│ {}", p.question);
     for a in p.attention.iter() {
         println!("│  ! {a}");
     }
     let mut n = 0;
     for o in p.options.iter() {
+        let st = crane_model::choice::stance_label(&o.stance);
+        let st = if st.is_empty() { String::new() } else { format!(" [{st}]") };
         if o.enabled {
             n += 1;
-            println!("│  {}) {}{} — {}", n, o.label, if o.recommended { " (권장)" } else { "" }, o.detail);
+            println!("│  {}) {}{}{} — {}", n, o.label, if o.recommended { " (권장)" } else { "" }, st, o.detail);
         } else {
-            println!("│  ✕ {} — 막힘: {}", o.label, o.blocked_by.join(", "));
+            println!("│  ✕ {}{} — 막힘: {}", o.label, st, o.blocked_by.join(", "));
+        }
+        if !o.outcome.is_empty() {
+            println!("│      → {}", o.outcome);
         }
     }
     print!("└─ 번호 [Enter = 권장, a = 남은 결정 모두 권장]: ");
@@ -554,6 +875,17 @@ fn print_operation(r: &OperationReport, ledger_path: Option<&Path>) {
     let al: Vec<String> = k.alerts_by_level.iter().map(|(l, n)| format!("{l} {n}")).collect();
     println!("  알림 {} 건 ({}) · 결정 {} 건 (작업자 {}) · 결정으로 줄인 기대 사고 {:.3}", r.alerts.len(), al.join(", "), k.decisions, k.decisions_by_operator, k.risk_avoided);
     println!("  사고 {} 건 (기대 {:.3}) · 위험 지수 평균 {:.0} · 최대 {:.0} · 정격 초과 차단 {:.0} 회", k.incidents, k.expected_incidents, k.risk_mean, k.risk_max, k.refused_overweight);
+    println!("  돌발 고장 {} 건 · 참 상태가 기준을 넘긴 채 운전 {:.0} h · 화물 보류 이동 {:.0} · 시험 인양 무게 재확인 {:.0}", k.breakdowns, k.hidden_overdue_h, k.cargo_held_moves, k.weight_rechecks);
+    if !k.moves_by_cargo.is_empty() {
+        let c: Vec<String> = k.moves_by_cargo.iter().map(|(n, v)| format!("{n} {v:.0}")).collect();
+        println!("  화물별 이동: {}", c.join(" · "));
+    }
+    if let Some(m) = &r.marine {
+        println!(
+            "  염해: {} ({}) · 염화물 {:.0} mg/m²·d · 탄소강 {:.1} µm/년 (기간 연환산) · 도장 열화 노출 {:.2} · 차폐 {:.2} · 녹 {:.2}% (Ri {}) · 세척 {} · 재도장 {} · 방지 {}",
+            m.setup.category, m.setup.chloride_class, m.mean_sd, m.steel_um_per_year, m.coat[0], m.coat[1], m.rust_area_pct, m.ri, m.washes, m.repaints, m.protection
+        );
+    }
     for i in r.incidents.iter().take(5) {
         println!("    {} [{}] {} — {}", i.at, i.severity, i.kind, i.detail);
     }
@@ -572,14 +904,19 @@ fn print_operation(r: &OperationReport, ledger_path: Option<&Path>) {
         d.moves,
         ledger_path.map(|p| format!(" — 원장 {}", p.display())).unwrap_or_default()
     );
-    println!("  {:<24} {:<8} {:>9} {:>9} {:>5} {:>8} {:>8}", "부품", "상태", "수명 사용", "남은 일", "교체", "여유", "최소 여유");
+    println!("  {:<24} {:<8} {:>9} {:>9} {:>14} {:>20} {:>6} {:>5} {:>8} {:>8}", "부품", "상태", "수명 사용", "남은 일", "건강 P50 (범위)", "예측 남은 일 P50 (범위)", "30일", "교체", "여유", "최소 여유");
+    let days = |v: f64| if v > 99_999.0 { "> 10만".to_string() } else { format!("{v:.0}") };
     for row in d.rows.iter() {
+        let pg = r.ledger.component(&row.id).and_then(|c| c.prog.clone());
         println!(
-            "  {:<24} {:<8} {:>8.1}% {:>9} {:>5} {:>8} {:>8}",
+            "  {:<24} {:<8} {:>8.1}% {:>9} {:>14} {:>20} {:>6} {:>5} {:>8} {:>8}",
             row.label,
             row.status_label,
             row.life_used * 100.0,
-            row.rul_days.map(|v| if v > 99_999.0 { "> 10만".into() } else { format!("{v:.0}") }).unwrap_or_else(|| "—".into()),
+            row.rul_days.map(days).unwrap_or_else(|| "—".into()),
+            pg.as_ref().map(|p| format!("{:.0} ({:.0}–{:.0})", p.health[1], p.health[0], p.health[2])).unwrap_or_else(|| "—".into()),
+            pg.as_ref().map(|p| format!("{} ({}–{})", days(p.rul[1]), days(p.rul[0]), days(p.rul[2]))).unwrap_or_else(|| "—".into()),
+            pg.as_ref().map(|p| format!("{:.0}%", p.p_fail[1] * 100.0)).unwrap_or_else(|| "—".into()),
             row.replacements,
             row.margin.map(|v| format!("{v:.2}")).unwrap_or_else(|| "—".into()),
             row.margin_min.map(|v| format!("{v:.2}")).unwrap_or_else(|| "—".into())
@@ -613,6 +950,7 @@ fn cmd_operate(a: &Args, out: &Path) -> Result<(), String> {
         policy,
         incidents: !a.opt.contains_key("no-incidents"),
         fresh: a.opt.contains_key("fresh"),
+        stochastic: !a.opt.contains_key("deterministic"),
     };
     let store = HealthStore::new(&ledger_dir(a));
     let ledger = if cfg.fresh { None } else { store.load(&cfg.asset_id)? };
@@ -710,6 +1048,10 @@ fn cmd_fieldcal(a: &Args, out: &Path) -> Result<(), String> {
                 "motor" => "모터 (제조사 표 vs 열 모델)",
                 "throughput" => "처리량",
                 "durability" => "내구도",
+                "corrosion" => "부식 (실측 첫해 부식 · 차폐 비 · 아연 — ISO 9223 식 확인, 차폐 배수 보정)",
+                "storm" => "폭풍 설계 확인 (KDS 41 12 00 기본풍속 vs 모델 100년 순간풍속)",
+                "availability" => "가용률 (항만 크레인 실적)",
+                "cargo" => "화물 (VGM 계근 · 시험 인양)",
                 _ => "법규 확인",
             });
             println!("  {:<40} {:>10} {:>10} {:>10} {:>9} {:>9}  계수 · 출처", "항목", "실데이터", "보정 전", "보정 뒤", "전 오차", "뒤 오차");
