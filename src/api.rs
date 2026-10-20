@@ -31,29 +31,92 @@ pub struct ModelStatus {
     pub notes: Vec<String>,
 }
 
-/// root 아래에서 경로(root 기준)에 `keyword` 가 들어가고 config.json 과 safetensors 를 가진 폴더를 찾는다 (깊이 4).
-/// 예: `granite-timeseries-ttm-r3/52-16-dec-52-r3/` 는 "ttm" 으로 찾는다.
-pub fn find_model_dir(root: &Path, keyword: &str) -> Option<PathBuf> {
-    fn walk(root: &Path, dir: &Path, kw: &str, depth: usize, out: &mut Vec<PathBuf>) {
+/// 화면 · 설정이 쓰는 모델 키 (modelhub 목록과 같다)
+pub const MODEL_KEYS: [&str; 2] = ["ttm", "laya"];
+
+/// 잠금 밖에서 따로 불러온 모델 하나 — `Models::insert` 로 넣는다
+pub enum LoadedModel {
+    Ttm(Box<dyn SeriesModel + Send + Sync>),
+    Laya(Box<dyn Advisor + Send + Sync>),
+}
+
+/// 모델 폴더 표지 — TTM 은 `config.json`, LAYA 는 Hugging Face 배치 그대로 `encoder/config.json`
+fn has_marker(dir: &Path, keyword: &str) -> bool {
+    match keyword {
+        "laya" => dir.join("encoder").join("config.json").exists(),
+        _ => dir.join("config.json").exists(),
+    }
+}
+
+/// root 아래(root 자신 포함, 깊이 4)에서 경로에 `keyword` 가 들어가고 표지 파일과 safetensors 를 가진 폴더를 찾는다.
+/// 예: `granite-timeseries-ttm-r3/52-16-dec-52-r3/` 는 "ttm", `laya-typed-decisions/` 는 "laya" 로 찾는다.
+/// TTM 이 여러 판이면 문맥 길이가 짧은 판을 앞에 둔다 (근무 이력이 짧아도 쓸 수 있게).
+pub fn find_model_dirs(root: &Path, keyword: &str) -> Vec<PathBuf> {
+    fn walk(base: &Path, dir: &Path, kw: &str, depth: usize, out: &mut Vec<PathBuf>) {
         if depth > 4 {
             return;
         }
         let Ok(rd) = std::fs::read_dir(dir) else { return };
         let mut entries: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).collect();
         entries.sort();
-        let rel = dir.strip_prefix(root).unwrap_or(dir).to_string_lossy().to_ascii_lowercase();
-        let has_cfg = dir.join("config.json").exists();
+        let rel = dir.strip_prefix(base).unwrap_or(dir).to_string_lossy().to_ascii_lowercase();
         let has_st = entries.iter().any(|p| p.extension().map(|x| x == "safetensors").unwrap_or(false));
-        if rel.contains(kw) && has_cfg && has_st {
+        if rel.contains(kw) && has_st && has_marker(dir, kw) {
             out.push(dir.to_path_buf());
         }
         for e in entries.iter().filter(|p| p.is_dir()) {
-            walk(root, e, kw, depth + 1, out);
+            walk(base, e, kw, depth + 1, out);
         }
     }
+    let kw = keyword.to_ascii_lowercase();
     let mut out = Vec::new();
-    walk(root, root, &keyword.to_ascii_lowercase(), 0, &mut out);
-    out.into_iter().next()
+    // root 의 이름도 경로에 넣어 비교한다 (root 가 곧 모델 폴더일 때)
+    walk(root.parent().unwrap_or(root), root, &kw, 0, &mut out);
+    if kw == "ttm" {
+        let ctx = |d: &PathBuf| {
+            std::fs::read_to_string(d.join("config.json"))
+                .ok()
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                .and_then(|v| v.get("context_length").and_then(|x| x.as_u64()))
+                .unwrap_or(u64::MAX)
+        };
+        out.sort_by(|a, b| ctx(a).cmp(&ctx(b)).then(a.cmp(b)));
+    }
+    out
+}
+
+pub fn find_model_dir(root: &Path, keyword: &str) -> Option<PathBuf> {
+    find_model_dirs(root, keyword).into_iter().next()
+}
+
+/// 모델 하나를 불러온다. 돌려주는 글은 화면에 보일 요약이다.
+#[cfg(feature = "ml")]
+pub fn load_model(key: &str, dir: &Path) -> Result<(LoadedModel, String), String> {
+    let device = crate::ml::device();
+    let dev = crate::ml::device_label(&device);
+    match key {
+        "ttm" => {
+            let t = crate::ml::ttm::TtmForecaster::load(dir, &device)?;
+            let detail = format!(
+                "context {} → 예측 {} · 분위 {}개 · {} · {dev}",
+                t.context_length(),
+                t.prediction_length(),
+                t.config.quantile_levels.len(),
+                if t.config.decompose { "추세/잔차 분해형" } else { "단일형" }
+            );
+            Ok((LoadedModel::Ttm(Box::new(t)), detail))
+        }
+        "laya" => {
+            let a = crate::ml::laya::LayaAdvisor::load(dir, &device)?;
+            Ok((LoadedModel::Laya(Box::new(a)), format!("ModernBERT-large 인코더 · 판정 조언 (상향만) · {dev}")))
+        }
+        other => Err(format!("알 수 없는 모델: {other}")),
+    }
+}
+
+#[cfg(not(feature = "ml"))]
+pub fn load_model(_key: &str, _dir: &Path) -> Result<(LoadedModel, String), String> {
+    Err("ml 기능 없이 빌드되어 모델을 불러오지 않습니다".into())
 }
 
 impl Models {
@@ -61,37 +124,63 @@ impl Models {
         Self::default()
     }
 
-    #[cfg(feature = "ml")]
-    pub fn load(root: &Path) -> Self {
-        let mut m = Models::default();
-        let device = crate::ml::device();
-        m.notes.push(format!("장치: {}", crate::ml::device_label(&device)));
-        match find_model_dir(root, "ttm") {
-            Some(dir) => match crate::ml::ttm::TtmForecaster::load(&dir, &device) {
-                Ok(t) => {
-                    m.notes.push(format!("TTM: {}", dir.display()));
-                    m.ttm = Some(Box::new(t));
-                }
-                Err(e) => m.notes.push(format!("TTM 로드 실패: {e}")),
-            },
-            None => m.notes.push("TTM 폴더를 찾지 못했습니다 (이름에 'ttm' 포함, config.json + safetensors)".into()),
+    pub fn is_loaded(&self, key: &str) -> bool {
+        match key {
+            "ttm" => self.ttm.is_some(),
+            "laya" => self.advisor.is_some(),
+            _ => false,
         }
-        match find_model_dir(root, "laya") {
-            Some(dir) => match crate::ml::laya::LayaAdvisor::load(&dir, &device) {
-                Ok(a) => {
-                    m.notes.push(format!("LAYA: {}", dir.display()));
-                    m.advisor = Some(Box::new(a));
-                }
-                Err(e) => m.notes.push(format!("LAYA 로드 실패: {e}")),
-            },
-            None => m.notes.push("LAYA 폴더를 찾지 못했습니다 (이름에 'laya' 포함)".into()),
-        }
-        m
     }
 
-    #[cfg(not(feature = "ml"))]
-    pub fn load(_root: &Path) -> Self {
-        Models { notes: vec!["ml 기능 없이 빌드되어 모델을 불러오지 않습니다".into()], ..Default::default() }
+    pub fn insert(&mut self, m: LoadedModel) {
+        match m {
+            LoadedModel::Ttm(t) => self.ttm = Some(t),
+            LoadedModel::Laya(a) => self.advisor = Some(a),
+        }
+    }
+
+    pub fn unload(&mut self, key: &str) -> bool {
+        let was = self.is_loaded(key);
+        match key {
+            "ttm" => self.ttm = None,
+            "laya" => self.advisor = None,
+            _ => {}
+        }
+        was
+    }
+
+    /// root 아래의 TTM · LAYA 를 모두 불러온다 (CLI `--models`)
+    pub fn load(root: &Path) -> Self {
+        let mut m = Models::default();
+        if !cfg!(feature = "ml") {
+            m.notes.push("ml 기능 없이 빌드되어 모델을 불러오지 않습니다".into());
+            return m;
+        }
+        #[cfg(feature = "ml")]
+        m.notes.push(format!("장치: {}", crate::ml::device_label(&crate::ml::device())));
+        for (key, name, hint) in [("ttm", "TTM", "이름에 'ttm' 포함, config.json + safetensors"), ("laya", "LAYA", "이름에 'laya' 포함, encoder/config.json + safetensors")] {
+            let dirs = find_model_dirs(root, key);
+            if dirs.is_empty() {
+                m.notes.push(format!("{name} 폴더를 찾지 못했습니다 ({hint})"));
+                continue;
+            }
+            let mut last = String::new();
+            for dir in dirs {
+                match load_model(key, &dir) {
+                    Ok((lm, _)) => {
+                        m.notes.push(format!("{name}: {}", dir.display()));
+                        m.insert(lm);
+                        last.clear();
+                        break;
+                    }
+                    Err(e) => last = format!("{name} 로드 실패: {e}"),
+                }
+            }
+            if !last.is_empty() {
+                m.notes.push(last);
+            }
+        }
+        m
     }
 
     pub fn status(&self) -> ModelStatus {
@@ -352,6 +441,15 @@ mod tests {
         // 가중치가 있는 하위 폴더 이름에 ttm 이 없어도 경로로 찾는다
         assert_eq!(find_model_dir(&root, "ttm").as_deref(), Some(d.as_path()));
         assert!(find_model_dir(&root, "laya").is_none());
+        // LAYA 는 Hugging Face 배치 그대로 (루트에 config.json 없이 encoder/config.json)
+        let l = root.join("laya-typed-decisions");
+        std::fs::create_dir_all(l.join("encoder")).unwrap();
+        std::fs::write(l.join("model.safetensors"), "").unwrap();
+        assert!(find_model_dir(&root, "laya").is_none());
+        std::fs::write(l.join("encoder").join("config.json"), "{}").unwrap();
+        assert_eq!(find_model_dir(&root, "laya").as_deref(), Some(l.as_path()));
+        // root 가 곧 모델 폴더여도 찾는다
+        assert_eq!(find_model_dir(&l, "laya").as_deref(), Some(l.as_path()));
         let _ = std::fs::remove_dir_all(&root);
     }
 }

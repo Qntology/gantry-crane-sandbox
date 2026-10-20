@@ -84,11 +84,99 @@ pub struct OperationConfig {
     /// 확률 열화 (참 상태 · 관측 · 예측) — 끄면 원장 물리 모델만 (보정 · 회귀 시험용)
     #[serde(default = "default_true")]
     pub stochastic: bool,
+    /// 날씨 출처 — 없으면 현장 기후로 만든 합성 날씨, 있으면 ERA5 시간별 실제 날씨를 그대로 재생
+    #[serde(default)]
+    pub weather: Option<WeatherSource>,
 }
 
 impl Default for OperationConfig {
     fn default() -> Self {
-        Self { asset_id: "crane-01".into(), days: 30, start_month: None, start_day: None, seed: 1, policy: DecisionPolicy::Recommended, incidents: true, fresh: false, stochastic: true }
+        Self { asset_id: "crane-01".into(), days: 30, start_month: None, start_day: None, seed: 1, policy: DecisionPolicy::Recommended, incidents: true, fresh: false, stochastic: true, weather: None }
+    }
+}
+
+/// ERA5 시간별 날씨 재생 — `data/climate/port_sites.json` 의 위치(기상청 지점 kma_* · 항만)를 고른다.
+/// 시간별 자료는 `weather build` 와 같은 캐시 파일(기상청 지점 [`ports::KMA_HOURLY`] · 항만 [`ports::PORT_HOURLY`])을 쓰고,
+/// 기상청 6개 지점으로 맞춘 보정([`field_constants::era5_adjust`])을 더한다.
+///
+/// [`ports::KMA_HOURLY`]: crate::ports::KMA_HOURLY
+/// [`ports::PORT_HOURLY`]: crate::ports::PORT_HOURLY
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WeatherSource {
+    /// 위치 id (예: kma_busan · busan_newport)
+    pub era5: String,
+    /// 시작 날짜 "YYYY-MM-DD" — 없으면 자료 첫해의 시작 월 · 일 (start_month · start_day), 그것도 없으면 자료 첫날
+    #[serde(default)]
+    pub from: Option<String>,
+    /// true 면 캐시만 쓴다 (없으면 오류). false 면 캐시에 없을 때 Open-Meteo 에서 받아 저장한다
+    #[serde(default)]
+    pub offline: bool,
+    /// 캐시 폴더 — 없으면 `out/weather_cache`
+    #[serde(default)]
+    pub cache_dir: Option<String>,
+}
+
+pub const DEFAULT_WEATHER_CACHE: &str = "out/weather_cache";
+
+impl WeatherSource {
+    /// "era5:<위치>[@YYYY-MM-DD]" 꼴을 읽는다 ("synthetic" 은 None)
+    pub fn parse(s: &str) -> Result<Option<Self>, String> {
+        let s = s.trim();
+        if s.is_empty() || s == "synthetic" {
+            return Ok(None);
+        }
+        let rest = s.strip_prefix("era5:").ok_or_else(|| format!("날씨 출처는 synthetic 또는 era5:<위치>[@YYYY-MM-DD] 입니다: {s}"))?;
+        let (id, from) = match rest.split_once('@') {
+            Some((i, f)) => (i, Some(f.trim().to_string())),
+            None => (rest, None),
+        };
+        if id.trim().is_empty() {
+            return Err("era5: 뒤에 위치 id 가 필요합니다 (crane_demo weather ports)".into());
+        }
+        Ok(Some(Self { era5: id.trim().to_string(), from, offline: false, cache_dir: None }))
+    }
+
+    /// 설명 한 줄 (보고서 메모)
+    pub fn label(&self) -> String {
+        format!("ERA5 재생 {}{}", self.era5, self.from.as_deref().map(|f| format!(" @{f}")).unwrap_or_default())
+    }
+
+    /// 재생 시간별 날씨 `days` 일 + 예보용 앞날(최대 2일, 자료 끝이면 마지막 날을 되풀이)
+    pub fn build(&self, days: u32, start: (Option<u32>, Option<u32>), height_m: f64, alpha: f64, seed: u64) -> Result<(Vec<HourWeather>, String), String> {
+        let site = crate::ports::site(&self.era5).ok_or_else(|| format!("ERA5 위치 '{}' 가 없습니다 (crane_demo weather ports)", self.era5))?;
+        let (h0, _) = crate::ports::hourly_period(&site);
+        let from = match (&self.from, start) {
+            (Some(f), _) => f.clone(),
+            (None, (Some(m), d)) => format!("{}-{:02}-{:02}", &h0[..4], m, d.unwrap_or(1)),
+            (None, _) => h0.to_string(),
+        };
+        if crate::weather_api::ymd(&from).is_none() {
+            return Err(format!("ERA5 시작 날짜는 YYYY-MM-DD 꼴입니다: {from}"));
+        }
+        let mut f = crate::weather_api::Fetcher::new(std::path::Path::new(self.cache_dir.as_deref().unwrap_or(DEFAULT_WEATHER_CACHE)));
+        f.offline = self.offline;
+        let h = crate::ports::hourly(&f, &site).map_err(|e| format!("ERA5 재생 {}: {e}", site.id))?;
+        // 캐시에 실제로 든 기간 (보통 요청 기간 전체)
+        let ymd_of = |t: &(i32, u32, u32, u8)| format!("{:04}-{:02}-{:02}", t.0, t.1, t.2);
+        let span = format!("{} – {}", ymd_of(&h.time[0]), ymd_of(h.time.last().unwrap()));
+        let i0 = h.index_of(&from).ok_or_else(|| format!("ERA5 재생 {}: 시작 날짜 {from} 가 시간별 자료({span}) 밖입니다", site.id))?;
+        // 2월 29일은 재생하지 않으므로 남은 날은 그만큼 짧다
+        let avail = h.time[i0..].iter().filter(|t| crate::weather_api::doy_noleap(t.1, t.2).is_some()).count() / 24;
+        if (days as usize) > avail {
+            return Err(format!("ERA5 재생 {}: {from} 부터 {days} 일은 시간별 자료({span})를 넘습니다 (최대 {avail} 일)", site.id));
+        }
+        let adj = field_constants::era5_adjust();
+        let ahead = (avail - days as usize).min(2) as u32;
+        let mut w = crate::weather_api::replay(&h, i0, days + ahead, height_m, alpha, &adj, seed)?;
+        // 예보 앞날이 자료 끝을 넘으면 마지막 하루를 날짜만 넘겨 되풀이한다 (운영 기간 밖, 예보 창만 채움)
+        while w.len() < (days as usize + 2) * 24 {
+            let mut x = w[w.len() - 24].clone();
+            x.day += 1;
+            x.doy = (x.doy + 1) % 365;
+            w.push(x);
+        }
+        let note = format!("날씨: ERA5 시간별 실제 날씨 재생 — {} ({:.2}, {:.2}) {from} 부터 {days} 일, 보정: {}. {}", site.name, site.lat, site.lon, adj.source, crate::weather_api::ATTRIBUTION);
+        Ok((w, note))
     }
 }
 
@@ -605,7 +693,14 @@ impl OpSim {
             _ => ledger.next_doy,
         };
         let seed = cfg.seed ^ (ledger.runs as u64).wrapping_mul(0x9E37_79B9) ^ (ledger.day as u64).wrapping_mul(0x85EB_CA6B);
-        let w = weather::generate(&climate, &WeatherOptions { start_doy, days: cfg.days + 2, height_m: site.environment.crane_height_m, seed });
+        let (w, start_doy, weather_note) = match &cfg.weather {
+            Some(src) => {
+                let (w, note) = src.build(cfg.days, (cfg.start_month, cfg.start_day), site.environment.crane_height_m, climate.alpha, seed)?;
+                let doy = w[0].doy;
+                (w, doy, Some(note))
+            }
+            None => (weather::generate(&climate, &WeatherOptions { start_doy, days: cfg.days + 2, height_m: site.environment.crane_height_m, seed }), start_doy, None),
+        };
         let outdoor_weather = if site.environment.indoor && site.environment.coastal.is_some() { Some(w.clone()) } else { None };
         let weather: Vec<HourWeather> = if site.environment.indoor {
             w.iter().map(|h| h.indoor(site.environment.indoor_base_c, site.environment.indoor_coupling, site.environment.heat_source_c)).collect()
@@ -690,7 +785,7 @@ impl OpSim {
             risk_n: 0.0,
             next_id: 1,
             queued_changes: Vec::new(),
-            notes: Vec::new(),
+            notes: weather_note.into_iter().collect(),
             finished: false,
             marine,
             outdoor_weather,
@@ -3082,6 +3177,90 @@ mod tests {
 
     fn site(id: &str) -> SitePreset {
         crate::site::builtin().into_iter().find(|p| p.id == id).unwrap_or_else(|| crate::site::builtin().remove(0))
+    }
+
+    /// 시간별 캐시 파일을 작게 만든다 (2023-01-01 부터 `days` 일, 이틀째 낮에 강풍)
+    fn fake_hourly_cache(dir: &std::path::Path, site_id: &str, days: u32) {
+        let site = crate::ports::site(site_id).unwrap();
+        let (h0, h1) = crate::ports::hourly_period(&site);
+        let f = crate::weather_api::Fetcher::new(dir);
+        let mut time = Vec::new();
+        let (mut t, mut rh, mut dew, mut pr, mut sn, mut ws, mut wd, mut gu) = (vec![], vec![], vec![], vec![], vec![], vec![], vec![], vec![]);
+        for d in 0..days {
+            for hr in 0..24 {
+                time.push(format!("2023-01-{:02}T{:02}:00", d + 1, hr));
+                t.push(3.0);
+                rh.push(60.0);
+                dew.push(-4.0);
+                pr.push(0.0);
+                sn.push(0.0);
+                let storm = d == 1 && (10..16).contains(&hr);
+                ws.push(if storm { 22.0 } else { 3.0 });
+                wd.push(315.0);
+                gu.push(if storm { 32.0 } else { 6.0 });
+            }
+        }
+        let v = serde_json::json!({
+            "latitude": site.lat, "longitude": site.lon, "elevation": 5.0, "timezone": "Asia/Seoul",
+            "hourly": { "time": time, "temperature_2m": t, "relative_humidity_2m": rh, "dew_point_2m": dew, "precipitation": pr,
+                        "snowfall": sn, "wind_speed_10m": ws, "wind_direction_10m": wd, "wind_gusts_10m": gu }
+        });
+        let path = f.cache_path("hourly-era5", site.lat, site.lon, h0, h1);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, v.to_string()).unwrap();
+    }
+
+    #[test]
+    fn era5_replay_feeds_operation_and_errors_when_short() {
+        let dir = std::env::temp_dir().join(format!("crane_era5_replay_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        fake_hourly_cache(&dir, "busan_newport", 3);
+        let src = |from: Option<&str>| WeatherSource { era5: "busan_newport".into(), from: from.map(String::from), offline: true, cache_dir: Some(dir.to_string_lossy().into_owned()) };
+        let cfg = |days, w| OperationConfig { asset_id: "t".into(), days, seed: 2, incidents: false, weather: Some(w), ..Default::default() };
+
+        let mut sim = OpSim::new(site("busan_newport_rmg"), cfg(2, src(Some("2023-01-01"))), None).unwrap();
+        // 재생 값 + 기상청 보정 (기온 +0.56 °C) · 크레인 높이 풍속 · 이틀째 강풍
+        let adj = field_constants::era5_adjust();
+        assert!((sim.weather[0].temp_c - (3.0 + adj.temp_offset_c)).abs() < 1e-9);
+        assert_eq!(sim.weather[0].doy, 0);
+        assert!(sim.weather[24 + 12].wind_mean_mps > 22.0 && sim.weather[12].wind_mean_mps < 5.0);
+        // 2일 + 예보 앞날 1일 (자료 끝) → 마지막 날을 되풀이해 2일을 채운다
+        assert_eq!(sim.weather.len(), 4 * 24);
+        let r = run_to_end(&mut sim);
+        assert!(r.finished);
+        assert_eq!(r.daily.len(), 2);
+        assert_eq!(r.start_date, weather::date_label(0));
+        assert!(r.notes.iter().any(|n| n.contains("ERA5")), "{:?}", r.notes);
+        // 강풍 시간에는 멈춘다: 이튿날 운전 시간이 첫날보다 짧다
+        assert!(r.daily[1].op_h < r.daily[0].op_h && r.daily[1].max_gust_mps > 30.0, "{:?}", r.daily);
+
+        // 시작 월 · 일만 주면 자료 첫해의 그날
+        let sim = OpSim::new(site("busan_newport_rmg"), OperationConfig { start_month: Some(1), start_day: Some(2), ..cfg(1, src(None)) }, None).unwrap();
+        assert_eq!(sim.weather[0].doy, 1);
+
+        // 자료보다 긴 기간 · 기간 밖 시작 · 캐시 없음(오프라인)은 분명한 오류
+        let e = OpSim::new(site("busan_newport_rmg"), cfg(4, src(Some("2023-01-01"))), None).err().unwrap();
+        assert!(e.contains("최대 3 일"), "{e}");
+        let e = OpSim::new(site("busan_newport_rmg"), cfg(1, src(Some("2021-06-01"))), None).err().unwrap();
+        assert!(e.contains("밖"), "{e}");
+        let e = OpSim::new(site("busan_newport_rmg"), cfg(1, WeatherSource { era5: "gwangyang".into(), ..src(None) }), None).err().unwrap();
+        assert!(e.contains("캐시에 없음"), "{e}");
+        let e = OpSim::new(site("busan_newport_rmg"), cfg(1, WeatherSource { era5: "nowhere".into(), ..src(None) }), None).err().unwrap();
+        assert!(e.contains("nowhere"), "{e}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn weather_source_parses_cli_form() {
+        assert_eq!(WeatherSource::parse("synthetic").unwrap(), None);
+        let w = WeatherSource::parse("era5:kma_busan@2022-07-01").unwrap().unwrap();
+        assert_eq!((w.era5.as_str(), w.from.as_deref()), ("kma_busan", Some("2022-07-01")));
+        assert_eq!(WeatherSource::parse("era5:hamburg").unwrap().unwrap().from, None);
+        assert!(WeatherSource::parse("kma:busan").is_err());
+        assert!(WeatherSource::parse("era5:").is_err());
+        // 옛 설정(날씨 칸 없음)은 합성 날씨
+        let c: OperationConfig = serde_json::from_str(r#"{"asset_id":"a","days":3}"#).unwrap();
+        assert!(c.weather.is_none());
     }
 
     #[test]

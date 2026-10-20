@@ -59,7 +59,7 @@ pub struct DoseSeries {
 
 /// 현장 운영을 `days` 일 돌려 부품별 하루 물리 소비를 모은다 (결정은 권장, 사고 뽑기 없음)
 pub fn collect(site: &SitePreset, days: u32, seed: u64) -> Result<DoseSeries, String> {
-    let cfg = OperationConfig { asset_id: format!("bt-{}", site.id), days, start_month: Some(1), start_day: Some(1), seed, policy: DecisionPolicy::Recommended, incidents: false, fresh: true, stochastic: false };
+    let cfg = OperationConfig { asset_id: format!("bt-{}", site.id), days, start_month: Some(1), start_day: Some(1), seed, policy: DecisionPolicy::Recommended, incidents: false, fresh: true, stochastic: false, weather: None };
     let mut sim = OpSim::new(site.clone(), cfg, None)?;
     let spec = site.spec()?;
     let prot = site.environment.protection()?;

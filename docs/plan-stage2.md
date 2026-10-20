@@ -36,8 +36,8 @@
 낮을 수 있어 신뢰도 low).
 
 **하지 않은 것 · 다음**
-- ERA5 시간 날씨를 운영 시뮬레이션에 그대로 재생하는 모드(`operate --weather`)는 변환 함수(`weather_api::replay`)만 있고 CLI 연결은
-  하지 않았다 — 지금은 ERA5 통계로 만든 항만 기후로 합성한다.
+- [x] ERA5 시간 날씨를 운영 시뮬레이션에 그대로 재생하는 모드 — `operate --weather era5:<위치>[@YYYY-MM-DD] [--offline]`,
+  `op_start` 설정 `weather`, 화면 '날씨' 선택 (marine-and-prognostics.md 1절). 기본은 여전히 항만 기후 합성.
 - 실제 점검 기록 · 부식 쿠폰 · 항만 크레인 교체 기록이 생기면 같은 절차(`fieldcal` · `prognostics`)로 다시 맞춘다.
 
 ## 진행 기록 · 일시정지 메모 (2026-10-20, 재개 전 상태 — 기록으로 남김)
@@ -151,7 +151,8 @@
 
 ### P2 날씨 API · 국가별 해안 위치
 - [x] `weather_api`: Open-Meteo 보관(ERA5) 시간별 기온 · 습도 · 이슬점 · 바람 · 돌풍 · 강수 · 눈, CAMS SO₂, 파고 조회 (curl, 키 없음) · 캐시
-- [~] 시간별 실제 날씨 → `HourWeather` 변환 (`replay`, 안개 · 결빙 · 낙뢰는 규칙으로 추정) — 운영 시뮬레이션 재생 모드 CLI 는 다음
+- [x] 시간별 실제 날씨 → `HourWeather` 변환 (`replay`, 안개 · 결빙 · 낙뢰는 규칙으로 추정) → 운영 시뮬레이션 재생 모드
+  (`operate --weather era5:<위치>[@YYYY-MM-DD]`, 캐시 먼저 · 자료 기간을 넘으면 오류)
 - [x] ERA5 → 월 평년값 · 폭풍 통계 → `Climate` (합성 날씨용)
 - [x] 세계 항만 기후 묶음: 기상청 6곳 + 항만 14곳 (`data/climate/ports.json`, 오프라인 동작)
 - [x] 교차검증: 기상청 6개 지점 평년값 vs ERA5, 지점 하나씩 빼고 맞춘 보정의 오차 (`crane_demo weather check`, `era5cal`)

@@ -28,6 +28,11 @@ pub fn device() -> Device {
         .clone()
 }
 
+/// 이미 정해진 공용 장치의 이름 (아직 정하지 않았으면 None — 상태 조회가 GPU 초기화를 일으키지 않도록)
+pub fn device_label_if_ready() -> Option<String> {
+    DEVICE.get().map(device_label)
+}
+
 /// 빌드된 백엔드 feature 순서(cuda → rocm → vulkan)대로 GPU 장치를 시도합니다.
 /// `CRANE_DEVICE=cuda|rocm|vulkan` 으로 특정 백엔드를 강제할 수 있습니다.
 pub fn new_gpu_device(id: usize) -> Option<Device> {

@@ -5,335 +5,937 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gantry Crane Sandbox</title>
 <style>
+/* 디자인 토큰 — endmill-sandbox 와 같은 무채색(zinc) 단계. 색은 상태(정상·주의·위험)와 데이터 표시에만 남긴다.
+   캔버스도 이 토큰을 읽는다(UI 객체). */
 :root {
-  --bg: #0f1216; --bg-panel: #161b22; --bg-raise: #1d242d; --bg-plot: #11161c;
-  --line: #2a323d; --plot-grid: #222a33; --plot-grid-strong: #313b47;
-  --text: #e6e9ee; --text-dim: #a7b0bc; --text-muted: #77818e;
-  --accent: #4aa3ff; --violet: #b18cff; --teal: #3fc9b0; --amber: #f2b35a;
-  --danger: #ff6b6b; --warning: #f2b35a; --success: #57c27a;
-  --font-sans: "Pretendard", "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Consolas", ui-monospace, monospace;
+  color-scheme: dark;
+  --bg-darkest: #09090b;
+  --bg-dark: #0c0c0e;
+  --bg-panel: #111113;
+  --bg-card: #161618;
+  --bg-input: #0d0d0f;
+  --bg-hover: #1b1b1e;
+  --bg-active: #232326;
+  --bg-active-hover: #2b2b2f;
+  --bg-plot: #060607;
+  --plot-grid: #18181b;
+  --plot-grid-strong: #27272a;
+  --border: #1d1d20;
+  --border-cell: #232326;
+  --border-light: #2b2b2f;
+  --border-strong: #3a3a3f;
+  --border-hover: #4a4a50;
+  --accent: #d4d4d8;
+  --accent-strong: #71717a;
+  --accent-glow: rgba(255, 255, 255, 0.07);
+  --signal: #a1a1aa;
+  --text-bright: #fafafa;
+  --text: #d4d4d8;
+  --text-dim: #a1a1aa;
+  --text-muted: #71717a;
+  --danger: #e06c6c;
+  --alert: #d9924f;
+  --warning: #d6b65e;
+  --success: #5fb98c;
+  --violet: #a08fd6;
+  --font-sans: 'Inter', 'Pretendard', 'Segoe UI Variable Text', 'Segoe UI', 'Malgun Gothic', 'Noto Sans KR', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Geist Mono', 'Cascadia Mono', 'Consolas', monospace;
+  --radius-card: 10px;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --track-caps: 0.1em;
+  --panel-header-h: 36px;
+  --statusbar-h: 28px;
+  --rail-w: 56px;
+  --bar-h: 38px;
+  --left-w: 300px;
+  --right-w: 330px;
+  --bottom-h: 300px;
+  --resizer-size: 8px;
+  --panel-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-* { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font-sans); }
-header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--bg-panel); }
-header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; }
-header .src { color: var(--text-muted); font-size: 12px; }
-header .spacer { flex: 1; }
-.layout { display: grid; grid-template-columns: 280px 1fr; height: calc(100% - 43px); }
-aside { border-right: 1px solid var(--line); background: var(--bg-panel); padding: 12px; overflow: auto; }
-main { overflow: auto; padding: 12px; display: grid; grid-template-rows: auto auto 1fr; gap: 12px; min-width: 0; }
-fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 8px 10px 10px; }
-legend { color: var(--text-dim); padding: 0 4px; font-size: 12px; }
-label { display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 6px; margin: 6px 0; color: var(--text-dim); }
-input, select { width: 100%; background: var(--bg-raise); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; }
-button { background: var(--bg-raise); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #06111e; font-weight: 600; }
-button:disabled { opacity: .5; cursor: default; }
-.btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
-.card { background: var(--bg-panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-width: 0; }
-.card h2 { margin: 0 0 8px; font-size: 13px; color: var(--text-dim); font-weight: 600; }
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.kpi { background: var(--bg-panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
-.kpi .v { font: 600 18px var(--font-mono); }
-.kpi .k { color: var(--text-muted); font-size: 12px; }
-.kpi.bad .v { color: var(--danger); } .kpi.warn .v { color: var(--warning); } .kpi.good .v { color: var(--success); }
-.view { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; }
-canvas { width: 100%; display: block; background: var(--bg-plot); border-radius: 8px; }
-#scene { height: 380px; cursor: grab; }
-.play { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-.play input[type=range] { flex: 1; }
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 10px; flex-wrap: wrap; }
-.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-dim); }
-.tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
-.tab { display: none; } .tab.on { display: block; }
-.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
-.charts canvas { height: 220px; }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { color: var(--text-muted); font-weight: 500; }
-td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
-.sev { display: inline-block; min-width: 38px; text-align: center; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
-.sev0 { background: #1d3a28; color: var(--success); } .sev1 { background: #3b3020; color: var(--warning); }
-.sev2 { background: #45241f; color: #ff9b7a; } .sev3 { background: #551d24; color: var(--danger); }
-.choice { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
-.choice button.rec { border-color: var(--accent); }
-.choice button.chosen { background: var(--accent); color: #06111e; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  background: var(--bg-darkest);
+  color: var(--text);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) var(--statusbar-h);
+  -webkit-font-smoothing: antialiased;
+}
+button, select, input { font-family: inherit; }
+strong, b { font-weight: 600; color: var(--text-bright); }
+.hidden { display: none !important; }
+
+/* ── 레이아웃: 바탕 위에 떠 있는 카드 + 간격이 곧 리사이저 ─────────── */
+.app-layout {
+  display: grid;
+  grid-template-columns: var(--left-w) var(--resizer-size) minmax(0, 1fr) var(--resizer-size) var(--right-w);
+  grid-template-rows: minmax(0, 1fr) var(--resizer-size) var(--bottom-h);
+  width: 100%; height: 100%;
+  padding: var(--resizer-size);
+  overflow: hidden;
+  min-height: 0;
+}
+.app-layout > .panel-left, .app-layout > .panel-center, .app-layout > .panel-right, .app-layout > .panel-bottom {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  position: relative;
+}
+.app-layout > .panel-left { grid-row: 1 / -1; grid-column: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.app-layout > .panel-center { grid-row: 1; grid-column: 3; min-width: 200px; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.app-layout > .panel-right { grid-row: 1; grid-column: 5; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.app-layout > .panel-bottom { grid-row: 3; grid-column: 3 / -1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+/* 사이클 해석 밖의 화면(현장 운영 · 염해 · 보정 · 설정)은 가운데가 오른쪽 · 아래까지 채운다 */
+.app-layout:not([data-view="cycle"]) > .panel-right,
+.app-layout:not([data-view="cycle"]) > .panel-bottom,
+.app-layout:not([data-view="cycle"]) > .resizer-v.right,
+.app-layout:not([data-view="cycle"]) > .resizer-h { display: none; }
+.app-layout:not([data-view="cycle"]) > .panel-center { grid-column: 3 / -1; grid-row: 1 / -1; }
+
+.resizer { background: transparent; position: relative; z-index: 10; }
+.resizer::after { content: ''; position: absolute; border-radius: 2px; background: transparent; transition: background 0.15s; }
+.resizer:hover::after, .resizer.active::after { background: var(--border-hover); }
+.resizer-v { grid-row: 1; cursor: col-resize; }
+.resizer-v::after { top: 14px; bottom: 14px; left: 50%; width: 2px; transform: translateX(-50%); }
+.resizer-v.left { grid-row: 1 / -1; grid-column: 2; }
+.resizer-v.right { grid-column: 4; }
+.resizer-h { grid-row: 2; grid-column: 3 / -1; cursor: row-resize; }
+.resizer-h::after { left: 14px; right: 14px; top: 50%; height: 2px; transform: translateY(-50%); }
+
+/* 오른쪽은 접으면 열과 간격을 비우고, 다시 열기는 가운데 툴바 끝(.vt-reopen). 아래는 머리글 한 줄이 남는다. */
+.app-layout:has(.panel-right.collapsed) { grid-template-columns: var(--left-w) var(--resizer-size) minmax(0, 1fr) 0 0; }
+.app-layout > .panel-right.collapsed, .app-layout:has(.panel-right.collapsed) .resizer-v.right { display: none; }
+.panel-bottom.collapsed { min-height: 0 !important; }
+.panel-bottom.collapsed #secOutput { display: none !important; }
+.panel-left.collapsed { min-width: 0 !important; }
+.panel-left.collapsed .brand, .panel-left.collapsed .menu-btn span, .panel-left.collapsed .group-label,
+.panel-left.collapsed .sec-name, .panel-left.collapsed .step-sum, .panel-left.collapsed .chevron,
+.panel-left.collapsed .panel-section-body, .panel-left.collapsed .help { display: none !important; }
+.panel-left.collapsed .sidebar-head { justify-content: center; padding: 0; }
+.panel-left.collapsed .menu-group { padding: 10px 7px; }
+.panel-left.collapsed .menu-btn { justify-content: center; padding: 10px 0; }
+.panel-left.collapsed .panel-section-header { justify-content: center; padding: 0; border-top-color: transparent; }
+.app-layout:has(.panel-left.collapsed) .resizer-v.left, .app-layout:has(.panel-bottom.collapsed) .resizer-h { pointer-events: none; }
+.vt-btn.vt-reopen { display: none; }
+.app-layout:has(.panel-right.collapsed) .vt-btn.vt-reopen { display: inline-flex; }
+
+.panel-toggle-btn {
+  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px;
+  border: 1px solid var(--border-light); background: var(--bg-card); color: var(--text-dim);
+  font-size: 10px; cursor: pointer; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center; z-index: 20;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.panel-toggle-btn:hover { background: var(--bg-active); border-color: var(--border-hover); color: var(--text-bright); }
+.panel-bottom > .panel-toggle-btn { top: 5px; }
+
+/* ── 사이드바 머리 · 화면 전환 ─────────────────────────────────── */
+.sidebar-head { display: flex; align-items: center; gap: 10px; flex-shrink: 0; height: 52px; padding: 0 12px; border-bottom: 1px solid var(--border); }
+.sidebar-head .panel-toggle-btn { position: static; flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; }
+.brand { min-width: 0; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-group { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; }
+.menu-btn {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px;
+  background: transparent; border: none; border-radius: 8px; color: var(--text-dim);
+  font-size: 0.78rem; font-weight: 500; text-align: left; white-space: nowrap; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.menu-btn svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.menu-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+.menu-btn.active { background: var(--bg-active); color: var(--text-bright); }
+.menu-btn .menu-badge { margin-left: auto; font-family: var(--font-mono); font-size: 0.58rem; color: var(--warning); }
+.group-label { margin: 0 14px; padding: 12px 0 6px; border-top: 1px solid var(--border); font-size: 0.6rem; font-weight: 600; letter-spacing: var(--track-caps); color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.panel-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex-shrink: 0; padding: 12px 40px 11px 14px; border-bottom: 1px solid var(--border-light); white-space: nowrap; overflow: hidden; }
+.panel-title b { font-size: 0.76rem; font-weight: 600; letter-spacing: 0.06em; color: var(--text-bright); }
+.panel-title small { font-size: 0.64rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+.panel-scroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+
+/* ── 패널 섹션(아코디언) ─────────────────────── */
+.panel-section-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: var(--panel-header-h); padding: 0 12px 0 14px; border-top: 1px solid var(--border);
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-bright);
+  cursor: pointer; user-select: none; transition: background 0.15s; flex-shrink: 0;
+}
+.panel-section-header:hover { background: var(--bg-hover); }
+.panel-bottom > .panel-section-header { padding-right: 40px; border-top: none; }
+.panel-bottom > .panel-section-header .chevron { display: none; }
+.sec-title { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.step-no {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 18px; height: 18px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 0.6rem; font-weight: 600; letter-spacing: 0; color: var(--text-dim);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.panel-section-header:not(.collapsed) .step-no { border-color: var(--border-hover); background: var(--bg-active); color: var(--text-bright); }
+.step-no.sec-icon svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.step-sum { flex: 1; min-width: 0; text-align: right; font-size: 0.64rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chevron { flex-shrink: 0; transition: transform var(--panel-transition); font-size: 8px; color: var(--text-muted); }
+.panel-section-header.collapsed .chevron { transform: rotate(-90deg); }
+.panel-section-body { overflow: hidden; padding: 2px 14px 14px; }
+.panel-section-body.collapsed { display: none; }
+
+/* 영역 설명 ? 와 툴팁 */
+.help {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 15px; height: 15px; margin-left: 6px;
+  border: 1px solid var(--border-strong); border-radius: 50%; color: var(--text-muted);
+  font-family: var(--font-sans); font-size: 9px; font-weight: 600; line-height: 1; letter-spacing: 0; text-transform: none;
+  cursor: help; vertical-align: middle; transition: color 0.15s, border-color 0.15s;
+}
+.help:hover, .help:focus-visible { color: var(--text-bright); border-color: var(--border-hover); outline: none; }
+.sec-title .help { margin-left: 0; }
+.tip-pop {
+  position: fixed; z-index: 1000; max-width: 320px; padding: 9px 11px; background: #1c1c1f;
+  border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  color: var(--text); font-size: 0.7rem; line-height: 1.6; white-space: pre-line; pointer-events: none;
+  opacity: 0; transform: translateY(2px); transition: opacity 0.12s, transform 0.12s;
+}
+.tip-pop.show { opacity: 1; transform: none; }
+.tip-pop b { display: block; margin-bottom: 3px; color: var(--text-bright); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--border-strong); }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── 폼 컨트롤 공통 ─────────────────────────────────────────── */
+select, input[type=text], input[type=number], input[type=password], input[type=date] {
+  min-height: 28px; padding: 0 8px; background: var(--bg-input); border: 1px solid var(--border-light);
+  border-radius: var(--radius); color: var(--text); font-size: 0.74rem; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s; min-width: 0;
+}
+input[type=number] { font-family: var(--font-mono); font-size: 0.72rem; }
+input[type=date] { font-family: var(--font-mono); font-size: 0.7rem; color-scheme: dark; }
+select {
+  appearance: none; padding-right: 24px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23696d73' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; background-size: 9px 6px;
+}
+select:hover, input[type=text]:hover, input[type=number]:hover, input[type=password]:hover, input[type=date]:hover { border-color: var(--border-strong); }
+select:focus, input[type=text]:focus, input[type=number]:focus, input[type=password]:focus, input[type=date]:focus { border-color: var(--border-hover); box-shadow: 0 0 0 3px var(--accent-glow); }
+input::placeholder { color: var(--text-muted); }
+input[type=checkbox] {
+  appearance: none; display: inline-grid; place-content: center; flex-shrink: 0; width: 14px; height: 14px; margin: 0;
+  background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 3px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+input[type=checkbox]::after { content: ''; width: 7px; height: 4px; border: solid var(--bg-darkest); border-width: 0 0 1.5px 1.5px; transform: translateY(-1px) rotate(-45deg) scale(0); transition: transform 0.12s; }
+input[type=checkbox]:hover { border-color: var(--text-muted); }
+input[type=checkbox]:checked { background: var(--text-bright); border-color: var(--text-bright); }
+input[type=checkbox]:checked::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
+input[type=checkbox]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); }
+input[type=range] { accent-color: var(--signal); cursor: pointer; }
+input[type=file] { font-size: 0.7rem; color: var(--text-dim); max-width: 100%; }
+input[type=file]::file-selector-button { margin-right: 10px; padding: 5px 10px; background: transparent; border: 1px solid var(--border-light); border-radius: var(--radius); color: var(--text); font: inherit; cursor: pointer; }
+input[type=file]::file-selector-button:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+
+.form-group { margin-bottom: 10px; min-width: 0; }
+.form-group label { display: block; font-size: 0.64rem; font-weight: 500; letter-spacing: 0.03em; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.form-group select, .form-group input:not([type=checkbox]) { width: 100%; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+.form-grid .span-2 { grid-column: 1 / -1; }
+.ct-sec { font-size: 0.6rem; font-weight: 600; letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--text-muted); margin: 14px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+.ct-sec:first-child { margin-top: 4px; }
+.ct-sec-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ct-check { font-size: 0.7rem; color: var(--text-dim); display: flex; align-items: center; gap: 7px; margin-bottom: 8px; cursor: pointer; }
+.st-note { font-size: 0.68rem; color: var(--text-dim); line-height: 1.65; margin-top: 8px; }
+.st-note b { color: var(--text-bright); }
 .muted { color: var(--text-muted); }
-.note { color: var(--text-dim); font-size: 12px; margin: 4px 0; }
-.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-.legend i { display: inline-block; width: 10px; height: 3px; margin-right: 4px; vertical-align: middle; }
-#drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; text-align: center; color: var(--text-muted); }
-.empty { color: var(--text-muted); padding: 30px; text-align: center; }
-details.ed { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; margin: 8px 0; }
-details.ed summary { cursor: pointer; color: var(--text-dim); font-size: 12px; padding: 4px 0; }
-details.ed h3 { font-size: 11px; color: var(--text-muted); margin: 10px 0 2px; font-weight: 600; letter-spacing: .3px; }
-label.chk { grid-template-columns: 1fr auto; }
-label.chk input { width: auto; }
-.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
-.feed { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
-.feed .it { padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.note { font-size: 0.7rem; color: var(--text-dim); line-height: 1.6; }
+.btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+.btn-block { display: flex; width: 100%; margin: 4px 0 10px; }
+.link-btn { padding: 0; margin: 2px 0; background: none; border: none; color: var(--text-dim); font-size: 0.66rem; font-weight: 500; cursor: pointer; }
+.link-btn:hover { color: var(--text-bright); text-decoration: underline; }
+.sub-block { margin-top: 12px; border: 1px solid var(--border-cell); border-radius: 8px; background: var(--bg-dark); }
+.sub-block > summary { list-style: none; padding: 8px 10px; font-size: 0.7rem; font-weight: 500; color: var(--text); cursor: pointer; user-select: none; border-radius: 8px; }
+.sub-block > summary::-webkit-details-marker { display: none; }
+.sub-block > summary:hover { background: var(--bg-hover); color: var(--text-bright); }
+.sub-block[open] > summary { border-bottom: 1px solid var(--border-cell); border-radius: 8px 8px 0 0; }
+.sub-body { padding: 4px 10px 12px; }
+.ctx-box { background: var(--bg-card); border: 1px solid var(--border-cell); border-radius: 8px; padding: 8px 10px; font-size: 0.68rem; color: var(--text-dim); margin-bottom: 10px; line-height: 1.6; }
+.ctx-box:empty { display: none; }
+.ctx-box b { color: var(--text-bright); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 30px; padding: 5px 14px;
+  background: var(--bg-active); color: var(--text-bright); border: 1px solid var(--border-strong); border-radius: var(--radius);
+  font-weight: 600; font-size: 0.74rem; line-height: 1.25; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:hover { background: var(--bg-active-hover); border-color: var(--border-hover); }
+.btn:active { filter: brightness(0.92); }
+.btn:disabled { opacity: 0.4; cursor: default; filter: none; }
+.btn-outline { background: transparent; border: 1px solid var(--border-light); color: var(--text); }
+.btn-outline:hover { background: var(--bg-hover); border-color: var(--border-strong); color: var(--text-bright); }
+.btn-sm { min-height: 26px; padding: 4px 10px; font-size: 0.7rem; font-weight: 500; }
+.btn-danger { background: rgba(223, 79, 80, 0.12); border-color: rgba(223, 79, 80, 0.45); color: #f08d8e; }
+.btn-danger:hover { background: rgba(223, 79, 80, 0.24); border-color: var(--danger); color: #fff; }
+
+.drop-zone { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; border: 1px dashed var(--border-strong); border-radius: var(--radius); color: var(--text-dim); font-size: 0.68rem; line-height: 1.6; text-align: center; transition: background 0.15s, border-color 0.15s; }
+.drop-zone.over { background: var(--bg-hover); border-color: var(--border-hover); color: var(--text-bright); }
+.progress { height: 6px; background: var(--bg-darkest); border: 1px solid var(--border-cell); border-radius: 999px; overflow: hidden; margin: 8px 0 4px; }
+.progress > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent-strong), var(--signal)); transition: width 0.3s; }
+
+/* ── 뷰포트 ─────────────────────────────────────────────────── */
+.viewport-toolbar { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--bg-panel); border-bottom: 1px solid var(--border); flex-shrink: 0; border-radius: var(--radius-card) var(--radius-card) 0 0; }
+.vt-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 28px; }
+.vt-label { font-size: 0.6rem; font-weight: 600; letter-spacing: var(--track-caps); color: var(--text-muted); }
+.vt-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 26px; padding: 0 10px;
+  background: transparent; border: 1px solid var(--border-light); border-radius: var(--radius); color: var(--text-dim);
+  font-size: 0.7rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.vt-btn:hover { background: var(--bg-hover); border-color: var(--border-strong); color: var(--text-bright); }
+.vt-btn.active { background: var(--bg-active); border-color: var(--border-strong); color: var(--text-bright); }
+.vt-btn:disabled { opacity: 0.4; cursor: default; background: transparent; border-color: var(--border-light); color: var(--text-dim); }
+.vt-btn.vt-primary { background: var(--bg-active); border-color: var(--border-hover); color: var(--text-bright); min-width: 76px; }
+.vt-btn.vt-primary:hover { background: var(--bg-active-hover); }
+.vt-sep { width: 1px; height: 18px; margin: 0 2px; background: var(--border-light); }
+.vt-push { margin-left: auto; }
+.vt-info { margin-left: auto; font-size: 0.64rem; color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.viewport-toolbar select { min-height: 26px; font-size: 0.7rem; }
+.viewport-toolbar input[type=range] { width: 140px; }
+.vt-time { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text); min-width: 112px; padding: 4px 9px; background: var(--bg-card); border: 1px solid var(--border-cell); border-radius: var(--radius); text-align: center; font-variant-numeric: tabular-nums; }
+.viewport-canvas-wrap { flex: 1; position: relative; overflow: hidden; background: var(--bg-plot); min-height: 0; border-radius: 0 0 var(--radius-card) var(--radius-card); }
+.viewport-canvas-wrap canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+.vp-hud { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 7; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; flex-wrap: wrap; }
+.vp-hud > div { pointer-events: auto; cursor: help; display: flex; align-items: center; background: rgba(17, 17, 19, 0.84); backdrop-filter: blur(6px); border: 1px solid var(--border-light); border-radius: 8px; }
+.status-indicators { gap: 8px; padding: 6px 11px; }
+.status-text { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.08em; color: var(--text-dim); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(95, 185, 140, 0.16); }
+.status-dot.idle { background: var(--warning); box-shadow: 0 0 0 3px rgba(214, 182, 94, 0.16); }
+.status-dot.error { background: var(--danger); box-shadow: 0 0 0 3px rgba(224, 108, 108, 0.18); }
+.dro-display { gap: 14px; padding: 6px 12px; flex-wrap: wrap; }
+.dro-item { display: flex; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-size: 0.72rem; }
+.dro-label { color: var(--text-muted); font-family: var(--font-sans); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.dro-value { color: var(--text-bright); font-weight: 500; font-variant-numeric: tabular-nums; }
+.viewport-hint { position: absolute; bottom: 10px; left: 12px; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.02em; color: var(--text-muted); pointer-events: none; }
+.vp-legend { position: absolute; right: 10px; bottom: 10px; background: rgba(17, 17, 19, 0.86); backdrop-filter: blur(6px); border: 1px solid var(--border-light); border-radius: 8px; padding: 7px 10px; font-size: 0.64rem; color: var(--text-dim); pointer-events: none; z-index: 6; line-height: 1.7; }
+.vp-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.vp-busy { position: absolute; left: 50%; top: 54px; transform: translateX(-50%); z-index: 8; max-width: calc(100% - 24px); background: rgba(17, 17, 19, 0.9); backdrop-filter: blur(6px); border: 1px solid var(--border-light); border-radius: 999px; padding: 4px 12px; font-family: var(--font-mono); font-size: 0.64rem; color: var(--warning); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vp-busy:hover { border-color: var(--border-hover); }
+.vp-empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--text-muted); font-size: 0.74rem; line-height: 1.8; pointer-events: none; }
+.vp-empty b { display: block; font-size: 0.7rem; letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+
+/* ── 오른쪽 요약 · 판정 ─────────────────────────────────────── */
+.summary-block { padding: 12px 14px 4px; }
+.spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.spec-item { background: var(--bg-card); border: 1px solid var(--border-cell); padding: 7px 9px; border-radius: var(--radius); min-width: 0; }
+.spec-item.wide { grid-column: 1 / -1; }
+.spec-item .label { font-size: 0.58rem; font-weight: 600; letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--text-muted); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spec-item .value { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 500; color: var(--text-bright); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spec-item.good .value { color: var(--success); } .spec-item.warn .value { color: var(--warning); } .spec-item.bad .value { color: var(--danger); }
+.empty { color: var(--text-muted); font-size: 0.7rem; padding: 14px 4px; text-align: center; }
+.result-row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 0.72rem; }
+.result-row:last-child { border-bottom: none; }
+.result-row .rlabel { color: var(--text-dim); }
+.result-row .rvalue { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500; color: var(--text-bright); text-align: right; }
+
+/* 선택 카드 — 안전 게이트가 허용한 선택지만 고를 수 있고(권장이 맨 앞) LAYA 확률은 고르는 근거로만 붙는다 */
+.choice-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: var(--radius-card); padding: 12px 14px; margin-bottom: 10px; outline: none; }
+.choice-card.attention { border-color: var(--alert); }
+.choice-card.stop { border-color: var(--danger); }
+.choice-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.choice-tag { font-size: 0.58rem; font-weight: 600; letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--text-muted); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 2px 6px; }
+.choice-meta { font-size: 0.66rem; color: var(--text-dim); }
+.choice-final { font-size: 0.92rem; font-weight: 600; color: var(--text-bright); }
+.choice-q { font-size: 0.84rem; font-weight: 600; color: var(--text-bright); line-height: 1.5; margin: 4px 0; }
+.choice-why { font-size: 0.68rem; color: var(--alert); margin: 2px 0 8px; display: flex; flex-direction: column; gap: 2px; line-height: 1.5; }
+.choice-why:empty { display: none; }
+.choice-reasons { font-size: 0.68rem; color: var(--text-dim); margin: 4px 0 8px 16px; line-height: 1.6; }
+.choice-opts { display: flex; flex-direction: column; gap: 6px; }
+.choice-opt { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; text-align: left; background: var(--bg-input); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 8px 10px; color: var(--text); font: inherit; cursor: pointer; transition: border-color 0.12s, background 0.12s; }
+.choice-opt:hover:not(:disabled), .choice-opt:focus-visible { border-color: var(--border-hover); background: var(--bg-hover); outline: none; }
+.choice-opt.rec { border-color: var(--accent-strong); }
+.choice-opt.chosen { border-color: var(--success); }
+.choice-opt:disabled { opacity: 0.5; cursor: not-allowed; }
+.choice-num { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); border: 1px solid var(--border-light); border-radius: var(--radius-sm); text-align: center; line-height: 18px; }
+.choice-opt:disabled .choice-num { color: var(--danger); }
+.choice-label { font-size: 0.76rem; font-weight: 600; color: var(--text-bright); }
+.choice-detail { font-size: 0.66rem; color: var(--text-dim); margin-top: 1px; line-height: 1.5; }
+.choice-out { font-size: 0.64rem; color: var(--text-muted); margin-top: 2px; }
+.choice-block { font-size: 0.64rem; color: var(--danger); margin-top: 2px; }
+.choice-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
+.choice-badge { font-size: 0.58rem; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border-light); color: var(--text-dim); white-space: nowrap; }
+.choice-badge.rec { color: var(--text-bright); border-color: var(--accent-strong); }
+.choice-badge.ai { color: var(--violet); }
+.choice-badge.block { color: var(--danger); }
+.choice-badge.done { color: var(--success); border-color: var(--success); }
+.choice-bar { height: 3px; background: var(--plot-grid-strong); border-radius: 2px; margin-top: 5px; overflow: hidden; max-width: 220px; }
+.choice-bar span { display: block; height: 100%; background: var(--violet); }
+.choice-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 0.62rem; color: var(--text-muted); line-height: 1.6; }
+.choice-foot kbd { font-family: var(--font-mono); border: 1px solid var(--border-light); border-radius: 3px; padding: 0 4px; }
+.stance { display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 0.58rem; font-weight: 600; border: 1px solid var(--border-light); white-space: nowrap; }
+.stance-safe { color: var(--success); border-color: rgba(83, 198, 121, 0.45); }
+.stance-proceed { color: var(--text-bright); border-color: var(--accent-strong); }
+.stance-danger { color: var(--alert); border-color: rgba(234, 149, 57, 0.5); }
+.stance-stop { color: var(--danger); border-color: rgba(223, 79, 80, 0.5); }
+.mdl-mini { display: flex; flex-direction: column; gap: 4px; }
+.mdl-mini .mm-row { display: flex; align-items: center; gap: 8px; font-size: 0.7rem; color: var(--text-dim); }
+.mdl-mini .mm-row b { min-width: 58px; font-weight: 600; }
+.mdl-mini .mm-row span:last-child { margin-left: auto; font-family: var(--font-mono); font-size: 0.64rem; }
+
+/* ── 하단 출력 ───────────────────────────── */
+.bottom-tabs { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-panel); flex-shrink: 0; overflow-x: auto; }
+.bottom-tab { flex-shrink: 0; white-space: nowrap; padding: 5px 12px; border-radius: 5px; font-size: 0.72rem; font-weight: 500; color: var(--text-dim); cursor: pointer; transition: background 0.15s, color 0.15s; border: none; background: none; }
+.bottom-tab:hover { background: var(--bg-hover); color: var(--text-bright); }
+.bottom-tab.active { background: var(--bg-active); color: var(--text-bright); }
+#secOutput { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; }
+.bottom-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px 12px; }
+.tab { display: none; } .tab.on { display: block; }
+.log-console { font-family: var(--font-mono); font-size: 0.68rem; line-height: 1.7; color: var(--text); }
+.log-console .ln { white-space: pre-wrap; padding: 0 6px; margin: 0 -6px; border-radius: 3px; }
+.log-console .ln:hover { background: var(--bg-hover); }
+.log-console .ln .t { color: var(--text-muted); margin-right: 8px; }
+.log-console .ln.warn { color: var(--warning); } .log-console .ln.err { color: var(--danger); } .log-console .ln.ok { color: var(--success); }
+
+/* 차트 · 표 */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 10px; }
+.chart-box { background: var(--bg-card); border: 1px solid var(--border-cell); border-radius: 8px; padding: 6px; min-width: 0; }
+canvas.chart { width: 100%; height: 200px; display: block; background: var(--bg-plot); border-radius: var(--radius); }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.62rem; color: var(--text-dim); margin: 5px 4px 1px; min-height: 0.9em; }
+.legend i { display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; border-radius: 2px; }
+.sub-title { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.04em; color: var(--text-bright); margin: 14px 0 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sub-title:first-child { margin-top: 2px; }
+.sub-title .muted { font-weight: 400; letter-spacing: 0; font-size: 0.64rem; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--border-cell); border-radius: 8px; background: var(--bg-card); }
+table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+th, td { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-muted); font-weight: 600; font-size: 0.62rem; letter-spacing: 0.04em; background: var(--bg-dark); border-bottom-color: var(--border-light); white-space: nowrap; }
+tr:hover td { background: var(--bg-hover); }
+td.num { font-family: var(--font-mono); font-size: 0.68rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-bright); }
+td.muted { color: var(--text-muted); }
+th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12px; font-size: 0.64rem; }
+/* 열이 많은 표는 좁게 접지 않고 가로로 스크롤한다 */
+#opHealth { min-width: 1280px; }
+#mrTable, #pgTable { min-width: 1080px; }
+#gates, #calTable { min-width: 960px; }
+#opHealth td:first-child, #opHealth td:nth-child(2), #gates td:nth-child(2), #mrTable td:first-child { white-space: nowrap; }
+#opHealth td.muted { min-width: 150px; }
+
+/* 상태 표시 (endmill 배지와 같은 꼴) */
+.sev, .lv, .st { display: inline-block; min-width: 38px; text-align: center; padding: 1px 7px; border-radius: var(--radius-sm); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.02em; border: 1px solid transparent; white-space: nowrap; }
+.sev0, .st-good { background: rgba(83, 198, 121, 0.12); border-color: rgba(83, 198, 121, 0.35); color: var(--success); }
+.sev1, .lv-caution, .st-plan { background: rgba(227, 195, 90, 0.12); border-color: rgba(227, 195, 90, 0.35); color: var(--warning); }
+.sev2, .lv-warning, .st-replace { background: rgba(234, 149, 57, 0.12); border-color: rgba(234, 149, 57, 0.35); color: var(--alert); }
+.sev3, .lv-danger, .st-overdue { background: rgba(223, 79, 80, 0.12); border-color: rgba(223, 79, 80, 0.35); color: var(--danger); }
+.lv-stop { background: rgba(223, 79, 80, 0.24); border-color: var(--danger); color: #ffd0d0; }
+.lv-info, .st-watch { background: transparent; border-color: var(--border-light); color: var(--text-dim); }
+.lv { margin-right: 6px; }
+.bar { position: relative; height: 6px; background: var(--bg-darkest); border: 1px solid var(--border-cell); border-radius: 999px; min-width: 90px; overflow: hidden; margin-top: 4px; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+.feed { max-height: 380px; overflow: auto; border: 1px solid var(--border-cell); border-radius: 8px; background: var(--bg-input); }
+.feed .it { padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 0.7rem; line-height: 1.55; }
 .feed .it:last-child { border-bottom: none; }
-.feed .at { font-family: var(--font-mono); color: var(--text-muted); margin-right: 6px; }
-.lv { display: inline-block; min-width: 42px; text-align: center; border-radius: 4px; padding: 0 5px; font-size: 11px; margin-right: 6px; }
-.lv-info { background: #1d2b3a; color: var(--accent); } .lv-caution { background: #3b3020; color: var(--warning); }
-.lv-warning { background: #45301f; color: #ffb074; } .lv-danger { background: #45241f; color: #ff9b7a; } .lv-stop { background: #551d24; color: var(--danger); }
-.st { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 11px; }
-.st-good { background: #1d3a28; color: var(--success); } .st-watch { background: #23303f; color: var(--accent); } .st-plan { background: #3b3020; color: var(--warning); }
-.st-replace { background: #45241f; color: #ff9b7a; } .st-overdue { background: #551d24; color: var(--danger); }
-.bar { position: relative; height: 8px; background: var(--bg-raise); border-radius: 4px; min-width: 90px; overflow: hidden; }
-.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
-.overlay { position: fixed; inset: 0; background: rgba(5, 8, 12, .62); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.feed .it:hover { background: var(--bg-hover); }
+.feed .at { font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-muted); margin-right: 6px; }
+.feed .it .muted { font-size: 0.66rem; }
+.chip { display: inline-block; font-size: 0.6rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border-light); color: var(--text); white-space: nowrap; }
+.inl { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 0.7rem; }
+.inl input[type=number] { width: 64px; }
+
+/* ── 가운데 오버레이 화면 (현장 운영 · 염해 · 보정 · 설정) ───── */
+.center-overlay { position: absolute; inset: 0; background: var(--bg-panel); overflow-y: auto; padding: 18px 20px; z-index: 50; display: none; border-radius: var(--radius-card); }
+.center-overlay.visible { display: block; }
+.ov-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.section-title { font-size: 0.7rem; font-weight: 600; color: var(--text-bright); text-transform: uppercase; letter-spacing: 0.06em; margin: 2px 0 6px; }
+.ov-head .st-note { margin-top: 0; max-width: 820px; }
+.pv-head { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-bottom: 10px; }
+.pv-chip { background: var(--bg-card); border: 1px solid var(--border-cell); border-radius: var(--radius); padding: 7px 9px; font-size: 0.7rem; min-width: 0; }
+.pv-chip .k { display: block; color: var(--text-muted); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.06em; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-chip .v { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 500; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.pv-chip.good .v { color: var(--success); } .pv-chip.warn .v { color: var(--warning); } .pv-chip.bad .v { color: var(--danger); }
+.pv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 10px; }
+.pv-grid.two { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+.pv-card { background: var(--bg-card); border: 1px solid var(--border-cell); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.pv-card + .pv-card, .pv-grid + .pv-card, .pv-card + .pv-grid, .pv-grid + .pv-grid { margin-top: 10px; }
+.pv-card h4 { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; color: var(--text-bright); margin-bottom: 10px; line-height: 1.45; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pv-card h4 .muted { font-weight: 400; letter-spacing: 0; font-size: 0.64rem; }
+.pv-card h4 select { min-height: 24px; font-size: 0.66rem; font-weight: 400; }
+.pv-card .tbl-wrap { background: var(--bg-input); }
+.pv-card canvas.chart { height: 210px; }
+.pv-tabs { display: flex; flex-wrap: wrap; gap: 2px; width: fit-content; max-width: 100%; padding: 3px; margin-bottom: 14px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 8px; }
+.pv-tab { padding: 6px 12px; border-radius: 5px; font-size: 0.72rem; font-weight: 500; color: var(--text-dim); cursor: pointer; transition: background 0.15s, color 0.15s; border: none; background: none; }
+.pv-tab:hover { background: var(--bg-hover); color: var(--text-bright); }
+.pv-tab.active { background: var(--bg-active); color: var(--text-bright); }
+.pv-pane { display: none; } .pv-pane.active { display: block; }
+.pv-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.pv-status { font-family: var(--font-mono); font-size: 0.66rem; color: var(--warning); min-height: 1em; margin-bottom: 8px; }
+.pv-kv { display: grid; grid-template-columns: minmax(110px, auto) minmax(0, 1fr); gap: 4px 12px; font-size: 0.7rem; }
+.pv-kv .k { color: var(--text-dim); }
+.pv-kv .v { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-bright); word-break: break-all; }
+.pv-check { font-size: 0.7rem; color: var(--text-dim); display: flex; align-items: center; gap: 7px; margin-bottom: 6px; cursor: pointer; line-height: 1.5; }
+.mdl-row { border: 1px solid var(--border-cell); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: var(--bg-input); }
+.mdl-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.76rem; }
+.mdl-head b { color: var(--text-bright); }
+.mdl-meta { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-muted); margin: 4px 0; word-break: break-all; line-height: 1.5; }
+.mdl-bar { height: 6px; background: var(--bg-darkest); border-radius: 999px; overflow: hidden; margin: 5px 0; border: 1px solid var(--border-cell); }
+.mdl-bar > span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent-strong), var(--signal)); transition: width 0.3s; }
+.mdl-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+/* 모델 대기 작업 (endmill-sandbox 와 같은 꼴) — 실행이 모델을 기다리는 동안 */
+.mq-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.mq-item:last-child { border-bottom: none; }
+.mq-state { min-width: 64px; font-family: var(--font-mono); font-size: 0.66rem; font-weight: 600; }
+.vp-prep { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); width: min(460px, 86%); background: rgba(17, 17, 19, 0.95); backdrop-filter: blur(8px); border: 1px solid var(--border-light); border-radius: 12px; padding: 16px 18px; z-index: 30; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6); }
+.vp-prep .prep-title { font-size: 0.74rem; font-weight: 600; letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--text-bright); margin-bottom: 8px; }
+.vp-prep .prep-stage { font-size: 0.74rem; color: var(--text); margin-bottom: 10px; min-height: 1.2em; line-height: 1.5; }
+.vp-prep .prep-bar { height: 6px; background: var(--bg-input); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-cell); }
+.vp-prep .prep-bar > span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-strong), var(--signal)); transition: width 0.2s; }
+.vp-prep .prep-steps { font-family: var(--font-mono); font-size: 0.62rem; line-height: 1.6; color: var(--text-muted); margin-top: 8px; }
+.vp-prep .prep-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.sev-0 { color: var(--success); } .sev-1 { color: var(--warning); } .sev-2 { color: var(--alert); } .sev-3 { color: var(--danger); font-weight: 600; }
+
+/* ── 상태 바 ───────────────────────── */
+.status-bar { background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-muted); gap: 14px; white-space: nowrap; overflow: hidden; }
+.status-bar strong { color: var(--text); font-weight: 500; }
+.sb-item { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sb-item strong { overflow: hidden; text-overflow: ellipsis; }
+.sb-sep { width: 1px; height: 12px; background: var(--border-light); flex-shrink: 0; }
+.sb-link { cursor: pointer; }
+.sb-link:hover strong { color: var(--text-bright); text-decoration: underline; }
+#sb-msg { max-width: 420px; }
+
+/* 결정 카드 (현장 운영이 멈추고 묻는 창) */
+.overlay { position: fixed; inset: 0; background: rgba(5, 5, 7, 0.66); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 900; }
 .overlay.hidden { display: none; }
-.dcard { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
-.dhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.chip { background: var(--bg-raise); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--accent); }
-.dq { font-size: 14px; margin: 4px 0 8px; line-height: 1.5; }
-.dopt { display: grid; grid-template-columns: 26px 1fr; gap: 2px 8px; width: 100%; text-align: left; margin: 6px 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-raise); color: var(--text); }
-.dopt.rec { border-color: var(--accent); }
-.dopt:not(.off):hover, .dopt:not(.off):focus { border-color: var(--accent); outline: none; background: #222c37; }
-.dopt .n { grid-row: span 2; font: 600 13px var(--font-mono); color: var(--accent); align-self: center; text-align: center; }
-.dopt .l { font-weight: 600; }
-.dopt .d { color: var(--text-dim); font-size: 12px; }
-.dopt.off { opacity: .55; cursor: not-allowed; }
-.dopt.off .n { color: var(--danger); }
-.dopt .n { grid-row: span 3; }
-.dopt .o { color: var(--text-muted); font-size: 11px; }
-.stance { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 11px; font-weight: 600; margin-left: 6px; vertical-align: 1px; }
-.stance-safe { background: #1d3a28; color: var(--success); } .stance-proceed { background: #1d2b3a; color: var(--accent); }
-.stance-danger { background: #45241f; color: #ff9b7a; } .stance-stop { background: #2a2f37; color: var(--text-dim); border: 1px solid var(--line); }
-.inl { display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
-.inl input { width: 70px; } .inl input[type=checkbox] { width: auto; }
-#toasts { position: fixed; right: 14px; bottom: 14px; display: grid; gap: 6px; z-index: 60; width: min(420px, calc(100vw - 28px)); }
-.toast { background: var(--bg-panel); border: 1px solid var(--line); border-left: 4px solid var(--warning); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
-.toast.danger, .toast.stop { border-left-color: var(--danger); }
-.progress { height: 4px; background: var(--bg-raise); border-radius: 2px; overflow: hidden; margin-top: 6px; }
-.progress i { display: block; height: 100%; background: var(--accent); width: 0; }
-@media (max-width: 1100px) { .view { grid-template-columns: 1fr; } .layout { grid-template-columns: 1fr; } aside { border-right: none; } .split { grid-template-columns: 1fr; } }
+.overlay .choice-card { width: min(660px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; margin: 0; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6); padding: 16px 18px; }
+
+/* 알림 (토스트) */
+.toast-stack { position: fixed; right: 16px; bottom: calc(var(--statusbar-h) + 12px); display: flex; flex-direction: column; gap: 8px; z-index: 9999; width: min(400px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; background: var(--bg-panel); border: 1px solid var(--border-strong); border-left: 3px solid var(--accent-strong); border-radius: var(--radius); padding: 10px 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); font-size: 0.72rem; color: var(--text); animation: toast-in 0.18s ease-out; }
+.toast.warn { border-left-color: var(--alert); } .toast.ok { border-left-color: var(--success); } .toast.err { border-left-color: var(--danger); }
+.toast-title { font-weight: 600; color: var(--text-bright); margin-bottom: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.toast-body { color: var(--text-dim); white-space: pre-line; line-height: 1.5; }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+@media (max-width: 1180px) { :root { --left-w: 260px; --right-w: 280px; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Gantry Crane Sandbox</h1>
-  <span class="src" id="src">파일 모드</span>
-  <span class="spacer"></span>
-  <span class="muted" id="status"></span>
-</header>
-<div class="layout">
-<aside>
-  <fieldset>
-    <legend>시나리오</legend>
-    <label>크레인 <select id="crane"><option value="gantry_10t_20m">갠트리 10 t × 20 m</option><option value="overhead_5t_16m">천장 5 t × 16 m</option><option value="rmg_41t_30m">컨테이너 RMG 41 t × 30 m</option><option value="overhead_40t_30m">코일 천장 40 t × 30 m</option><option value="gantry_40t_30m">갠트리 40 t × 30 m</option><option value="goliath_900t_120m">골리앗 900 t × 120 m</option></select></label>
-    <label>하중 (kg) <input id="load" type="number" value="8000" step="500"></label>
-    <label>흔들림 억제 <select id="mode"><option value="off">없음</option><option value="zv">ZV</option><option value="zvd" selected>ZVD</option><option value="ei">EI</option><option value="closed_loop">각도 궤환 (LQR)</option></select></label>
-    <label>평균 풍속 (m/s) <input id="wind" type="number" value="0" step="1"></label>
-    <label>돌풍 진폭 (m/s) <input id="gust" type="number" value="0" step="1"></label>
-    <label>이동 방식 <select id="movemode"><option value="sequential">순차 (올림→이동→내림)</option><option value="simultaneous">동시</option></select></label>
-  </fieldset>
-  <fieldset>
-    <legend>근무 · 예측</legend>
-    <label>근무 시간 (h) <input id="hours" type="number" value="8" step="1"></label>
-    <label>시간당 사이클 <input id="cph" type="number" value="6" step="1"></label>
-    <label>예측 수평선 (h) <input id="fh" type="number" value="8" step="1"></label>
-  </fieldset>
-  <div class="btnrow">
-    <button class="primary" id="run">실행</button>
-    <button id="cmp">방식 비교</button>
-  </div>
-  <fieldset style="margin-top:12px">
-    <legend>현장 운영 · 내구도</legend>
-    <label>현장 프리셋 <select id="siteSel"></select></label>
-    <div class="note" id="siteDesc"></div>
-    <details class="ed" id="siteEd">
-      <summary>프리셋 값 보기 · 바꾸기</summary>
-      <h3>크레인 · 기후</h3>
-      <label>크레인 <select id="e_crane"></select></label>
-      <label>기후 (기상청 지점) <select id="e_climate"></select></label>
-      <h3>물량</h3>
-      <label>시간당 이동 (수요) <input id="e_mph" type="number" step="0.5"></label>
-      <label>교대 수 <input id="e_shifts" type="number" min="1" max="3" step="1"></label>
-      <label>교대 시간 (h) <input id="e_shift_h" type="number" step="0.5"></label>
-      <label>첫 교대 시작 (시) <input id="e_start_h" type="number" min="0" max="23" step="1"></label>
-      <label>주당 운전 일 <input id="e_dpw" type="number" min="1" max="7" step="1"></label>
-      <label>취급 시간 (s/이동) <input id="e_handling" type="number" step="1"></label>
-      <label>주행 · 횡행 · 권상 (m) <input id="e_geom" placeholder="60, 15, 12"></label>
-      <h3>무게 (정격 대비 비율 : 비중)</h3>
-      <label>하중 스펙트럼 <input id="e_spec" placeholder="0.1:0.3, 0.5:0.5, 1.0:0.2"></label>
-      <label>중량물 기준 비율 <input id="e_crit" type="number" step="0.05"></label>
-      <label>정격 초과 섞임 비율 <input id="e_over" type="number" step="0.001"></label>
-      <h3>환경</h3>
-      <label class="chk">실내 <input id="e_indoor" type="checkbox"></label>
-      <label>부식성 (ISO 9223) <select id="e_corr"><option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option><option>CX</option></select></label>
-      <label>분진 (ISO 281) <select id="e_dust"><option value="clean">깨끗</option><option value="normal">보통</option><option value="dusty">오염</option><option value="severe">심한 오염</option></select></label>
-      <label>열원 가산 (K) <input id="e_heat" type="number" step="1"></label>
-      <label>레일 상태 <select id="e_rail"><option value="good">양호</option><option value="fair">보통</option><option value="poor">나쁨</option></select></label>
-      <h3>해안 · 염해 · 화물</h3>
-      <label>크레인 평균 높이 (m) <input id="e_height" type="number" step="1"></label>
-      <label class="chk">해안 노출 계산 (염해) <input id="e_coast_on" type="checkbox"></label>
-      <label>바다까지 거리 (m) <input id="e_coast_dist" type="number" step="10"></label>
-      <label>바다 방위 (°, 북 0) <input id="e_coast_bearing" type="number" step="5"></label>
-      <label>해안 형태 <select id="e_coast_type"><option value="harbor">항만 (방파제 안)</option><option value="bay">만</option><option value="open">외해 (쇄파)</option><option value="tidal">갯벌 · 조간대</option><option value="strait">해협</option><option value="river">하구 · 강</option></select></label>
-      <label>비래염분 지역 (국내 실측) <select id="e_salt_area"></select></label>
-      <label>실측 염화물 (mg/m²·d) <input id="e_cl" type="number" step="5" placeholder="모르면 비움"></label>
-      <label>염해 방지 프리셋 <select id="e_prot"></select></label>
-      <label>화물 시나리오 <select id="e_cargo"></select></label>
-      <div class="note" id="e_cargo_note"></div>
-      <h3>운영 · 사람 · 정비</h3>
-      <label>운전원 숙련 <select id="e_oper"><option value="novice">초보</option><option value="standard">보통</option><option value="expert">숙련</option></select></label>
-      <label class="chk">지상 작업자 (줄걸이 · 신호) <input id="e_ground" type="checkbox"></label>
-      <label class="chk">운전실 냉방 <input id="e_cab" type="checkbox"></label>
-      <label class="chk">신호수 · 신호 체계 <input id="e_signal" type="checkbox"></label>
-      <label class="chk">작업 반경 출입 통제 <input id="e_excl" type="checkbox"></label>
-      <label>정비 품질 <select id="e_maint"><option value="good">양호</option><option value="average">보통</option><option value="poor">미흡</option></select></label>
-      <label>정기 점검 주기 (일) <input id="e_periodic" type="number" step="1"></label>
-      <label>야간 조도 (lx) <input id="e_lux" type="number" step="10"></label>
-      <h3>새 이름으로 저장</h3>
-      <label>새 id (영문) <input id="e_newid" placeholder="my_site"></label>
-      <label>이름 <input id="e_newname" placeholder="우리 현장"></label>
-      <div class="btnrow"><button id="siteSave">프리셋 저장</button><button id="siteDel">사용자 프리셋 삭제</button></div>
-    </details>
-    <label>자산 이름 (원장) <input id="opAsset" value="crane-01"></label>
-    <label>시작 날짜 (MM-DD) <input id="opStart" value="07-01"></label>
-    <label>기간 (일) <input id="opDays" type="number" value="30" step="1"></label>
-    <label>시드 <input id="opSeed" type="number" value="1" step="1"></label>
-    <label>결정 방식 <select id="opPolicy"><option value="ask">카드마다 묻기</option><option value="recommended">권장 자동</option><option value="conservative">가장 보수적</option><option value="risky">알림 무시 (위험 비교)</option></select></label>
-    <label class="chk">원장 새로 시작 <input id="opFresh" type="checkbox"></label>
-    <div class="btnrow"><button class="primary" id="opRun">현장 운영 실행</button></div>
-    <div class="progress"><i id="opProg"></i></div>
-    <div class="note" id="opStatus">같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.</div>
-  </fieldset>
-  <fieldset>
-    <legend>모델 (TTM-R3 · LAYA)</legend>
-    <label>폴더 <input id="mroot" placeholder="models 폴더 경로"></label>
-    <div class="btnrow"><button id="mload">불러오기</button></div>
-    <div class="note" id="mstatus">모델 없이 Holt 예측 · 규칙 판정만 씁니다.</div>
-  </fieldset>
-  <fieldset>
-    <legend>결과 파일 열기</legend>
-    <div id="drop">crane_demo 가 저장한<br><b>pipeline.json</b> · compare.json<br><b>operation.json</b> · fieldcal.json<br>prognostics.json<br>을 끌어다 놓거나 고르세요<br><input type="file" id="file" accept=".json" multiple style="margin-top:8px"></div>
-  </fieldset>
-  <fieldset>
-    <legend>내보내기</legend>
-    <div class="btnrow"><button id="exCsv">샘플 CSV</button><button id="exProg">속도 프로파일</button><button id="exJson">전체 JSON</button></div>
-  </fieldset>
-</aside>
-<main>
-  <section class="kpis" id="kpis"><div class="empty">실행하거나 결과 파일을 여세요.</div></section>
-  <section class="view">
-    <div class="card">
-      <h2>3D 보기 <span class="muted" id="sceneInfo"></span></h2>
+<div class="app-layout" id="appLayout" data-view="cycle">
+  <aside class="panel-left" id="panelLeft">
+    <div class="sidebar-head">
+      <button class="panel-toggle-btn" data-toggle="panelLeft" title="좌측 패널 접기">◀</button>
+      <span class="brand">Gantry Crane Sandbox</span>
+    </div>
+    <div class="panel-scroll">
+      <nav class="menu-group" aria-label="화면 전환">
+        <button class="menu-btn active" data-view="cycle" data-tip-title="사이클 해석" data-tip="한 번의 운반(올림 → 이동 → 내림)을 동역학으로 풀고 근무 · 예측 · 판정까지 봅니다. 가운데 3D 재생, 오른쪽 판정, 아래 차트·표."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 20V6h14v14"/><path d="M5 6l3-2h8l3 2"/><path d="M12 6v6"/><rect x="10" y="12" width="4" height="3" rx="0.6"/></svg><span>사이클 해석</span></button>
+        <button class="menu-btn" data-view="op" data-tip-title="현장 운영 · 내구도" data-tip="현장 프리셋으로 며칠 ~ 몇 달을 시간 단위로 운영합니다. 날씨 · 물량 · 사람 · 정비가 쌓이는 부품 수명과 사고 예방 알림, 결정 카드 기록을 봅니다."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><path d="M8 15l3.5-4 3 2.5L19 8"/></svg><span>현장 운영 · 내구도</span><span class="menu-badge" id="menuOpBadge"></span></button>
+        <button class="menu-btn" data-view="marine" data-tip-title="염해 · 예측 점수" data-tip="해안 노출과 염해 방지 프리셋으로 ISO 9223 부식 · 도장 열화를 해마다 진행하고, 부품 상태 예측의 교차검증 점수를 봅니다."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c2 0 2-1.5 4.5-1.5S10 15 12 15s2.5-1.5 4.5-1.5S19 15 21 15"/><path d="M3 19c2 0 2-1.5 4.5-1.5S10 19 12 19s2.5-1.5 4.5-1.5S19 19 21 19"/><path d="M12 3l3 6H9z"/></svg><span>염해 · 예측 점수</span></button>
+        <button class="menu-btn" data-view="cal" data-tip-title="실데이터 보정" data-tip="조사한 실데이터(기상청 · 제조사 · 현장 사례 · 법규)와 모델 출력의 오차를 보정 전 · 뒤로 비교합니다."><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span>실데이터 보정</span></button>
+        <button class="menu-btn" data-view="settings" data-tip-title="환경·모델 설정" data-tip="학습 모델(TTM-R3 · LAYA) 다운로드 · 이어받기 · 삭제, 시작할 때 자동으로 받기, 모델 폴더와 저장 위치를 정합니다."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>환경·모델 설정</span><span class="menu-badge" id="menuMdlBadge"></span></button>
+      </nav>
+
+      <div class="group-label">사이클 해석 · 한 번의 운반<span class="help" tabindex="0" data-tip="① 크레인 · 하중 · 흔들림 억제 · 바람을 정하고 ② 근무 시간과 예측 수평선을 정한 뒤 '실행'을 누릅니다. '방식 비교'는 흔들림 억제 방식 다섯 가지를 같은 조건으로 돌립니다.">?</span></div>
+      <div class="panel-section-header" data-section="secScenario">
+        <span class="sec-title"><span class="step-no">1</span><span class="sec-name">시나리오</span></span><span class="step-sum" id="sum-scn"></span><span class="chevron">▼</span>
+      </div>
+      <div class="panel-section-body" id="secScenario">
+        <div class="form-grid">
+          <div class="form-group span-2"><label>크레인</label><select id="crane"><option value="gantry_10t_20m">갠트리 10 t × 20 m</option><option value="overhead_5t_16m">천장 5 t × 16 m</option><option value="rmg_41t_30m">컨테이너 RMG 41 t × 30 m</option><option value="overhead_40t_30m">코일 천장 40 t × 30 m</option><option value="gantry_40t_30m">갠트리 40 t × 30 m</option><option value="goliath_900t_120m">골리앗 900 t × 120 m</option></select></div>
+          <div class="form-group"><label>하중 (kg)</label><input id="load" type="number" value="8000" step="500"></div>
+          <div class="form-group"><label>흔들림 억제</label><select id="mode"><option value="off">없음</option><option value="zv">ZV</option><option value="zvd" selected>ZVD</option><option value="ei">EI</option><option value="closed_loop">각도 궤환 (LQR)</option></select></div>
+          <div class="form-group"><label>평균 풍속 (m/s)</label><input id="wind" type="number" value="0" step="1"></div>
+          <div class="form-group"><label>돌풍 진폭 (m/s)</label><input id="gust" type="number" value="0" step="1"></div>
+          <div class="form-group span-2"><label>이동 방식</label><select id="movemode"><option value="sequential">순차 (올림 → 이동 → 내림)</option><option value="simultaneous">동시</option></select></div>
+        </div>
+      </div>
+      <div class="panel-section-header" data-section="secDuty">
+        <span class="sec-title"><span class="step-no">2</span><span class="sec-name">근무 · 예측</span><span class="help" tabindex="0" data-tip="근무 시간 동안 사이클을 반복해 권선 온도 · 로프 손상 · 브레이크 라이닝을 쌓고, 예측 수평선까지 임계 도달을 예측합니다 (TTM-R3 가 있으면 잔차 예측, 없으면 Holt).">?</span></span><span class="step-sum" id="sum-duty"></span><span class="chevron">▼</span>
+      </div>
+      <div class="panel-section-body" id="secDuty">
+        <div class="form-grid">
+          <div class="form-group"><label>근무 시간 (h)</label><input id="hours" type="number" value="8" step="1"></div>
+          <div class="form-group"><label>시간당 사이클</label><input id="cph" type="number" value="6" step="1"></div>
+          <div class="form-group span-2"><label>예측 수평선 (h)</label><input id="fh" type="number" value="8" step="1"></div>
+        </div>
+        <div class="btn-row"><button class="btn" id="run">실행</button><button class="btn btn-outline" id="cmp">방식 비교</button></div>
+      </div>
+
+      <div class="group-label">현장 운영 · 내구도<span class="help" tabindex="0" data-tip="③ 현장 프리셋(크레인 · 기후 · 물량 · 환경 · 사람 · 정비)을 고르거나 바꿔 저장하고, ④ 기간과 결정 방식을 정해 운영합니다. 같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.">?</span></div>
+      <div class="panel-section-header" data-section="secSite">
+        <span class="sec-title"><span class="step-no">3</span><span class="sec-name">현장 프리셋</span></span><span class="step-sum" id="sum-site"></span><span class="chevron">▼</span>
+      </div>
+      <div class="panel-section-body" id="secSite">
+        <div class="form-group"><label>현장 프리셋</label><select id="siteSel"></select></div>
+        <div class="note" id="siteDesc"></div>
+        <details class="sub-block" id="siteEd">
+          <summary>프리셋 값 보기 · 바꾸기</summary>
+          <div class="sub-body">
+            <div class="ct-sec">크레인 · 기후</div>
+            <div class="form-group"><label>크레인</label><select id="e_crane"></select></div>
+            <div class="form-group"><label>기후 (기상청 지점)</label><select id="e_climate"></select></div>
+            <div class="ct-sec">물량</div>
+            <div class="form-grid">
+              <div class="form-group"><label>시간당 이동 (수요)</label><input id="e_mph" type="number" step="0.5"></div>
+              <div class="form-group"><label>교대 수</label><input id="e_shifts" type="number" min="1" max="3" step="1"></div>
+              <div class="form-group"><label>교대 시간 (h)</label><input id="e_shift_h" type="number" step="0.5"></div>
+              <div class="form-group"><label>첫 교대 시작 (시)</label><input id="e_start_h" type="number" min="0" max="23" step="1"></div>
+              <div class="form-group"><label>주당 운전 일</label><input id="e_dpw" type="number" min="1" max="7" step="1"></div>
+              <div class="form-group"><label>취급 시간 (s/이동)</label><input id="e_handling" type="number" step="1"></div>
+              <div class="form-group span-2"><label>주행 · 횡행 · 권상 (m)</label><input id="e_geom" type="text" placeholder="60, 15, 12"></div>
+            </div>
+            <div class="ct-sec">무게 (정격 대비 비율 : 비중)</div>
+            <div class="form-group"><label>하중 스펙트럼</label><input id="e_spec" type="text" placeholder="0.1:0.3, 0.5:0.5, 1.0:0.2"></div>
+            <div class="form-grid">
+              <div class="form-group"><label>중량물 기준 비율</label><input id="e_crit" type="number" step="0.05"></div>
+              <div class="form-group"><label>정격 초과 섞임 비율</label><input id="e_over" type="number" step="0.001"></div>
+            </div>
+            <div class="ct-sec">환경</div>
+            <label class="ct-check"><input id="e_indoor" type="checkbox"> 실내</label>
+            <div class="form-grid">
+              <div class="form-group"><label>부식성 (ISO 9223)</label><select id="e_corr"><option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option><option>CX</option></select></div>
+              <div class="form-group"><label>분진 (ISO 281)</label><select id="e_dust"><option value="clean">깨끗</option><option value="normal">보통</option><option value="dusty">오염</option><option value="severe">심한 오염</option></select></div>
+              <div class="form-group"><label>열원 가산 (K)</label><input id="e_heat" type="number" step="1"></div>
+              <div class="form-group"><label>레일 상태</label><select id="e_rail"><option value="good">양호</option><option value="fair">보통</option><option value="poor">나쁨</option></select></div>
+            </div>
+            <div class="ct-sec">해안 · 염해 · 화물</div>
+            <div class="form-grid">
+              <div class="form-group"><label>크레인 평균 높이 (m)</label><input id="e_height" type="number" step="1"></div>
+              <div class="form-group"><label>바다까지 거리 (m)</label><input id="e_coast_dist" type="number" step="10"></div>
+              <div class="form-group"><label>바다 방위 (°, 북 0)</label><input id="e_coast_bearing" type="number" step="5"></div>
+              <div class="form-group"><label>해안 형태</label><select id="e_coast_type"><option value="harbor">항만 (방파제 안)</option><option value="bay">만</option><option value="open">외해 (쇄파)</option><option value="tidal">갯벌 · 조간대</option><option value="strait">해협</option><option value="river">하구 · 강</option></select></div>
+            </div>
+            <label class="ct-check"><input id="e_coast_on" type="checkbox"> 해안 노출 계산 (염해)</label>
+            <div class="form-group"><label>비래염분 지역 (국내 실측)</label><select id="e_salt_area"></select></div>
+            <div class="form-grid">
+              <div class="form-group"><label>실측 염화물 (mg/m²·d)</label><input id="e_cl" type="number" step="5" placeholder="모르면 비움"></div>
+              <div class="form-group"><label>염해 방지 프리셋</label><select id="e_prot"></select></div>
+            </div>
+            <div class="form-group"><label>화물 시나리오</label><select id="e_cargo"></select></div>
+            <div class="st-note" id="e_cargo_note"></div>
+            <div class="ct-sec">운영 · 사람 · 정비</div>
+            <div class="form-grid">
+              <div class="form-group"><label>운전원 숙련</label><select id="e_oper"><option value="novice">초보</option><option value="standard">보통</option><option value="expert">숙련</option></select></div>
+              <div class="form-group"><label>정비 품질</label><select id="e_maint"><option value="good">양호</option><option value="average">보통</option><option value="poor">미흡</option></select></div>
+              <div class="form-group"><label>정기 점검 주기 (일)</label><input id="e_periodic" type="number" step="1"></div>
+              <div class="form-group"><label>야간 조도 (lx)</label><input id="e_lux" type="number" step="10"></div>
+            </div>
+            <label class="ct-check"><input id="e_ground" type="checkbox"> 지상 작업자 (줄걸이 · 신호)</label>
+            <label class="ct-check"><input id="e_cab" type="checkbox"> 운전실 냉방</label>
+            <label class="ct-check"><input id="e_signal" type="checkbox"> 신호수 · 신호 체계</label>
+            <label class="ct-check"><input id="e_excl" type="checkbox"> 작업 반경 출입 통제</label>
+            <div class="ct-sec">새 이름으로 저장</div>
+            <div class="form-grid">
+              <div class="form-group"><label>새 id (영문)</label><input id="e_newid" type="text" placeholder="my_site"></div>
+              <div class="form-group"><label>이름</label><input id="e_newname" type="text" placeholder="우리 현장"></div>
+            </div>
+            <div class="btn-row"><button class="btn btn-sm" id="siteSave">프리셋 저장</button><button class="btn btn-sm btn-danger" id="siteDel">사용자 프리셋 삭제</button></div>
+          </div>
+        </details>
+      </div>
+      <div class="panel-section-header" data-section="secOp">
+        <span class="sec-title"><span class="step-no">4</span><span class="sec-name">운영 실행</span><span class="help" tabindex="0" data-tip="결정 방식이 '카드마다 묻기'면 위험한 순간마다 운영이 멈추고 결정 카드가 뜹니다 (숫자 키로 고르고 Enter 는 권장).&#10;날씨는 현장 기후로 만든 합성 날씨나 ERA5 시간별 실제 날씨 재생 중에서 고릅니다.">?</span></span><span class="step-sum" id="sum-op"></span><span class="chevron">▼</span>
+      </div>
+      <div class="panel-section-body" id="secOp">
+        <div class="form-grid">
+          <div class="form-group"><label>자산 이름 (원장)</label><input id="opAsset" type="text" value="crane-01"></div>
+          <div class="form-group"><label>시작 날짜 (MM-DD)</label><input id="opStart" type="text" value="07-01"></div>
+          <div class="form-group"><label>기간 (일)</label><input id="opDays" type="number" value="30" step="1"></div>
+          <div class="form-group"><label>시드</label><input id="opSeed" type="number" value="1" step="1"></div>
+          <div class="form-group span-2"><label>날씨</label><select id="opWeather"><option value="">합성 (현장 기후로 생성)</option></select></div>
+          <div class="form-group span-2" id="opWeatherFromRow" style="display:none"><label>ERA5 시작 날짜</label><input id="opWeatherFrom" type="date"></div>
+        </div>
+        <label class="ct-check" id="opWeatherOffRow" style="display:none"><input id="opWeatherOff" type="checkbox"> 캐시만 (인터넷 요청 안 함)</label>
+        <div class="st-note" id="opWeatherNote" style="margin-top:0;margin-bottom:8px"></div>
+        <div class="form-group"><label>결정 방식</label><select id="opPolicy"><option value="ask">카드마다 묻기</option><option value="recommended">권장 자동</option><option value="conservative">가장 보수적</option><option value="risky">알림 무시 (위험 비교)</option></select></div>
+        <label class="ct-check"><input id="opFresh" type="checkbox"> 원장 새로 시작</label>
+        <button class="btn btn-block" id="opRun">현장 운영 실행</button>
+        <div class="progress"><i id="opProg"></i></div>
+        <div class="st-note" id="opStatus" style="margin-top:4px">같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.</div>
+      </div>
+
+      <div class="group-label">파일</div>
+      <div class="panel-section-header collapsed" data-section="secFiles">
+        <span class="sec-title"><span class="step-no">5</span><span class="sec-name">결과 파일 · 내보내기</span><span class="help" tabindex="0" data-tip="crane_demo 가 저장한 pipeline.json · compare.json · operation.json · fieldcal.json · prognostics.json 을 끌어다 놓으면 해당 화면에 그립니다 (백엔드 없이 파일만으로도 볼 수 있음).">?</span></span><span class="step-sum">JSON 열기 · CSV</span><span class="chevron">▼</span>
+      </div>
+      <div class="panel-section-body collapsed" id="secFiles">
+        <div class="drop-zone" id="drop">
+          <span><b>pipeline.json</b> · compare.json · <b>operation.json</b><br>fieldcal.json · prognostics.json 을 끌어다 놓거나 고르세요</span>
+          <input type="file" id="file" accept=".json" multiple>
+        </div>
+        <div class="ct-sec">내보내기 (마지막 사이클 해석)</div>
+        <div class="btn-row"><button class="btn btn-sm btn-outline" id="exCsv">샘플 CSV</button><button class="btn btn-sm btn-outline" id="exProg">속도 프로파일</button></div>
+        <button class="btn btn-sm btn-outline btn-block" id="exJson" style="margin-top:8px">전체 JSON (pipeline.json)</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="resizer resizer-v left" id="resizerLeft"></div>
+
+  <main class="panel-center" id="panelCenter">
+    <div class="viewport-toolbar">
+      <div class="vt-row">
+        <span class="vt-label">재생</span>
+        <button class="vt-btn vt-primary" id="playBtn">⏵ 재생</button>
+        <button class="vt-btn" id="stopBtn" title="처음으로">⏹</button>
+        <select id="speed" title="실제 시간 대비 재생 배속"><option value="1">×1</option><option value="5">×5</option><option value="20" selected>×20</option><option value="60">×60</option></select>
+        <input type="range" id="slider" min="0" max="1000" value="0" title="재생 위치">
+        <span class="vt-time" id="tLabel">0.0 / 0.0 s</span>
+        <div class="vt-sep"></div>
+        <button class="vt-btn" id="vtRun" title="왼쪽 ① ② 조건으로 사이클 해석 실행">실행</button>
+        <button class="vt-btn" id="vtCmp" title="흔들림 억제 방식 다섯 가지 비교">방식 비교</button>
+        <button class="vt-btn vt-reopen vt-push" onclick="panelOpen('panelRight')" title="접어 둔 오른쪽 판정 패널 다시 열기">◀ 판정</button>
+      </div>
+      <div class="vt-row">
+        <span class="vt-label">표시</span>
+        <span class="help" tabindex="0" data-tip="궤적 — 지금까지 하중이 지나간 길&#10;격자 — 바닥 격자와 주행 레일&#10;로프 — 트롤리에서 하중까지 로프&#10;시점 — 드래그로 회전, 휠로 확대, 더블클릭 또는 '리셋'으로 기본 각도">?</span>
+        <button class="vt-btn active" id="tg-trail" data-show="trail">궤적</button>
+        <button class="vt-btn active" id="tg-grid" data-show="grid">격자</button>
+        <button class="vt-btn active" id="tg-rope" data-show="rope">로프</button>
+        <div class="vt-sep"></div>
+        <span class="vt-label">시점</span>
+        <button class="vt-btn" id="viewTop" title="위에서 내려다보기">⊞ 평면</button>
+        <button class="vt-btn" id="viewReset" title="회전 · 기울기 · 확대 초기화 (더블클릭과 같음)">⟲ 리셋</button>
+        <span class="vt-info" id="sceneInfo"></span>
+      </div>
+    </div>
+    <div class="viewport-canvas-wrap" id="vpWrap">
       <canvas id="scene"></canvas>
-      <div class="play">
-        <button id="playBtn">재생</button>
-        <select id="speed"><option value="1">×1</option><option value="5">×5</option><option value="20" selected>×20</option><option value="60">×60</option></select>
-        <input type="range" id="slider" min="0" max="1000" value="0">
-        <span class="muted" id="tLabel">0.0 s</span>
+      <div class="vp-hud">
+        <div class="status-indicators" data-tip-title="상태" data-tip="READY 대기 · RUNNING 계산 중 · PLAYING 재생 중 · PAUSED 일시정지 · COMPLETE 재생 끝 · ERROR 오류 (아래 로그 탭)">
+          <div class="status-dot idle" id="statusDot"></div>
+          <span class="status-text" id="statusText">READY</span>
+        </div>
+        <div class="dro-display" data-tip-title="재생 위치" data-tip="주행 · 횡행 위치(m), 로프 길이(m), 하중 흔들림(mm), 로프 장력(kN)입니다.">
+          <div class="dro-item"><span class="dro-label">주행</span><span class="dro-value" id="dro-x">—</span></div>
+          <div class="dro-item"><span class="dro-label">횡행</span><span class="dro-value" id="dro-y">—</span></div>
+          <div class="dro-item"><span class="dro-label">로프</span><span class="dro-value" id="dro-l">—</span></div>
+          <div class="dro-item"><span class="dro-label">흔들림</span><span class="dro-value" id="dro-sw">—</span></div>
+          <div class="dro-item"><span class="dro-label">장력</span><span class="dro-value" id="dro-t">—</span></div>
+        </div>
+      </div>
+      <div class="vp-busy hidden" id="vpBusy" title="환경·모델 설정 열기"></div>
+      <div class="vp-prep hidden" id="vpWait">
+        <div class="prep-title">모델 준비 중 — 실행 대기</div>
+        <div class="prep-stage" id="vpWaitMsg"></div>
+        <div class="prep-bar"><span id="vpWaitBar"></span></div>
+        <div class="prep-steps" id="vpWaitSteps"></div>
+        <div class="prep-row" id="vpWaitBtns"></div>
+      </div>
+      <div class="vp-empty" id="vpEmpty"><b>결과 없음</b>왼쪽 ① ② 를 정하고 '실행'을 누르거나<br>⑤ 에서 pipeline.json 을 여세요</div>
+      <div class="vp-legend"><div><i style="background:var(--accent)"></i>트롤리</div><div><i style="background:var(--warning)"></i>하중 (매달림)</div><div><i style="background:var(--violet)"></i>하중 궤적</div></div>
+      <div class="viewport-hint">드래그 회전 · 휠 확대 · 더블클릭 리셋</div>
+    </div>
+
+    <!-- 현장 운영 · 내구도 -->
+    <section class="center-overlay" id="view-op">
+      <div class="ov-head">
+        <div><div class="section-title">현장 운영 · 내구도</div><div class="st-note" id="opHead">왼쪽 ③ ④ 에서 현장 운영을 실행하거나 ⑤ 에서 operation.json 을 여세요.</div></div>
+      </div>
+      <div class="pv-head" id="opKpis"></div>
+      <div class="ctx-box" id="opMarine"></div>
+      <div class="pv-grid">
+        <div class="pv-card"><canvas class="chart" id="cOpMoves"></canvas><div class="legend" id="lOpMoves"></div></div>
+        <div class="pv-card"><canvas class="chart" id="cOpWx"></canvas><div class="legend" id="lOpWx"></div></div>
+        <div class="pv-card"><canvas class="chart" id="cOpRisk"></canvas><div class="legend" id="lOpRisk"></div></div>
+        <div class="pv-card"><canvas class="chart" id="cOpLife"></canvas><div class="legend" id="lOpLife"></div></div>
+        <div class="pv-card" id="opSaltBox"><canvas class="chart" id="cOpSalt"></canvas><div class="legend" id="lOpSalt"></div></div>
+      </div>
+      <div class="pv-card">
+        <h4>부품 내구도 · 안정성 <span class="muted" id="opLedger"></span></h4>
+        <div class="tbl-wrap"><table id="opHealth"></table></div>
+      </div>
+      <div class="pv-grid two">
+        <div class="pv-card"><h4>사고 예방 알림 <select id="alertFilter"><option value="1">주의 이상</option><option value="2">경고 이상</option><option value="0">전체</option></select><select id="alertProc"><option value="">모든 절차</option></select></h4><div id="opAlerts" class="feed"></div></div>
+        <div class="pv-card"><h4>결정 기록</h4><div id="opDecisions" class="feed"></div></div>
+      </div>
+      <div class="pv-card"><h4>사고 · 정지 사유</h4><div id="opIncidents" class="note"></div></div>
+    </section>
+
+    <!-- 염해 · 예측 점수 -->
+    <section class="center-overlay" id="view-marine">
+      <div class="ov-head"><div><div class="section-title">염해 · 예측 점수</div><div class="st-note">현장 프리셋의 해안 노출(거리 · 방위 · 해안 형태 · 비래염분 지역)과 염해 방지 프리셋으로 ISO 9223 부식 속도 · 도장 열화 · 녹 면적을 해마다 진행하고, 부품 상태 예측의 교차검증 점수를 봅니다.</div></div></div>
+      <div class="pv-tabs" id="mrTabs"><button class="pv-tab active" data-pane="mrPaneSalt">염해 진행</button><button class="pv-tab" data-pane="mrPaneProg">예측 점수</button></div>
+      <div class="pv-pane active" id="mrPaneSalt">
+        <div class="pv-card">
+          <div class="pv-row"><button class="btn btn-sm" id="mrRun">염해 진행 계산</button><span class="inl">기간 <input id="mrYears" type="number" value="10" min="1" max="40"> 년</span><label class="pv-check" style="margin:0"><input id="mrMaint" type="checkbox" checked> 도장 점검 · 보수 포함</label></div>
+          <div id="mrSum" class="note">선택한 현장 프리셋(왼쪽 ③, 저장 전 편집 값 포함)에 방지 프리셋들을 바꿔 끼워 비교합니다.</div>
+        </div>
+        <div class="pv-card"><div class="tbl-wrap"><table id="mrTable"></table></div></div>
+        <div class="pv-grid">
+          <div class="pv-card"><canvas class="chart" id="cMrCoat"></canvas><div class="legend" id="lMrCoat"></div></div>
+          <div class="pv-card"><canvas class="chart" id="cMrLoss"></canvas><div class="legend" id="lMrLoss"></div></div>
+        </div>
+      </div>
+      <div class="pv-pane" id="mrPaneProg">
+        <div class="pv-card">
+          <h4>부품 상태 예측 점수 <span class="muted">시계열 열화 · 현장 하나 빼기 교차검증</span></h4>
+          <div class="pv-row"><button class="btn btn-sm btn-outline" id="pgRun">다시 계산 (3개 현장 · 3년 · 복제 4 · 몇 분)</button></div>
+          <div id="pgSum" class="note">저장된 점수(crane_demo prognostics)를 불러오는 중…</div>
+        </div>
+        <div class="pv-card"><div class="tbl-wrap"><table id="pgTable"></table></div></div>
+        <div class="pv-grid">
+          <div class="pv-card"><canvas class="chart" id="cPgPit"></canvas><div class="legend" id="lPgPit"></div></div>
+          <div class="pv-card"><canvas class="chart" id="cPgRel"></canvas><div class="legend" id="lPgRel"></div></div>
+          <div class="pv-card"><canvas class="chart" id="cPgHealth"></canvas><div class="legend" id="lPgHealth"></div></div>
+        </div>
+        <div class="pv-grid two">
+          <div class="pv-card"><h4>현장 하나 빼기 (v3 · v4)</h4><div class="tbl-wrap"><table id="pgFolds"></table></div></div>
+          <div class="pv-card"><h4>부품 종류별 (마지막 판)</h4><div class="tbl-wrap"><table id="pgKinds"></table></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 실데이터 보정 -->
+    <section class="center-overlay" id="view-cal">
+      <div class="ov-head"><div><div class="section-title">실데이터 보정</div><div class="st-note" id="calSum">조사한 실데이터(기상청 · 제조사 · 현장 사례 · 법규)와 모델 출력의 오차입니다. crane_demo fieldcal 결과(fieldcal.json)도 열 수 있습니다.</div></div>
+        <div class="pv-row" style="margin:0"><button class="btn btn-sm btn-outline" id="calQuick">빠른 확인 (짧은 표본)</button><button class="btn btn-sm" id="calFull">전체 보정 다시 계산 (몇 분)</button></div></div>
+      <div class="pv-card"><div class="tbl-wrap"><table id="calTable"></table></div></div>
+      <div class="pv-card"><h4>ERA5 재분석 → 기상청 관측 보정 <span class="muted">지점 6곳, 지점 하나 빼기 교차검증 — 항만 기후에 쓰는 계수</span></h4><div class="tbl-wrap"><table id="calEra5"></table></div></div>
+    </section>
+
+    <!-- 환경 · 모델 설정 -->
+    <section class="center-overlay" id="view-settings">
+      <div class="section-title">설정 — 모델 다운로드/삭제 · 시작 시 자동 준비 · 모델 폴더 · 저장 위치</div>
+      <div class="pv-status" id="st-status"></div>
+      <div class="pv-grid two">
+        <div class="pv-card">
+          <h4>모델 <span class="muted">Hugging Face safetensors · 진행률 · 이어받기 · 삭제</span></h4>
+          <div class="mdl-meta" id="mdl-root-line" style="margin:0 0 8px"></div>
+          <div id="mdl-list"><div class="empty">모델 관리는 데스크톱 앱 · crane_demo serve 에서 합니다.</div></div>
+          <div class="pv-row" style="margin-top:4px"><button class="btn btn-sm" id="mdlPrepare">없는 모델 모두 받기</button></div>
+          <div class="ct-sec">다운로드 설정</div>
+          <label class="pv-check"><input type="checkbox" id="mdl-startup"> 앱을 켤 때 없는 모델 모두 받기 (TTM-R3 + LAYA 약 0.85 GB · 기본 켬)</label>
+          <label class="pv-check"><input type="checkbox" id="mdl-autoload"> 받아 둔 · 다 받은 모델을 바로 불러오기 (LAYA 는 메모리 약 1.7 GB)</label>
+          <label class="pv-check"><input type="checkbox" id="mdl-auto"> 실행할 때 모델이 없으면 백그라운드로 받기 (이번 실행은 Holt · 규칙 판정)</label>
+          <div class="form-group" style="margin-top:6px"><label>모델 서버 (비우면 https://huggingface.co · 사내 미러 주소 가능)</label><input type="text" id="mdl-endpoint" placeholder="https://huggingface.co"></div>
+          <div class="form-group"><label>액세스 토큰 (선택 · 저장 후에는 표시하지 않음)</label><input type="password" id="mdl-token" placeholder="hf_..." autocomplete="off"></div>
+          <div class="pv-row"><button class="btn btn-sm" id="mdlSave">다운로드 설정 저장</button><button class="btn btn-sm btn-outline" id="mdlClearToken">토큰 삭제</button></div>
+        </div>
+        <div class="pv-card">
+          <h4>모델 폴더 · 저장 위치</h4>
+          <div class="form-group"><label>모델 폴더 (경로에 'ttm' · 'laya' 가 들어간 safetensors 폴더를 찾음)</label><input type="text" id="mdl-root" placeholder="models 폴더 경로"></div>
+          <div class="pv-row"><button class="btn btn-sm" id="mdlSetRoot">폴더 바꾸기</button><button class="btn btn-sm btn-outline hidden" id="mdlSibling">endmill-sandbox 모델 폴더 쓰기</button></div>
+          <div class="st-note" id="mdl-sibling-note" style="margin-top:0"></div>
+          <div class="ct-sec">저장 위치</div>
+          <div class="pv-kv" id="st-paths"></div>
+          <div class="st-note">
+            <b>TTM-R3</b> (5.9 MB) 는 근무 시계열(권선 온도 · 로프 손상 · 라이닝)의 잔차를 예측합니다. 없으면 Holt 감쇠 추세 + 물리 사전값을 씁니다.
+            <b>LAYA</b> (843 MB) 는 판정을 상향만 할 수 있는 조언 모델이고 작업자 선택 카드에 확률을 붙입니다. 없으면 결정적 안전 게이트만 씁니다.
+            모델이 받아지는 동안 '실행'을 누르면 아래 대기 작업으로 기다렸다가 준비되면 자동으로 이어서 실행합니다 ('모델 없이 진행'도 가능).
+          </div>
+        </div>
+      </div>
+      <div class="pv-card">
+        <h4>모델 대기 작업 <span class="muted">필요한 모델이 준비될 때까지 일시정지 → 준비되면 자동 재개</span></h4>
+        <div id="mq-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="resizer resizer-v right" id="resizerRight"></div>
+
+  <aside class="panel-right" id="panelRight">
+    <button class="panel-toggle-btn" data-toggle="panelRight" title="우측 패널 접기">▶</button>
+    <div class="panel-title"><b>판정</b><small>게이트 · LAYA 조언 · 작업자 선택</small></div>
+    <div class="panel-scroll">
+      <div class="summary-block">
+        <div class="ct-sec ct-sec-row"><span>핵심 지표</span><span class="help" tabindex="0" data-tip="마지막 사이클 해석의 요약입니다. 색은 허용 한계 대비 상태입니다 (초록 통과 · 노랑 주의 · 빨강 조치).">?</span></div>
+        <div class="spec-grid" id="kpis"><div class="empty spec-item wide">실행하거나 결과 파일을 여세요.</div></div>
+      </div>
+      <div class="panel-section-header" data-section="secDecision">
+        <span class="sec-title"><span class="step-no sec-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V7z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><span class="sec-name">판정 · 작업자 선택</span><span class="help" tabindex="0" data-tip="결정적 안전 게이트가 판정을 정하고, LAYA 는 판정을 더 보수적으로만 바꿀 수 있습니다. 작업자가 고른 선택은 SDS 원장에 일치율로 남습니다.">?</span></span><span class="step-sum" id="sum-dec"></span><span class="chevron">▼</span>
+      </div>
+      <div class="panel-section-body" id="secDecision"><div id="decision" class="empty">—</div></div>
+      <div class="panel-section-header" data-section="secModels">
+        <span class="sec-title"><span class="step-no sec-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg></span><span class="sec-name">학습 모델</span></span><span class="step-sum" id="sum-mdl"></span><span class="chevron">▼</span>
+      </div>
+      <div class="panel-section-body" id="secModels">
+        <div class="mdl-mini" id="mdlMini"><div class="note">파일 모드에서는 모델을 쓰지 않습니다.</div></div>
+        <button class="link-btn" onclick="switchView('settings')">모델 다운로드 · 폴더 설정 →</button>
       </div>
     </div>
-    <div class="card">
-      <h2>판정</h2>
-      <div id="decision" class="muted">—</div>
+  </aside>
+
+  <div class="resizer resizer-h" id="resizerBottom"></div>
+
+  <section class="panel-bottom" id="panelBottom">
+    <button class="panel-toggle-btn" data-toggle="panelBottom" title="하단 패널 접기">▼</button>
+    <div class="panel-section-header" data-section="secOutput">
+      <span class="sec-title"><span class="step-no">6</span><span class="sec-name">출력</span><span class="help" tabindex="0" data-tip="흔들림 — 하중 수평 변위 · 로프 길이 · 장력, 이동별 표&#10;모터 — 축별 전류 · 권선 온도 · 속도 · 전력&#10;게이트 — 안전 게이트 전체 (심각도 순)&#10;근무 · 예측 — 근무 요약과 임계 도달 예측&#10;방식 비교 · 교차검증 · 로그">?</span></span><span class="step-sum">흔들림 · 모터 · 게이트 · 근무·예측 · 방식 비교 · 교차검증 · 로그</span><span class="chevron">▼</span>
+    </div>
+    <div class="panel-section-body" id="secOutput">
+      <div class="bottom-tabs" id="tabs">
+        <button class="bottom-tab active" data-t="sway">흔들림</button>
+        <button class="bottom-tab" data-t="motor">모터</button>
+        <button class="bottom-tab" data-t="gates">게이트</button>
+        <button class="bottom-tab" data-t="duty">근무 · 예측</button>
+        <button class="bottom-tab" data-t="compare">방식 비교</button>
+        <button class="bottom-tab" data-t="xcheck">교차검증</button>
+        <button class="bottom-tab" data-t="log">로그</button>
+      </div>
+      <div class="bottom-body" id="bottomBody">
+        <div class="tab on" id="t-sway">
+          <div class="charts">
+            <div class="chart-box"><canvas class="chart" id="cSway"></canvas><div class="legend" id="lSway"></div></div>
+            <div class="chart-box"><canvas class="chart" id="cRope"></canvas><div class="legend" id="lRope"></div></div>
+          </div>
+          <div class="sub-title">이동</div>
+          <div class="tbl-wrap"><table id="moves"></table></div>
+        </div>
+        <div class="tab" id="t-motor">
+          <div class="charts">
+            <div class="chart-box"><canvas class="chart" id="cCur"></canvas><div class="legend" id="lCur"></div></div>
+            <div class="chart-box"><canvas class="chart" id="cTemp"></canvas><div class="legend" id="lTemp"></div></div>
+            <div class="chart-box"><canvas class="chart" id="cVel"></canvas><div class="legend" id="lVel"></div></div>
+            <div class="chart-box"><canvas class="chart" id="cPow"></canvas><div class="legend" id="lPow"></div></div>
+          </div>
+          <div class="sub-title">축</div>
+          <div class="tbl-wrap"><table id="axes"></table></div>
+        </div>
+        <div class="tab" id="t-gates"><div class="tbl-wrap"><table id="gates"></table></div></div>
+        <div class="tab" id="t-duty">
+          <div id="dutySum" class="ctx-box"></div>
+          <div class="charts" id="fcCharts"></div>
+        </div>
+        <div class="tab" id="t-compare">
+          <div class="chart-box"><canvas class="chart" id="cCmp" style="height:230px"></canvas></div>
+          <div class="sub-title">방식별</div>
+          <div class="tbl-wrap"><table id="cmpTable"></table></div>
+        </div>
+        <div class="tab" id="t-xcheck"><div id="xcheck" class="empty">—</div></div>
+        <div class="tab" id="t-log"><div class="log-console" id="logOut"></div></div>
+      </div>
     </div>
   </section>
-  <section class="card">
-    <div class="tabs" id="tabs">
-      <button data-t="sway" class="on">흔들림</button>
-      <button data-t="motor">모터</button>
-      <button data-t="gates">게이트</button>
-      <button data-t="duty">근무 · 예측</button>
-      <button data-t="compare">방식 비교</button>
-      <button data-t="xcheck">교차검증</button>
-      <button data-t="op">현장 운영 · 내구도</button>
-      <button data-t="marine">염해 · 예측 점수</button>
-      <button data-t="cal">실데이터 보정</button>
-    </div>
-    <div class="tab on" id="t-sway">
-      <div class="charts">
-        <div><canvas id="cSway"></canvas><div class="legend" id="lSway"></div></div>
-        <div><canvas id="cRope"></canvas><div class="legend" id="lRope"></div></div>
-      </div>
-      <h2 style="margin-top:12px">이동</h2>
-      <table id="moves"></table>
-    </div>
-    <div class="tab" id="t-motor">
-      <div class="charts">
-        <div><canvas id="cCur"></canvas><div class="legend" id="lCur"></div></div>
-        <div><canvas id="cTemp"></canvas><div class="legend" id="lTemp"></div></div>
-        <div><canvas id="cVel"></canvas><div class="legend" id="lVel"></div></div>
-        <div><canvas id="cPow"></canvas><div class="legend" id="lPow"></div></div>
-      </div>
-      <table id="axes" style="margin-top:12px"></table>
-    </div>
-    <div class="tab" id="t-gates"><table id="gates"></table></div>
-    <div class="tab" id="t-duty">
-      <div id="dutySum" class="note"></div>
-      <div class="charts" id="fcCharts"></div>
-    </div>
-    <div class="tab" id="t-compare"><canvas id="cCmp" style="height:240px"></canvas><table id="cmpTable" style="margin-top:10px"></table></div>
-    <div class="tab" id="t-xcheck"><div id="xcheck" class="muted">—</div></div>
-    <div class="tab" id="t-op">
-      <div id="opHead" class="note">현장 운영을 실행하거나 operation.json 을 여세요.</div>
-      <div class="kpis" id="opKpis"></div>
-      <div id="opMarine" class="note" style="margin-top:8px"></div>
-      <div class="charts" style="margin-top:12px">
-        <div><canvas id="cOpMoves"></canvas><div class="legend" id="lOpMoves"></div></div>
-        <div><canvas id="cOpWx"></canvas><div class="legend" id="lOpWx"></div></div>
-        <div><canvas id="cOpRisk"></canvas><div class="legend" id="lOpRisk"></div></div>
-        <div><canvas id="cOpLife"></canvas><div class="legend" id="lOpLife"></div></div>
-        <div id="opSaltBox"><canvas id="cOpSalt"></canvas><div class="legend" id="lOpSalt"></div></div>
-      </div>
-      <h2 style="margin-top:12px">부품 내구도 · 안정성 <span class="muted" id="opLedger"></span></h2>
-      <table id="opHealth"></table>
-      <div class="split">
-        <div><h2>사고 예방 알림 <select id="alertFilter" style="width:auto;margin-left:6px"><option value="1">주의 이상</option><option value="2">경고 이상</option><option value="0">전체</option></select> <select id="alertProc" style="width:auto"><option value="">모든 절차</option></select></h2><div id="opAlerts" class="feed"></div></div>
-        <div><h2>결정 기록</h2><div id="opDecisions" class="feed"></div></div>
-      </div>
-      <h2 style="margin-top:12px">사고 · 정지 사유</h2>
-      <div id="opIncidents" class="note"></div>
-    </div>
-    <div class="tab" id="t-marine">
-      <div class="btnrow"><button id="mrRun">염해 진행 계산 (선택한 현장 · 방지 프리셋 비교)</button><span class="inl">기간 <input id="mrYears" type="number" value="10" min="1" max="40"> 년</span><span class="inl"><input id="mrMaint" type="checkbox" checked> 도장 점검 · 보수 포함</span></div>
-      <div id="mrSum" class="note" style="margin-top:8px">현장 프리셋의 해안 노출(거리 · 방위 · 해안 형태 · 비래염분 지역)과 염해 방지 프리셋으로 ISO 9223 부식 속도 · 도장 열화 · 녹 면적을 해마다 진행합니다. 프리셋 편집 값(저장 전)도 그대로 씁니다.</div>
-      <table id="mrTable" style="margin-top:8px"></table>
-      <div class="charts" style="margin-top:12px">
-        <div><canvas id="cMrCoat"></canvas><div class="legend" id="lMrCoat"></div></div>
-        <div><canvas id="cMrLoss"></canvas><div class="legend" id="lMrLoss"></div></div>
-      </div>
-      <h2 style="margin-top:16px">부품 상태 예측 점수 — 시계열 열화 · 현장 하나 빼기 교차검증</h2>
-      <div class="btnrow"><button id="pgRun">다시 계산 (3개 현장 · 3년 · 복제 4 · 몇 분)</button></div>
-      <div id="pgSum" class="note" style="margin-top:8px">저장된 점수(crane_demo prognostics)를 불러오는 중…</div>
-      <table id="pgTable" style="margin-top:8px"></table>
-      <div class="charts" style="margin-top:12px">
-        <div><canvas id="cPgPit"></canvas><div class="legend" id="lPgPit"></div></div>
-        <div><canvas id="cPgRel"></canvas><div class="legend" id="lPgRel"></div></div>
-        <div><canvas id="cPgHealth"></canvas><div class="legend" id="lPgHealth"></div></div>
-      </div>
-      <div class="split">
-        <div><h2>현장 하나 빼기 (v3 · v4)</h2><table id="pgFolds"></table></div>
-        <div><h2>부품 종류별 (마지막 판)</h2><table id="pgKinds"></table></div>
-      </div>
-    </div>
-    <div class="tab" id="t-cal">
-      <div class="btnrow"><button id="calQuick">빠른 확인 (짧은 표본 · 오차 큼)</button><button id="calFull">전체 보정 다시 계산 (몇 분)</button></div>
-      <div id="calSum" class="note" style="margin-top:8px">조사한 실데이터(기상청 · 제조사 · 현장 사례 · 법규)와 모델 출력의 오차입니다. crane_demo fieldcal 결과(fieldcal.json)도 열 수 있습니다.</div>
-      <table id="calTable" style="margin-top:8px"></table>
-      <h2 style="margin-top:14px">ERA5 재분석 → 기상청 관측 보정 <span class="muted">(지점 6곳, 지점 하나 빼기 교차검증 — 항만 기후에 쓰는 계수)</span></h2>
-      <table id="calEra5"></table>
-    </div>
-  </section>
-</main>
 </div>
+
+<div class="status-bar">
+  <div class="sb-item">모드: <strong id="src">파일</strong></div>
+  <div class="sb-sep"></div>
+  <div class="sb-item">크레인: <strong id="sb-crane">-</strong></div>
+  <div class="sb-sep"></div>
+  <div class="sb-item">사이클: <strong id="sb-cycle">-</strong></div>
+  <div class="sb-sep"></div>
+  <div class="sb-item">판정: <strong id="sb-dec">-</strong></div>
+  <div class="sb-sep"></div>
+  <div class="sb-item sb-link" onclick="switchView('op')">운영: <strong id="sb-op">-</strong></div>
+  <div class="sb-sep"></div>
+  <div class="sb-item sb-link" onclick="switchView('settings')">모델: <strong id="sb-models">-</strong></div>
+  <div class="sb-sep"></div>
+  <div class="sb-item"><strong id="sb-msg"></strong></div>
+  <div style="margin-left:auto" class="sb-item">v0.1.0 | Tauri + Rust</div>
+</div>
+
 <div id="decOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="decQ">
-  <div class="dcard">
-    <div class="dhead"><span class="chip" id="decHeader"></span><span class="muted" id="decAt"></span><span class="spacer" style="flex:1"></span><span class="muted" id="decRisk"></span></div>
-    <div class="dq" id="decQ"></div>
-    <div class="note" id="decAttn"></div>
-    <div id="decOpts"></div>
-    <div class="note" style="margin-top:8px">숫자 키로 고르고 Enter 는 권장입니다. 막힌 선택지는 안전 기준(게이트)이 고를 수 없게 한 것입니다.</div>
-    <div class="btnrow" style="margin-top:6px"><button id="decAuto">남은 결정은 모두 권장으로</button></div>
+  <div class="choice-card attention">
+    <div class="choice-head"><span class="choice-tag" id="decHeader"></span><span class="choice-meta" id="decAt"></span><span class="choice-badge" id="decRisk" style="margin-left:auto"></span></div>
+    <div class="choice-q" id="decQ"></div>
+    <div class="choice-why" id="decAttn"></div>
+    <div class="choice-opts" id="decOpts"></div>
+    <div class="choice-foot"><span><kbd>1</kbd>–<kbd>9</kbd> 고르기 · <kbd>Enter</kbd> 권장 · 막힌 선택지는 안전 기준(게이트)이 고를 수 없게 한 것</span><button class="btn btn-sm btn-outline" id="decAuto">남은 결정은 모두 권장으로</button></div>
   </div>
 </div>
-<div id="toasts" aria-live="polite"></div>
+<div id="toasts" class="toast-stack" aria-live="polite"></div>
+
 <script>
 const TAURI = window.__TAURI__ && (window.__TAURI__.invoke || (window.__TAURI__.tauri && window.__TAURI__.tauri.invoke));
 // crane_demo serve 로 열면 같은 명령을 /api/<명령> 으로 부른다
@@ -346,26 +948,164 @@ async function httpCall(cmd, args) {
 }
 const online = () => !!TAURI || HTTP;
 const invoke = (cmd, args) => TAURI ? TAURI(cmd, args) : HTTP ? httpCall(cmd, args) : Promise.reject('파일 모드');
-const api = (cmd, args) => TAURI ? TAURI('api_call', { cmd, args: args || {} }) : HTTP ? httpCall(cmd, args) : Promise.reject('파일 모드');
+// 공통 입구. Tauri v1 의 invoke 는 인자를 {cmd, ...args} 로 펼쳐 보내므로 인자 이름이 cmd 면 명령 이름을 덮어쓴다 → name 으로 보낸다
+const api = (cmd, args) => TAURI ? TAURI('api_call', { name: cmd, args: args || {} }) : HTTP ? httpCall(cmd, args) : Promise.reject('파일 모드');
+// 모델 · 설정 — endmill-sandbox 처럼 개별 명령(models_catalog · models_download …)으로 부른다 (인자는 snake_case)
+const mcall = (cmd, args) => invoke(cmd, args || {});
 const $ = id => document.getElementById(id);
+// 캔버스 색상 — :root 디자인 토큰을 그대로 읽어 화면 UI 와 같은 팔레트로 그린다
 const UI = (() => { const cs = getComputedStyle(document.documentElement); const v = n => cs.getPropertyValue(n).trim();
-  return { plot: v('--bg-plot'), grid: v('--plot-grid'), gridStrong: v('--plot-grid-strong'), text: v('--text'), dim: v('--text-dim'), muted: v('--text-muted'),
-    accent: v('--accent'), violet: v('--violet'), teal: v('--teal'), amber: v('--amber'), danger: v('--danger'), success: v('--success'), mono: v('--font-mono'), sans: v('--font-sans') }; })();
+  return { plot: v('--bg-plot'), grid: v('--plot-grid'), gridStrong: v('--plot-grid-strong'), text: v('--text'), bright: v('--text-bright'), label: v('--text-dim'), muted: v('--text-muted'),
+    accent: v('--accent'), violet: v('--violet'), warning: v('--warning'), alert: v('--alert'), danger: v('--danger'), success: v('--success'), card: v('--bg-card'), mono: v('--font-mono'), sans: v('--font-sans') }; })();
 const AXES = [['travel', '주행'], ['trolley', '횡행'], ['hoist', '권상']];
-const AX_COL = [UI.accent, UI.teal, UI.amber];
+const AX_COL = [UI.accent, UI.violet, UI.warning];
 const SEV = ['통과', '관찰', '초과', '위험'];
+const MODE_LABEL = { off: '없음', zv: 'ZV', zvd: 'ZVD', ei: 'EI', closed_loop: 'LQR' };
 let REPORT = null, COMPARE = null, play = { on: false, t: 0, last: 0 };
 let view = { yaw: -0.65, pitch: 0.42, dist: 1.0, dragging: false, px: 0, py: 0 };
+const SHOW = { trail: true, grid: true, rope: true };
+let VIEW = 'cycle';
 
-function setStatus(s) { $('status').textContent = s || ''; }
 function fmt(v, d = 1) { return (v === null || v === undefined || !isFinite(v)) ? '—' : Number(v).toFixed(d); }
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function appendLog(msg, kind = '') {
+  const out = $('logOut'); if (!out) return;
+  const d = document.createElement('div'); d.className = 'ln ' + kind;
+  d.innerHTML = `<span class="t">${new Date().toLocaleTimeString('ko-KR', { hour12: false })}</span>${esc(msg)}`;
+  out.prepend(d);
+  while (out.childNodes.length > 400) out.lastChild.remove();
+}
+function setStatus(s, kind = '') { $('sb-msg').textContent = s || ''; if (s) appendLog(s, kind || (/^오류|실패/.test(s) ? 'err' : '')); }
+function setHud(state) {
+  $('statusText').textContent = state;
+  $('statusDot').className = 'status-dot' + (state === 'ERROR' ? ' error' : ['READY', 'PAUSED', 'RUNNING'].includes(state) ? ' idle' : '');
+}
+function toast(title, body, kind = '', ms = 6000) {
+  const t = document.createElement('div'); t.className = `toast ${kind}`;
+  t.innerHTML = `<div class="toast-title">${title}</div>${body ? `<div class="toast-body">${body}</div>` : ''}`;
+  $('toasts').appendChild(t);
+  while ($('toasts').childNodes.length > 5) $('toasts').firstChild.remove();
+  setTimeout(() => t.remove(), ms);
+}
+
+// ---------- 레이아웃: 화면 전환 · 패널 접기 · 크기 조절 · 아코디언 · 툴팁 ----------
+function switchView(v) {
+  VIEW = v;
+  $('appLayout').dataset.view = v;
+  document.querySelectorAll('.menu-btn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  document.querySelectorAll('.center-overlay').forEach(o => o.classList.toggle('visible', o.id === 'view-' + v));
+  if (v === 'settings') stEnter();
+  scheduleRedraw();
+}
+document.querySelectorAll('.menu-btn[data-view]').forEach(b => b.onclick = () => switchView(b.dataset.view));
+
+const root = document.documentElement;
+const PANEL = { left: 300, right: 330, bottom: 300 };
+function cssPx(name) { return parseInt(getComputedStyle(root).getPropertyValue(name)) || 0; }
+function initResizer(el, dir, cssVar, min, sign) {
+  el.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const start = dir === 'x' ? e.clientX : e.clientY, size = cssPx(cssVar);
+    el.classList.add('active'); document.body.style.cursor = dir === 'x' ? 'col-resize' : 'row-resize'; document.body.style.userSelect = 'none';
+    const move = ev => { const d = (dir === 'x' ? ev.clientX : ev.clientY) - start; root.style.setProperty(cssVar, Math.max(min, size + sign * d) + 'px'); };
+    const up = () => { el.classList.remove('active'); document.body.style.cursor = ''; document.body.style.userSelect = ''; document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  });
+}
+initResizer($('resizerLeft'), 'x', '--left-w', 230, 1);
+initResizer($('resizerRight'), 'x', '--right-w', 260, -1);
+initResizer($('resizerBottom'), 'y', '--bottom-h', 140, -1);
+$('resizerLeft').ondblclick = () => root.style.setProperty('--left-w', '300px');
+$('resizerRight').ondblclick = () => root.style.setProperty('--right-w', '330px');
+$('resizerBottom').ondblclick = () => root.style.setProperty('--bottom-h', '300px');
+
+document.querySelectorAll('.panel-toggle-btn[data-toggle]').forEach(btn => btn.addEventListener('click', () => {
+  const id = btn.dataset.toggle, panel = $(id), shut = panel.classList.toggle('collapsed');
+  if (id === 'panelLeft') {
+    btn.textContent = shut ? '▶' : '◀'; btn.title = shut ? '좌측 패널 펼치기' : '좌측 패널 접기';
+    if (shut) { PANEL.left = Math.max(230, cssPx('--left-w')); root.style.setProperty('--left-w', getComputedStyle(root).getPropertyValue('--rail-w').trim()); }
+    else root.style.setProperty('--left-w', PANEL.left + 'px');
+  } else if (id === 'panelRight') {
+    btn.textContent = shut ? '◀' : '▶'; btn.title = shut ? '우측 패널 펼치기' : '우측 패널 접기';
+  } else if (id === 'panelBottom') {
+    btn.textContent = shut ? '▲' : '▼'; btn.title = shut ? '하단 패널 펼치기' : '하단 패널 접기';
+    if (shut) { PANEL.bottom = Math.max(140, cssPx('--bottom-h')); root.style.setProperty('--bottom-h', getComputedStyle(root).getPropertyValue('--bar-h').trim()); }
+    else root.style.setProperty('--bottom-h', PANEL.bottom + 'px');
+  }
+  scheduleRedraw();
+}));
+function panelOpen(id) { const p = $(id); if (p && p.classList.contains('collapsed')) document.querySelector(`.panel-toggle-btn[data-toggle="${id}"]`).click(); }
+
+document.querySelectorAll('.panel-section-header').forEach(h => h.addEventListener('click', e => {
+  if (e.target.closest('.help')) return;
+  const id = h.dataset.section;
+  if (id === 'secOutput') { document.querySelector('.panel-toggle-btn[data-toggle="panelBottom"]').click(); return; }
+  const body = $(id); if (!body) return;
+  const rail = h.closest('.panel-left.collapsed');
+  if (rail) { panelOpen(rail.id); body.classList.remove('collapsed'); h.classList.remove('collapsed'); return; }
+  const shut = body.classList.toggle('collapsed'); h.classList.toggle('collapsed', shut);
+}));
+function sectionOpen(id) { const b = $(id), h = document.querySelector(`.panel-section-header[data-section="${id}"]`); if (b) b.classList.remove('collapsed'); if (h) h.classList.remove('collapsed'); }
+
+(function tips() {
+  const pop = document.createElement('div'); pop.className = 'tip-pop'; pop.setAttribute('role', 'tooltip');
+  let cur = null;
+  function show(el) {
+    cur = el; const title = el.dataset.tipTitle;
+    pop.innerHTML = (title ? `<b>${esc(title)}</b>` : '') + esc(el.dataset.tip);
+    if (!pop.isConnected) document.body.appendChild(pop);
+    const r = el.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    let x = Math.min(Math.max(8, r.left), innerWidth - w - 8), y = r.bottom + 8;
+    if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 8);
+    pop.style.left = x + 'px'; pop.style.top = y + 'px'; pop.classList.add('show');
+  }
+  function hide() { cur = null; pop.classList.remove('show'); }
+  document.addEventListener('mouseover', e => { const el = e.target.closest('[data-tip]'); if (el && el !== cur) show(el); else if (!el && cur) hide(); });
+  document.addEventListener('focusin', e => { const el = e.target.closest('[data-tip]'); if (el) show(el); });
+  document.addEventListener('focusout', hide);
+  document.addEventListener('scroll', hide, true);
+})();
+
+// 다시 그리기 — 화면 · 패널 크기가 바뀌면 보이는 캔버스만 다시 그린다
+let rzFrame = 0;
+function scheduleRedraw() { if (rzFrame) return; rzFrame = requestAnimationFrame(() => { rzFrame = 0; redrawVisible(); }); }
+function activeTab() { return (document.querySelector('#tabs .bottom-tab.active') || {}).dataset?.t || 'sway'; }
+function renderActiveTab() {
+  const t = activeTab();
+  if (t === 'compare') { renderCompare(); return; }
+  if (!REPORT) return;
+  if (t === 'sway') renderSway(); else if (t === 'motor') renderMotor(); else if (t === 'duty') renderDuty();
+}
+function redrawVisible() {
+  if (VIEW === 'cycle') { drawScene(); renderActiveTab(); }
+  else if (VIEW === 'op') renderOp();
+  else if (VIEW === 'marine') { renderMarine(); renderProg(); }
+}
+new ResizeObserver(scheduleRedraw).observe($('vpWrap'));
+new ResizeObserver(scheduleRedraw).observe($('bottomBody'));
+new ResizeObserver(scheduleRedraw).observe($('panelCenter'));
+
+$('tabs').onclick = e => {
+  const b = e.target.closest('.bottom-tab'); if (!b) return;
+  document.querySelectorAll('#tabs .bottom-tab').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('#bottomBody > .tab').forEach(t => t.classList.toggle('on', t.id === 't-' + b.dataset.t));
+  panelOpen('panelBottom');
+  scheduleRedraw();
+};
+function showTab(t) { const b = document.querySelector(`#tabs .bottom-tab[data-t="${t}"]`); if (b) b.click(); }
+$('mrTabs').onclick = e => {
+  const b = e.target.closest('.pv-tab'); if (!b) return;
+  document.querySelectorAll('#mrTabs .pv-tab').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('#view-marine .pv-pane').forEach(p => p.classList.toggle('active', p.id === b.dataset.pane));
+  scheduleRedraw();
+};
 
 // ---------- 캔버스 공통 ----------
 function prep(c) {
   const ctx = c.getContext && c.getContext('2d');
   if (!ctx) return null;
-  const dpr = window.devicePixelRatio || 1, w = c.clientWidth || 600, h = c.clientHeight || 220;
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (!w || !h) return null;
   if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h); ctx.fillStyle = UI.plot; ctx.fillRect(0, 0, w, h);
@@ -381,39 +1121,42 @@ function niceTicks(lo, hi, n = 5) {
 }
 // opts: {title, xLabel, yLabel, series:[{name,x,y,color,dash,width}], bands:[{x,lo,hi,color}], hlines:[{y,label,color}], vlines:[{x,color}], xMin,xMax,yMin,yMax}
 function chart(c, opts, legendEl) {
+  if (legendEl) legendEl.innerHTML = (opts.series || []).filter(s => s.name).map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('');
   const P = prep(c); if (!P) return; const { ctx, w, h } = P;
-  const m = { l: 52, r: 12, t: 22, b: 30 };
+  const m = { l: 50, r: 12, t: 24, b: 28 };
   let xs = [], ys = [];
   for (const s of opts.series || []) { for (let i = 0; i < s.x.length; i += Math.max(1, Math.floor(s.x.length / 4000))) { if (isFinite(s.y[i])) { xs.push(s.x[i]); ys.push(s.y[i]); } } }
   for (const b of opts.bands || []) { xs.push(...b.x); ys.push(...b.lo.filter(isFinite), ...b.hi.filter(isFinite)); }
   for (const l of opts.hlines || []) ys.push(l.y);
-  if (!xs.length) { ctx.fillStyle = UI.muted; ctx.font = `12px ${UI.sans}`; ctx.fillText('데이터 없음', 12, 24); return; }
+  ctx.fillStyle = UI.label; ctx.textAlign = 'left'; ctx.font = `600 11px ${UI.sans}`; if (opts.title) ctx.fillText(opts.title, 10, 16);
+  if (!xs.length) { ctx.fillStyle = UI.muted; ctx.font = `11px ${UI.sans}`; ctx.fillText('데이터 없음', 10, 40); return; }
   let x0 = opts.xMin ?? Math.min(...xs), x1 = opts.xMax ?? Math.max(...xs), y0 = opts.yMin ?? Math.min(...ys), y1 = opts.yMax ?? Math.max(...ys);
   if (x1 - x0 < 1e-12) x1 = x0 + 1; if (y1 - y0 < 1e-12) { y1 += 1; y0 -= 1; }
-  const pad = (y1 - y0) * 0.06; y0 -= pad; y1 += pad;
+  const pad = (y1 - y0) * 0.06; if (opts.yMin == null) y0 -= pad; if (opts.yMax == null) y1 += pad;
   const X = v => m.l + (v - x0) / (x1 - x0) * (w - m.l - m.r), Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
-  ctx.font = `11px ${UI.mono}`; ctx.lineWidth = 1;
-  for (const v of niceTicks(y0, y1)) { ctx.strokeStyle = UI.grid; ctx.beginPath(); ctx.moveTo(m.l, Y(v)); ctx.lineTo(w - m.r, Y(v)); ctx.stroke(); ctx.fillStyle = UI.muted; ctx.textAlign = 'right'; ctx.fillText(String(v), m.l - 6, Y(v) + 4); }
-  for (const v of niceTicks(x0, x1, 6)) { ctx.strokeStyle = UI.grid; ctx.beginPath(); ctx.moveTo(X(v), m.t); ctx.lineTo(X(v), h - m.b); ctx.stroke(); ctx.fillStyle = UI.muted; ctx.textAlign = 'center'; ctx.fillText(String(v), X(v), h - m.b + 14); }
-  ctx.strokeStyle = UI.gridStrong; ctx.strokeRect(m.l, m.t, w - m.l - m.r, h - m.t - m.b);
+  ctx.font = `10px ${UI.mono}`; ctx.lineWidth = 1;
+  for (const v of niceTicks(y0, y1)) { ctx.strokeStyle = UI.grid; ctx.beginPath(); ctx.moveTo(m.l, Y(v)); ctx.lineTo(w - m.r, Y(v)); ctx.stroke(); ctx.fillStyle = UI.muted; ctx.textAlign = 'right'; ctx.fillText(String(v), m.l - 6, Y(v) + 3); }
+  for (const v of niceTicks(x0, x1, 6)) { ctx.strokeStyle = UI.grid; ctx.beginPath(); ctx.moveTo(X(v), m.t); ctx.lineTo(X(v), h - m.b); ctx.stroke(); ctx.fillStyle = UI.muted; ctx.textAlign = 'center'; ctx.fillText(String(v), X(v), h - m.b + 13); }
+  ctx.strokeStyle = UI.gridStrong; ctx.strokeRect(m.l + 0.5, m.t + 0.5, w - m.l - m.r - 1, h - m.t - m.b - 1);
+  ctx.save(); ctx.beginPath(); ctx.rect(m.l, m.t, w - m.l - m.r, h - m.t - m.b); ctx.clip();
   for (const b of opts.bands || []) {
-    ctx.fillStyle = b.color; ctx.globalAlpha = 0.22; ctx.beginPath();
+    ctx.fillStyle = b.color; ctx.globalAlpha = 0.16; ctx.beginPath();
     b.x.forEach((v, i) => i ? ctx.lineTo(X(v), Y(b.hi[i])) : ctx.moveTo(X(v), Y(b.hi[i])));
     for (let i = b.x.length - 1; i >= 0; i--) ctx.lineTo(X(b.x[i]), Y(b.lo[i]));
     ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
   }
-  for (const l of opts.hlines || []) { ctx.strokeStyle = l.color || UI.danger; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(m.l, Y(l.y)); ctx.lineTo(w - m.r, Y(l.y)); ctx.stroke(); ctx.setLineDash([]); if (l.label) { ctx.fillStyle = l.color || UI.danger; ctx.textAlign = 'right'; ctx.fillText(l.label, w - m.r - 4, Y(l.y) - 4); } }
-  for (const l of opts.vlines || []) { ctx.strokeStyle = l.color || UI.muted; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(l.x), m.t); ctx.lineTo(X(l.x), h - m.b); ctx.stroke(); ctx.setLineDash([]); }
+  for (const l of opts.vlines || []) { ctx.strokeStyle = l.color || UI.gridStrong; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(l.x), m.t); ctx.lineTo(X(l.x), h - m.b); ctx.stroke(); ctx.setLineDash([]); }
   for (const s of opts.series || []) {
     ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.5; if (s.dash) ctx.setLineDash(s.dash);
     ctx.beginPath(); let started = false; const step = Math.max(1, Math.floor(s.x.length / 3000));
     for (let i = 0; i < s.x.length; i += step) { const yy = s.y[i]; if (!isFinite(yy)) { started = false; continue; } if (!started) { ctx.moveTo(X(s.x[i]), Y(yy)); started = true; } else ctx.lineTo(X(s.x[i]), Y(yy)); }
     ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
   }
-  ctx.fillStyle = UI.dim; ctx.textAlign = 'left'; ctx.font = `12px ${UI.sans}`; if (opts.title) ctx.fillText(opts.title, m.l, 14);
-  ctx.fillStyle = UI.muted; ctx.font = `11px ${UI.sans}`; if (opts.yLabel) { ctx.save(); ctx.translate(12, h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(opts.yLabel, 0, 0); ctx.restore(); }
+  ctx.restore();
+  for (const l of opts.hlines || []) { ctx.strokeStyle = l.color || UI.danger; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(m.l, Y(l.y)); ctx.lineTo(w - m.r, Y(l.y)); ctx.stroke(); ctx.setLineDash([]); if (l.label) { ctx.fillStyle = l.color || UI.danger; ctx.textAlign = 'right'; ctx.font = `10px ${UI.sans}`; ctx.fillText(l.label, w - m.r - 4, Y(l.y) - 4); } }
+  ctx.fillStyle = UI.muted; ctx.font = `10px ${UI.sans}`;
+  if (opts.yLabel) { ctx.save(); ctx.translate(11, (h - m.b + m.t) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(opts.yLabel, 0, 0); ctx.restore(); }
   if (opts.xLabel) { ctx.textAlign = 'right'; ctx.fillText(opts.xLabel, w - m.r, h - 4); }
-  if (legendEl) legendEl.innerHTML = (opts.series || []).filter(s => s.name).map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('');
 }
 
 // ---------- 3D ----------
@@ -426,88 +1169,118 @@ function project(p, W, H, spec) {
   const scale = Math.min(W, H) / (Math.max(s.runway_m, s.span_m) * 0.9) * view.dist, depth = 1 / (1 + y2 * 0.012);
   return [W / 2 + x1 * scale * depth, H / 2 - z2 * scale * depth];
 }
+function setDro(x, y, l, sw, t) {
+  $('dro-x').textContent = x; $('dro-y').textContent = y; $('dro-l').textContent = l; $('dro-sw').textContent = sw; $('dro-t').textContent = t;
+}
 function drawScene() {
   const c = $('scene'), P = prep(c); if (!P) return; const { ctx, w, h } = P;
-  if (!REPORT) { ctx.fillStyle = UI.muted; ctx.font = `12px ${UI.sans}`; ctx.fillText('결과가 없습니다', 14, 22); return; }
+  $('vpEmpty').classList.toggle('hidden', !!REPORT);
+  if (!REPORT) { setDro('—', '—', '—', '—', '—'); $('tLabel').textContent = '0.0 / 0.0 s'; return; }
   const spec = REPORT.crane, s = spec.structure, S = REPORT.cycle.samples, n = S.t.length;
   const i = Math.min(n - 1, Math.max(0, idxAt(play.t)));
   const P3 = p => project(p, w, h, spec);
   const line = (a, b, col, wdt = 1) => { const A = P3(a), B = P3(b); ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); };
-  for (let gx = 0; gx <= s.runway_m + 1e-9; gx += s.runway_m / 10) line([gx, 0, 0], [gx, s.span_m, 0], UI.grid);
-  for (let gy = 0; gy <= s.span_m + 1e-9; gy += s.span_m / 5) line([0, gy, 0], [s.runway_m, gy, 0], UI.grid);
+  if (SHOW.grid) {
+    for (let gx = 0; gx <= s.runway_m + 1e-9; gx += s.runway_m / 10) line([gx, 0, 0], [gx, s.span_m, 0], UI.grid);
+    for (let gy = 0; gy <= s.span_m + 1e-9; gy += s.span_m / 5) line([0, gy, 0], [s.runway_m, gy, 0], UI.grid);
+  }
   line([0, 0, 0], [s.runway_m, 0, 0], UI.gridStrong, 2); line([0, s.span_m, 0], [s.runway_m, s.span_m, 0], UI.gridStrong, 2);
-  ctx.strokeStyle = UI.violet; ctx.globalAlpha = 0.55; ctx.beginPath();
-  for (let k = 0; k <= i; k += 5) { const q = P3([S.load_x[k], S.load_y[k], S.load_z[k]]); k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
-  ctx.stroke(); ctx.globalAlpha = 1;
+  if (SHOW.trail) {
+    ctx.strokeStyle = UI.violet; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let k = 0; k <= i; k += 5) { const q = P3([S.load_x[k], S.load_y[k], S.load_z[k]]); k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
   const x = S.x[i], y = S.y[i], H0 = s.suspension_height_m, skew = (S.skew_mm[i] || 0) / 1000;
   const xl = x + skew / 2, xr = x - skew / 2;
-  line([xl, 0, 0], [xl, 0, H0], UI.dim, 3); line([xr, s.span_m, 0], [xr, s.span_m, H0], UI.dim, 3);
+  line([xl, 0, 0], [xl, 0, H0], UI.label, 3); line([xr, s.span_m, 0], [xr, s.span_m, H0], UI.label, 3);
   line([xl, 0, H0], [xr, s.span_m, H0], UI.text, 4);
   const lp = [S.load_x[i], S.load_y[i], S.load_z[i]];
-  line([x, y, H0], lp, UI.dim, 1.5);
+  if (SHOW.rope) line([x, y, H0], lp, UI.muted, 1.5);
   const T = P3([x, y, H0]); ctx.fillStyle = UI.accent; ctx.fillRect(T[0] - 7, T[1] - 5, 14, 10);
   const L = P3(lp), loaded = (S.load_kg[i] || 0) > 0, sz = loaded ? 9 : 5;
-  ctx.fillStyle = loaded ? UI.amber : UI.muted; ctx.fillRect(L[0] - sz, L[1] - sz * 0.7, sz * 2, sz * 1.4);
+  ctx.fillStyle = loaded ? UI.warning : UI.muted; ctx.fillRect(L[0] - sz, L[1] - sz * 0.7, sz * 2, sz * 1.4);
   const sw = S.sway_mm[i] || 0;
-  $('sceneInfo').textContent = `t ${fmt(S.t[i], 1)} s · 주행 ${fmt(x, 2)} m · 횡행 ${fmt(y, 2)} m · 로프 ${fmt(S.l[i], 2)} m · 흔들림 ${fmt(sw, 0)} mm · 장력 ${fmt(S.tension_kn[i], 1)} kN`;
-  $('tLabel').textContent = `${fmt(S.t[i], 1)} s`;
+  setDro(`${fmt(x, 2)} m`, `${fmt(y, 2)} m`, `${fmt(S.l[i], 2)} m`, `${fmt(sw, 0)} mm`, `${fmt(S.tension_kn[i], 1)} kN`);
+  $('sceneInfo').textContent = `${REPORT.cycle.scenario || ''} · 정격 ${fmt(spec.structure.rated_load_kg / 1000, 0)} t · 경간 ${fmt(s.span_m, 0)} m · 주행 ${fmt(s.runway_m, 0)} m`;
+  $('tLabel').textContent = `${fmt(S.t[i], 1)} / ${fmt(S.t[n - 1], 1)} s`;
 }
 function idxAt(t) { const S = REPORT.cycle.samples; if (!S.t.length) return 0; const dt = (S.t[S.t.length - 1] - S.t[0]) / Math.max(1, S.t.length - 1); return Math.round((t - S.t[0]) / Math.max(dt, 1e-9)); }
+function setPlaying(on) { play.on = on; $('playBtn').textContent = on ? '⏸ 일시정지' : '⏵ 재생'; setHud(on ? 'PLAYING' : REPORT ? (play.t > 0 && play.t < REPORT.cycle.samples.t.at(-1) ? 'PAUSED' : play.t > 0 ? 'COMPLETE' : 'READY') : 'READY'); }
 function tick(ts) {
   if (play.on && REPORT) {
     const S = REPORT.cycle.samples, T = S.t[S.t.length - 1];
     if (play.last) play.t += (ts - play.last) / 1000 * Number($('speed').value);
-    if (play.t >= T) { play.t = T; play.on = false; $('playBtn').textContent = '재생'; }
+    if (play.t >= T) { play.t = T; setPlaying(false); }
     $('slider').value = Math.round(play.t / T * 1000);
     drawScene();
   }
   play.last = ts; requestAnimationFrame(tick);
 }
-$('playBtn').onclick = () => { if (!REPORT) return; const T = REPORT.cycle.samples.t.at(-1); if (play.t >= T) play.t = 0; play.on = !play.on; $('playBtn').textContent = play.on ? '정지' : '재생'; };
-$('slider').oninput = e => { if (!REPORT) return; play.t = e.target.value / 1000 * REPORT.cycle.samples.t.at(-1); drawScene(); };
+$('playBtn').onclick = () => { if (!REPORT) return; const T = REPORT.cycle.samples.t.at(-1); if (play.t >= T) play.t = 0; setPlaying(!play.on); };
+$('stopBtn').onclick = () => { if (!REPORT) return; play.t = 0; $('slider').value = 0; setPlaying(false); drawScene(); };
+$('slider').oninput = e => { if (!REPORT) return; play.t = e.target.value / 1000 * REPORT.cycle.samples.t.at(-1); if (!play.on) setHud('PAUSED'); drawScene(); };
+document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show; SHOW[k] = !SHOW[k]; b.classList.toggle('active', SHOW[k]); drawScene(); });
+function resetView() { Object.assign(view, { yaw: -0.65, pitch: 0.42, dist: 1.0 }); drawScene(); }
+$('viewReset').onclick = resetView;
+$('viewTop').onclick = () => { Object.assign(view, { yaw: 0, pitch: 1.4, dist: 1.0 }); drawScene(); };
 const sc = $('scene');
 sc.onmousedown = e => { view.dragging = true; view.px = e.clientX; view.py = e.clientY; sc.style.cursor = 'grabbing'; };
-window.addEventListener('mouseup', () => { view.dragging = false; sc.style.cursor = 'grab'; });
+sc.ondblclick = resetView;
+window.addEventListener('mouseup', () => { view.dragging = false; sc.style.cursor = ''; });
 window.addEventListener('mousemove', e => { if (!view.dragging) return; view.yaw += (e.clientX - view.px) * 0.008; view.pitch = Math.max(-0.2, Math.min(1.4, view.pitch + (e.clientY - view.py) * 0.006)); view.px = e.clientX; view.py = e.clientY; drawScene(); });
-sc.onwheel = e => { e.preventDefault(); view.dist = Math.max(0.4, Math.min(3, view.dist * (e.deltaY < 0 ? 1.1 : 0.9))); drawScene(); };
+sc.addEventListener('wheel', e => { e.preventDefault(); view.dist = Math.max(0.4, Math.min(3, view.dist * (e.deltaY < 0 ? 1.1 : 0.9))); drawScene(); }, { passive: false });
 
 // ---------- 렌더 ----------
 function renderKpis() {
   const r = REPORT, c = r.cycle, d = r.decision, du = r.duty;
   const worst = Math.max(0, ...c.moves.filter(m => !m.aborted).map(m => c.antisway === 'closed_loop' ? m.final_sway_mm : m.residual_sway_mm));
   const energy = c.axes.reduce((a, b) => a + b.energy_in_kwh, 0);
-  const k = (label, value, cls = '') => `<div class="kpi ${cls}"><div class="v">${value}</div><div class="k">${label}</div></div>`;
+  const k = (label, value, cls = '', wide = false) => `<div class="spec-item ${cls} ${wide ? 'wide' : ''}"><div class="label">${label}</div><div class="value" title="${esc(String(value).replace(/<[^>]+>/g, ''))}">${value}</div></div>`;
   const cons = { continue: 0, reduce_speed: 1, reduce_acceleration: 1, enable_anti_sway: 1, cool_down: 2, inspect: 2, limit_load: 3, park: 3, stop: 4 }[d.final_action] ?? 0;
+  const winding = du ? Math.max(du.max_winding_c[2], c.axes[2].peak_winding_c) : c.axes[2].peak_winding_c;
   $('kpis').innerHTML = [
-    k('최종 판정', esc(d.final_action_label), cons >= 3 ? 'bad' : cons >= 1 ? 'warn' : 'good'),
+    k('최종 판정', esc(d.final_action_label), cons >= 3 ? 'bad' : cons >= 1 ? 'warn' : 'good', true),
     k('사이클 시간', `${fmt(c.cycle_time_s, 0)} s`),
-    k('잔류 흔들림 (최대)', `${fmt(worst, 0)} mm`, worst > r.crane.limits.sway_tolerance_mm ? 'warn' : 'good'),
+    k('잔류 흔들림 최대', `${fmt(worst, 0)} mm`, worst > r.crane.limits.sway_tolerance_mm ? 'warn' : 'good'),
     k('사이클 에너지', `${fmt(energy, 3)} kWh`),
-    k('권상 권선 최고', `${fmt(du ? Math.max(du.max_winding_c[2], c.axes[2].peak_winding_c) : c.axes[2].peak_winding_c, 1)} °C`),
+    k('권상 권선 최고', `${fmt(winding, 1)} °C`),
     k('로프 손상 (근무)', du ? du.rope_damage.toExponential(2) : c.rope.damage.toExponential(2)),
-    k('흔들림 억제', esc(c.antisway)),
+    k('흔들림 억제', esc(MODE_LABEL[c.antisway] || c.antisway)),
   ].join('');
+  $('sb-crane').textContent = r.crane.name || '-';
+  $('sb-cycle').textContent = `${fmt(c.cycle_time_s, 0)} s · ${fmt(energy, 2)} kWh`;
+  $('sb-dec').textContent = d.final_action_label || '-';
+  $('sum-dec').textContent = d.final_action_label || '';
 }
+function stanceBadge(s) { return s && STANCE[s] ? `<span class="stance stance-${s}">${STANCE[s]}</span>` : ''; }
 function renderDecision() {
   const d = REPORT.decision, ch = d.choice;
-  let html = `<div><b>${esc(d.final_action_label)}</b> <span class="muted">(규칙: ${esc(d.rule_action_label)}${d.escalated_by_advisor ? ' → LAYA 상향' : ''})</span></div>`;
-  if (d.rule_reasons && d.rule_reasons.length) html += '<ul class="note">' + d.rule_reasons.slice(0, 6).map(r => `<li>${esc(r)}</li>`).join('') + '</ul>';
-  else html += '<div class="note">통과하지 못한 게이트가 없습니다.</div>';
+  const cons = { continue: 0, reduce_speed: 1, reduce_acceleration: 1, enable_anti_sway: 1, cool_down: 2, inspect: 2, limit_load: 3, park: 3, stop: 4 }[d.final_action] ?? 0;
+  let html = `<div class="choice-card ${cons >= 3 ? 'stop' : cons >= 1 ? 'attention' : ''}">
+    <div class="choice-head"><span class="choice-tag">최종 판정</span><span class="choice-final">${esc(d.final_action_label)}</span></div>
+    <div class="choice-detail">규칙 판정 ${esc(d.rule_action_label)}${d.escalated_by_advisor ? ' → <b>LAYA 상향</b>' : ''}${d.advisor_action ? '' : ' · LAYA 없음 (결정적 게이트만)'}</div>`;
+  html += d.rule_reasons && d.rule_reasons.length ? '<ul class="choice-reasons">' + d.rule_reasons.slice(0, 6).map(r => `<li>${esc(r)}</li>`).join('') + '</ul>' : '<div class="choice-detail" style="margin:6px 0 8px">통과하지 못한 게이트가 없습니다.</div>';
   if (ch) {
-    html += `<div class="note">${esc(ch.question)} ${ch.attention.map(a => `· ${esc(a)}`).join(' ')}</div><div class="choice">`;
-    for (const o of ch.options) html += `<button data-a="${esc(o.key)}" class="${o.recommended ? 'rec' : ''} ${o.chosen ? 'chosen' : ''}" ${o.enabled ? '' : 'disabled'} title="${esc(o.detail)}${o.blocked_by.length ? ' — 막음: ' + esc(o.blocked_by.join(', ')) : ''}">${esc(o.label)}${o.advisor_probability != null ? ` <span class="muted">${fmt(o.advisor_probability * 100, 0)}%</span>` : ''}</button>`;
-    html += `</div><div class="note">${esc(ch.advisor_note)}</div>`;
+    html += `<div class="choice-q">${esc(ch.question)}</div><div class="choice-why">${(ch.attention || []).map(a => `<span>· ${esc(a)}</span>`).join('')}</div><div class="choice-opts">`;
+    let n = 0;
+    for (const o of ch.options) {
+      const p = o.advisor_probability;
+      const badges = [o.recommended ? '<span class="choice-badge rec">권장</span>' : '', o.chosen ? '<span class="choice-badge done">선택함</span>' : '', p != null ? `<span class="choice-badge ai">LAYA ${fmt(p * 100, 0)}%</span>` : '', !o.enabled ? '<span class="choice-badge block">막힘</span>' : ''].join('');
+      html += `<button class="choice-opt ${o.recommended ? 'rec' : ''} ${o.chosen ? 'chosen' : ''}" data-a="${esc(o.key)}" ${o.enabled ? '' : 'disabled'}><span class="choice-num">${o.enabled ? ++n : '✕'}</span><span><div class="choice-label">${esc(o.label)}</div><div class="choice-detail">${esc(o.detail)}</div>${o.blocked_by.length ? `<div class="choice-block">막음: ${esc(o.blocked_by.join(', '))}</div>` : ''}${p != null ? `<div class="choice-bar"><span style="width:${fmt(p * 100, 0)}%"></span></div>` : ''}</span><span class="choice-badges">${badges}</span></button>`;
+    }
+    html += `</div><div class="choice-foot"><span>${esc(ch.advisor_note)}</span></div>`;
   }
-  $('decision').innerHTML = html;
+  html += '</div>';
+  $('decision').className = ''; $('decision').innerHTML = html;
   $('decision').querySelectorAll('button[data-a]').forEach(b => b.onclick = async () => {
     if (!online()) { setStatus('작업자 선택은 데스크톱 앱 · crane_demo serve 에서 기록됩니다'); return; }
-    try { REPORT.decision = await invoke('choose_action', { action: b.dataset.a }); renderDecision(); renderKpis(); } catch (e) { setStatus(String(e)); }
+    try { REPORT.decision = await invoke('choose_action', { action: b.dataset.a }); renderDecision(); renderKpis(); setStatus(`작업자 선택 기록: ${b.querySelector('.choice-label').textContent}`, 'ok'); } catch (e) { setStatus('오류: ' + e); }
   });
 }
 function renderSway() {
   const S = REPORT.cycle.samples;
-  chart($('cSway'), { title: '흔들림 (하중 수평 변위)', xLabel: 's', yLabel: 'mm', series: [{ name: '흔들림 mm', x: S.t, y: S.sway_mm, color: UI.violet }], hlines: [{ y: REPORT.crane.limits.sway_tolerance_mm, label: '허용', color: UI.amber }], vlines: REPORT.cycle.moves.map(m => ({ x: m.end_s })) }, $('lSway'));
-  chart($('cRope'), { title: '로프 길이 · 장력', xLabel: 's', series: [{ name: '로프 길이 m', x: S.t, y: S.l, color: UI.teal }, { name: '장력 kN ÷ 10', x: S.t, y: S.tension_kn.map(v => v / 10), color: UI.amber }] }, $('lRope'));
+  chart($('cSway'), { title: '흔들림 (하중 수평 변위)', xLabel: 's', yLabel: 'mm', series: [{ name: '흔들림 mm', x: S.t, y: S.sway_mm, color: UI.accent }], hlines: [{ y: REPORT.crane.limits.sway_tolerance_mm, label: '허용', color: UI.warning }], vlines: REPORT.cycle.moves.map(m => ({ x: m.end_s })) }, $('lSway'));
+  chart($('cRope'), { title: '로프 길이 · 장력', xLabel: 's', series: [{ name: '로프 길이 m', x: S.t, y: S.l, color: UI.accent }, { name: '장력 kN ÷ 10', x: S.t, y: S.tension_kn.map(v => v / 10), color: UI.violet }] }, $('lRope'));
   const rows = REPORT.cycle.moves.map(m => `<tr><td>${esc(m.label)}${m.aborted ? ' <span class="sev sev2">중단</span>' : ''}</td><td class="num">${fmt(m.duration_s, 1)}</td><td class="num">${fmt(m.rope_length_m, 2)}</td><td>${esc(m.shaper ?? '—')}${m.shaper_freq_hz ? ` ${fmt(m.shaper_freq_hz, 3)} Hz` : ''}</td><td class="num">${fmt(m.max_sway_mm, 0)}</td><td class="num">${fmt(m.residual_sway_mm, 0)}</td><td class="num">${fmt(m.final_sway_mm, 0)}</td><td class="num">${fmt(m.settle_time_s, 1)}</td><td class="num">${fmt(m.position_error_mm, 0)}</td></tr>`).join('');
   $('moves').innerHTML = `<tr><th>이동</th><th>시간 s</th><th>설계 로프 m</th><th>셰이퍼</th><th>최대 mm</th><th>잔류 mm</th><th>끝 mm</th><th>안정 s</th><th>위치 오차 mm</th></tr>${rows}`;
 }
@@ -523,58 +1296,60 @@ function renderMotor() {
 }
 function renderGates() {
   const g = REPORT.decision.gates.slice().sort((a, b) => b.severity - a.severity);
-  $('gates').innerHTML = `<tr><th>상태</th><th>게이트</th><th>값</th><th>한계</th><th>조치</th><th>내용</th><th>근거</th></tr>` + g.map(x => `<tr><td><span class="sev sev${x.severity}">${SEV[Math.min(3, x.severity)]}</span></td><td>${esc(x.label)}</td><td class="num">${fmt(x.value, 3)} ${esc(x.unit)}</td><td class="num">${fmt(x.limit, 3)}</td><td>${esc(x.action)}</td><td>${esc(x.message)}</td><td class="muted">${esc(x.basis)}</td></tr>`).join('');
+  $('gates').innerHTML = `<tr><th>상태</th><th>게이트</th><th>값</th><th>한계</th><th>조치</th><th>내용</th><th>근거</th></tr>` + g.map(x => `<tr><td><span class="sev sev${Math.min(3, x.severity)}">${SEV[Math.min(3, x.severity)]}</span></td><td>${esc(x.label)}</td><td class="num">${fmt(x.value, 3)} ${esc(x.unit)}</td><td class="num">${fmt(x.limit, 3)}</td><td>${esc(x.action)}</td><td>${esc(x.message)}</td><td class="muted">${esc(x.basis)}</td></tr>`).join('');
 }
 function renderDuty() {
   const du = REPORT.duty, box = $('fcCharts');
   if (!du) { $('dutySum').textContent = '근무 시뮬레이션 결과가 없습니다.'; box.innerHTML = ''; return; }
-  $('dutySum').innerHTML = `근무 ${fmt(du.hours, 1)} h · ${du.cycles} 사이클 · 하중 스펙트럼 Kp ${fmt(du.kp, 3)} (${esc(du.spectrum_class)}) · 에너지 ${fmt(du.energy_kwh, 2)} kWh (회생 ${fmt(du.regen_kwh, 2)}) · 전부하 환산 ${fmt(du.full_load_hours, 2)} h / 설계 ${fmt(du.design_full_load_hours, 0)} h · 운전율 [${du.mean_cdf.map(v => fmt(v * 100, 0) + '%').join(', ')}]`;
-  box.innerHTML = '';
-  for (const f of REPORT.forecasts || []) {
-    const wrap = document.createElement('div'), cv = document.createElement('canvas'), lg = document.createElement('div'); lg.className = 'legend';
-    wrap.appendChild(cv); wrap.appendChild(lg); box.appendChild(wrap);
+  $('dutySum').innerHTML = `근무 <b>${fmt(du.hours, 1)} h</b> · <b>${du.cycles}</b> 사이클 · 하중 스펙트럼 Kp ${fmt(du.kp, 3)} (${esc(du.spectrum_class)}) · 에너지 ${fmt(du.energy_kwh, 2)} kWh (회생 ${fmt(du.regen_kwh, 2)}) · 전부하 환산 ${fmt(du.full_load_hours, 2)} h / 설계 ${fmt(du.design_full_load_hours, 0)} h · 운전율 [${du.mean_cdf.map(v => fmt(v * 100, 0) + '%').join(', ')}]${(REPORT.notes || []).length ? `<div class="muted" style="margin-top:4px">${REPORT.notes.map(esc).join(' · ')}</div>` : ''}`;
+  const fcs = REPORT.forecasts || [];
+  if (box.childElementCount !== fcs.length) {
+    box.innerHTML = fcs.map((_, i) => `<div class="chart-box"><canvas class="chart" id="fc${i}"></canvas><div class="legend" id="fcl${i}"></div></div>`).join('');
+  }
+  fcs.forEach((f, i) => {
     const qi = l => f.quantile_levels.findIndex(q => Math.abs(q - l) < 1e-6);
     const lo = f.quantiles[qi(0.1)] || f.point, hi = f.quantiles[qi(0.9)] || f.point;
     const series = [{ name: '이력', x: f.history_t, y: f.history_y, color: UI.accent }, { name: `예측 (${f.method})`, x: f.t_future, y: f.point, color: UI.violet }];
     if (f.prior_future && f.prior_future.length) series.push({ name: '물리 사전값', x: f.t_future, y: f.prior_future, color: UI.muted, dash: [3, 3], width: 1 });
     const hl = f.threshold ? [{ y: f.threshold.limit, label: '임계', color: UI.danger }] : [];
-    requestAnimationFrame(() => chart(cv, { title: `${f.key} ${f.unit ? '(' + f.unit + ')' : ''}`, xLabel: f.t_unit, series, bands: [{ x: f.t_future, lo, hi, color: UI.violet }], hlines: hl }, lg));
-  }
+    chart($('fc' + i), { title: `${f.key} ${f.unit ? '(' + f.unit + ')' : ''}`, xLabel: f.t_unit, series, bands: [{ x: f.t_future, lo, hi, color: UI.violet }], hlines: hl }, $('fcl' + i));
+  });
 }
 function renderCompare() {
   const rows = COMPARE;
   if (!rows || !rows.length) { $('cmpTable').innerHTML = '<tr><td class="muted">방식 비교를 실행하거나 compare.json 을 여세요.</td></tr>'; prep($('cCmp')); return; }
   const P = prep($('cCmp')); if (P) {
-    const { ctx, w, h } = P, m = { l: 50, r: 12, t: 22, b: 34 }, max = Math.max(1, ...rows.map(r => r.max_residual_sway_mm)), bw = (w - m.l - m.r) / rows.length;
-    ctx.fillStyle = UI.dim; ctx.font = `12px ${UI.sans}`; ctx.fillText('방식별 최대 잔류 흔들림 (mm) — 막대 위: 사이클 시간', m.l, 14);
-    rows.forEach((r, i) => { const x = m.l + i * bw + bw * 0.2, bh = (r.max_residual_sway_mm / max) * (h - m.t - m.b), y = h - m.b - bh;
-      ctx.fillStyle = r.mode === 'off' ? UI.danger : UI.accent; ctx.fillRect(x, y, bw * 0.6, bh);
-      ctx.fillStyle = UI.text; ctx.textAlign = 'center'; ctx.font = `11px ${UI.mono}`; ctx.fillText(`${fmt(r.max_residual_sway_mm, 0)} mm`, x + bw * 0.3, y - 14); ctx.fillStyle = UI.muted; ctx.fillText(`${fmt(r.cycle_time_s, 0)} s`, x + bw * 0.3, y - 3);
-      ctx.fillStyle = UI.dim; ctx.fillText(r.mode, x + bw * 0.3, h - m.b + 14); });
+    const { ctx, w, h } = P, m = { l: 50, r: 12, t: 28, b: 30 }, max = Math.max(1, ...rows.map(r => r.max_residual_sway_mm)), bw = (w - m.l - m.r) / rows.length;
+    ctx.fillStyle = UI.label; ctx.font = `600 11px ${UI.sans}`; ctx.textAlign = 'left'; ctx.fillText('방식별 최대 잔류 흔들림 (mm) — 막대 위: 사이클 시간', 10, 16);
+    for (const v of niceTicks(0, max)) { const y = h - m.b - (v / max) * (h - m.t - m.b); ctx.strokeStyle = UI.grid; ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(w - m.r, y); ctx.stroke(); ctx.fillStyle = UI.muted; ctx.font = `10px ${UI.mono}`; ctx.textAlign = 'right'; ctx.fillText(String(v), m.l - 6, y + 3); }
+    rows.forEach((r, i) => { const x = m.l + i * bw + bw * 0.25, bh = (r.max_residual_sway_mm / max) * (h - m.t - m.b - 14), y = h - m.b - bh;
+      ctx.fillStyle = r.mode === 'off' ? UI.danger : UI.accent; ctx.globalAlpha = r.mode === 'off' ? 0.85 : 0.75; ctx.fillRect(x, y, bw * 0.5, bh); ctx.globalAlpha = 1;
+      ctx.fillStyle = UI.bright; ctx.textAlign = 'center'; ctx.font = `10px ${UI.mono}`; ctx.fillText(`${fmt(r.max_residual_sway_mm, 0)} mm`, x + bw * 0.25, y - 14); ctx.fillStyle = UI.muted; ctx.fillText(`${fmt(r.cycle_time_s, 0)} s`, x + bw * 0.25, y - 3);
+      ctx.fillStyle = UI.label; ctx.font = `11px ${UI.sans}`; ctx.fillText(MODE_LABEL[r.mode] || r.mode, x + bw * 0.25, h - m.b + 16); });
   }
-  $('cmpTable').innerHTML = `<tr><th>방식</th><th>사이클 s</th><th>잔류 mm</th><th>끝 mm</th><th>안정 s</th><th>kWh</th><th>권상 피크 A</th><th>주행 토크 사용률</th></tr>` + rows.map(r => `<tr><td>${esc(r.mode)}</td><td class="num">${fmt(r.cycle_time_s, 1)}</td><td class="num">${fmt(r.max_residual_sway_mm, 0)}</td><td class="num">${fmt(r.max_final_sway_mm, 0)}</td><td class="num">${fmt(r.max_settle_time_s, 1)}</td><td class="num">${fmt(r.energy_kwh, 3)}</td><td class="num">${fmt(r.hoist_peak_current_a, 1)}</td><td class="num">${fmt(r.travel_peak_torque_ratio, 2)}</td></tr>`).join('');
+  $('cmpTable').innerHTML = `<tr><th>방식</th><th>사이클 s</th><th>잔류 mm</th><th>끝 mm</th><th>안정 s</th><th>kWh</th><th>권상 피크 A</th><th>주행 토크 사용률</th></tr>` + rows.map(r => `<tr><td>${esc(MODE_LABEL[r.mode] || r.mode)}</td><td class="num">${fmt(r.cycle_time_s, 1)}</td><td class="num">${fmt(r.max_residual_sway_mm, 0)}</td><td class="num">${fmt(r.max_final_sway_mm, 0)}</td><td class="num">${fmt(r.max_settle_time_s, 1)}</td><td class="num">${fmt(r.energy_kwh, 3)}</td><td class="num">${fmt(r.hoist_peak_current_a, 1)}</td><td class="num">${fmt(r.travel_peak_torque_ratio, 2)}</td></tr>`).join('');
 }
 function renderXcheck() {
   const c = REPORT.crosscheck;
-  if (!c) { $('xcheck').textContent = '교차검증 결과가 없습니다.'; return; }
-  $('xcheck').innerHTML = `<table><tr><th>항목</th><th>값</th></tr>
+  if (!c) { $('xcheck').className = 'empty'; $('xcheck').textContent = '교차검증 결과가 없습니다.'; return; }
+  $('xcheck').className = '';
+  $('xcheck').innerHTML = `<div class="tbl-wrap"><table><tr><th>항목</th><th>값</th></tr>
     <tr><td>로프 길이 · 슬링</td><td class="num">${fmt(c.rope_length_m, 2)} m · ${fmt(c.sling_length_m, 2)} m</td></tr>
     <tr><td>앱 모델 (단진자) 흔들림 진동수</td><td class="num">${fmt(c.analytic_freq_hz, 4)} Hz</td></tr>
     <tr><td>정밀 해석 (질점 로프 · 이중 진자) 1차 모드</td><td class="num">${fmt(c.mbd_freq_hz, 4)} Hz</td></tr>
     <tr><td>비 (정밀 / 앱)</td><td class="num">${fmt(c.freq_ratio, 4)}</td></tr>
     <tr><td>하중 상하 진동 (로프 탄성)</td><td class="num">${fmt(c.bounce_freq_hz, 2)} Hz</td></tr>
     <tr><td>정적 늘음</td><td class="num">${fmt(c.static_stretch_mm, 1)} mm</td></tr>
-    <tr><td>셰이퍼 설계 진동수 보정 제안 (freq_error)</td><td class="num">${fmt(c.suggested_freq_error, 4)}</td></tr></table>
-    <div class="note">기본은 적용하지 않습니다 (validated = false). ${c.notes.map(esc).join(' ')}</div>`;
+    <tr><td>셰이퍼 설계 진동수 보정 제안 (freq_error)</td><td class="num">${fmt(c.suggested_freq_error, 4)}</td></tr></table></div>
+    <div class="st-note">기본은 적용하지 않습니다 (validated = false). ${c.notes.map(esc).join(' ')}</div>`;
 }
 function renderAll() {
   if (!REPORT) return;
-  renderKpis(); renderDecision(); renderSway(); renderMotor(); renderGates(); renderDuty(); renderCompare(); renderXcheck();
-  play.t = 0; play.on = false; $('playBtn').textContent = '재생'; drawScene();
-  if (REPORT.models) $('mstatus').textContent = (REPORT.models.notes || []).join(' · ') || $('mstatus').textContent;
+  renderKpis(); renderDecision(); renderGates(); renderXcheck();
+  play.t = 0; setPlaying(false); $('slider').value = 0;
+  if (REPORT.models && !online()) $('mdlMini').innerHTML = `<div class="note">${(REPORT.models.notes || []).map(esc).join(' · ')}</div>`;
+  scheduleRedraw();
 }
-$('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 't-' + b.dataset.t)); if (REPORT) { renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP && b.dataset.t === 'op') renderOp(); if (b.dataset.t === 'marine') { renderMarine(); renderProg(); } };
-window.addEventListener('resize', () => { if (REPORT) { drawScene(); renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP) renderOp(); renderMarine(); renderProg(); });
 
 // ---------- 실행 · 파일 ----------
 async function buildScenario() {
@@ -583,43 +1358,50 @@ async function buildScenario() {
   for (const wp of sc.waypoints) wp.mode = $('movemode').value;
   return sc;
 }
-$('run').onclick = async () => {
+async function runCycle() {
   if (!online()) { setStatus('파일 모드: crane_demo pipeline 결과를 여세요'); return; }
   try {
-    setStatus('계산 중…'); $('run').disabled = true;
+    $('run').disabled = $('vtRun').disabled = true; setHud('RUNNING');
+    // 시계열 예측(TTM-R3) · 판정 조언(LAYA) 이 받는 중 · 불러오는 중이면 준비될 때까지 기다린다 (endmill 의 모델 대기 작업)
+    const g = await requireModels(['ttm', 'laya'], '사이클 해석 — 시계열 예측 · 판정 조언', { optional: true });
+    if (g.cancelled) { setStatus('사이클 해석을 취소했습니다', 'warn'); setHud(REPORT ? 'COMPLETE' : 'READY'); return; }
+    if (g.fallback) appendLog('모델 없이 진행 — 받은 모델만 쓰고 나머지는 Holt 예측 · 규칙 판정', 'warn');
+    // LAYA(ModernBERT-large) 는 CPU 에서 한 번 묻는 데 20초 안팎 걸린다 — 기다리는 이유를 보여 준다
+    const laya = MDL.cat && MDL.cat.entries.find(m => m.key === 'laya' && m.loaded);
+    setStatus(laya ? `계산 중… (LAYA 조언 포함${/CPU/.test(MDL.cat.device) ? ' · CPU 에서 20초 안팎' : ''})` : '계산 중…');
     const scenario = await buildScenario();
     const config = { duty: { cycles_per_hour: Number($('cph').value), hours: Number($('hours').value), spectrum: [{ fraction: 1.0, share: 0.1 }, { fraction: 0.6, share: 0.3 }, { fraction: 0.3, share: 0.4 }, { fraction: 0.1, share: 0.2 }] }, forecast_hours: Number($('fh').value) };
-    REPORT = await invoke('run_pipeline', { scenario, config }); renderAll(); setStatus('완료');
-  } catch (e) { setStatus('오류: ' + e); } finally { $('run').disabled = false; }
-};
-$('cmp').onclick = async () => {
+    REPORT = await invoke('run_pipeline', { scenario, config }); renderAll();
+    setStatus(`완료: ${REPORT.cycle.scenario} · ${REPORT.decision.final_action_label}`, 'ok');
+    for (const n of REPORT.notes || []) appendLog(n);
+    mdlRefresh().then(cat => cat && mdlEnsurePoll());
+  } catch (e) { setHud('ERROR'); setStatus('오류: ' + e); } finally { $('run').disabled = $('vtRun').disabled = false; }
+}
+async function runCompare() {
   if (!online()) { setStatus('파일 모드: compare.json 을 여세요'); return; }
-  try { setStatus('비교 중…'); COMPARE = await invoke('compare', { scenario: await buildScenario() }); renderCompare(); document.querySelector('#tabs button[data-t=compare]').click(); setStatus('완료'); } catch (e) { setStatus('오류: ' + e); }
-};
-$('mload').onclick = async () => {
-  if (!online()) { setStatus('모델은 데스크톱 앱에서 불러옵니다'); return; }
-  try { const s = await invoke('models_load', { root: $('mroot').value }); $('mstatus').textContent = `TTM ${s.ttm ? '있음' : '없음'} · LAYA ${s.advisor ? '있음' : '없음'} · ${s.notes.join(' · ')}`; } catch (e) { setStatus('오류: ' + e); }
-};
+  try { setStatus('비교 중…'); setHud('RUNNING'); COMPARE = await invoke('compare', { scenario: await buildScenario() }); showTab('compare'); renderCompare(); setHud(REPORT ? 'COMPLETE' : 'READY'); setStatus('방식 비교 완료', 'ok'); } catch (e) { setHud('ERROR'); setStatus('오류: ' + e); }
+}
+$('run').onclick = runCycle; $('vtRun').onclick = runCycle;
+$('cmp').onclick = runCompare; $('vtCmp').onclick = runCompare;
 async function openFiles(files) {
   for (const f of files) {
     try { const j = JSON.parse(await f.text());
-      if (Array.isArray(j) && j.length && 'max_residual_sway_mm' in j[0]) { COMPARE = j; renderCompare(); }
-      else if (j.kpi && j.ledger && j.daily) { OP = j; renderOp(); document.querySelector('#tabs button[data-t=op]').click(); setStatus(`불러옴: ${j.site_name}`); }
-      else if (j.benchmarks && j.fitted) { CAL = j; renderCal(); document.querySelector('#tabs button[data-t=cal]').click(); setStatus('불러옴: 실데이터 보정'); }
-      else if (j.overall && j.folds && j.by_kind) { PG = j; document.querySelector('#tabs button[data-t=marine]').click(); setStatus('불러옴: 예측 점수'); }
-      else if (Array.isArray(j) && j.length && j[0].protection && j[0].rows) { MR = j; document.querySelector('#tabs button[data-t=marine]').click(); setStatus('불러옴: 염해 진행'); }
-      else if (j.cycle && j.decision) { REPORT = j; renderAll(); }
-      else if (j.samples && j.moves) { setStatus(`${f.name}: cycle.json 에는 크레인 제원이 없어 그릴 수 없습니다. crane_demo pipeline 이 저장한 pipeline.json 을 여세요`); }
-      else setStatus(`${f.name}: 알 수 없는 형식`);
-    } catch (e) { setStatus(`${f.name}: ${e}`); }
+      if (Array.isArray(j) && j.length && 'max_residual_sway_mm' in j[0]) { COMPARE = j; switchView('cycle'); showTab('compare'); setStatus(`불러옴: ${f.name} (방식 비교)`, 'ok'); }
+      else if (j.kpi && j.ledger && j.daily) { OP = j; switchView('op'); setStatus(`불러옴: ${j.site_name}`, 'ok'); }
+      else if (j.benchmarks && j.fitted) { CAL = j; renderCal(); switchView('cal'); setStatus('불러옴: 실데이터 보정', 'ok'); }
+      else if (j.overall && j.folds && j.by_kind) { PG = j; switchView('marine'); document.querySelector('#mrTabs .pv-tab[data-pane=mrPaneProg]').click(); setStatus('불러옴: 예측 점수', 'ok'); }
+      else if (Array.isArray(j) && j.length && j[0].protection && j[0].rows) { MR = j; switchView('marine'); document.querySelector('#mrTabs .pv-tab[data-pane=mrPaneSalt]').click(); setStatus('불러옴: 염해 진행', 'ok'); }
+      else if (j.cycle && j.decision) { REPORT = j; switchView('cycle'); renderAll(); setStatus(`불러옴: ${j.cycle.scenario}`, 'ok'); }
+      else if (j.samples && j.moves) { setStatus(`${f.name}: cycle.json 에는 크레인 제원이 없어 그릴 수 없습니다. crane_demo pipeline 이 저장한 pipeline.json 을 여세요`, 'warn'); }
+      else setStatus(`${f.name}: 알 수 없는 형식`, 'warn');
+    } catch (e) { setStatus(`${f.name}: ${e}`, 'err'); }
   }
-  if (REPORT && REPORT.crane) setStatus(`불러옴: ${REPORT.cycle.scenario}`);
 }
 $('file').onchange = e => openFiles(e.target.files);
 const drop = $('drop');
-drop.ondragover = e => { e.preventDefault(); drop.style.borderColor = UI.accent; };
-drop.ondragleave = () => drop.style.borderColor = '';
-drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = ''; openFiles(e.dataTransfer.files); };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); openFiles(e.dataTransfer.files); };
 function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
 function samplesCsv() {
   const S = REPORT.cycle.samples, cols = ['t', 'x', 'y', 'l', 'theta_x_deg', 'theta_y_deg', 'sway_mm', 'tension_kn', 'wind_mps', 'skew_mm', 'load_kg'];
@@ -628,21 +1410,31 @@ function samplesCsv() {
   for (let i = 0; i < S.t.length; i++) lines.push([...cols.map(c => S[c][i]), ...S.axes.flatMap(a => [a.v_ref[i], a.v[i], a.rpm[i], a.torque_nm[i], a.current_a[i], a.power_kw[i], a.winding_c[i], a.brake[i]])].join(','));
   return lines.join('\n');
 }
-$('exCsv').onclick = () => REPORT && download('samples.csv', samplesCsv());
-$('exProg').onclick = () => REPORT && download('motion_program.json', JSON.stringify(REPORT.cycle.program, null, 2));
-$('exJson').onclick = () => REPORT && download('pipeline.json', JSON.stringify(REPORT));
+const needReport = f => () => { if (!REPORT) { setStatus('먼저 사이클 해석을 실행하거나 pipeline.json 을 여세요', 'warn'); return; } f(); };
+$('exCsv').onclick = needReport(() => download('samples.csv', samplesCsv()));
+$('exProg').onclick = needReport(() => download('motion_program.json', JSON.stringify(REPORT.cycle.program, null, 2)));
+$('exJson').onclick = needReport(() => download('pipeline.json', JSON.stringify(REPORT)));
+
+// 접힌 단계 오른쪽 요약
+function updateSums() {
+  const cr = $('crane').selectedOptions[0]?.textContent || '';
+  $('sum-scn').textContent = `${cr.split(' ')[0]} ${cr.split(' ')[1] || ''} · ${fmt(Number($('load').value) / 1000, 1)} t · ${MODE_LABEL[$('mode').value] || ''}`;
+  $('sum-duty').textContent = `${$('hours').value} h · ${$('cph').value}/h · 예측 ${$('fh').value} h`;
+  $('sum-site').textContent = SITE ? SITE.name : '';
+  $('sum-op').textContent = `${$('opAsset').value} · ${$('opDays').value}일 · ${$('opPolicy').selectedOptions[0]?.textContent || ''}`;
+}
+['crane', 'load', 'mode', 'hours', 'cph', 'fh', 'opAsset', 'opDays', 'opPolicy'].forEach(id => $(id).addEventListener('input', updateSums));
 
 // ---------- 현장 운영 · 내구도 ----------
 let SITES = [], SITE = null, OP = null, CAL = null, CRANES = [], CLIMATES = [], AUTO = false, SHOWN_ALERTS = 0;
 let PROTS = [], SALT_AREAS = [], CARGOS = [], MR = null, PG = null;
 const STANCE = { safe: '안전', proceed: '진행', danger: '위험', stop: '중단' };
 const REGION = { east: '동해', west: '서해', south: '남해' };
-const stanceBadge = s => s && STANCE[s] ? `<span class="stance stance-${s}">${STANCE[s]}</span>` : '';
 const LV = { info: ['안내', 0], caution: ['주의', 1], warning: ['경고', 2], danger: ['위험', 3], stop: ['작업 중지', 4] };
 const ST = { good: '양호', watch: '관찰', plan: '정비 계획', replace: '교체 필요', overdue: '기준 초과' };
 const lvRank = l => (LV[l] || ['', 0])[1];
 
-function setOpStatus(s) { $('opStatus').textContent = s || ''; }
+function setOpStatus(s) { $('opStatus').textContent = s || ''; if (s) appendLog(s, /^오류|실패/.test(s) ? 'err' : ''); }
 function doyLabel(doy) { const dim = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; let d = ((doy % 365) + 365) % 365, m = 0; while (d >= dim[m]) { d -= dim[m]; m++; } return `${String(m + 1).padStart(2, '0')}-${String(d + 1).padStart(2, '0')}`; }
 function fillSelect(sel, items, val) { sel.innerHTML = items.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); if (val !== undefined) sel.value = val; }
 
@@ -655,7 +1447,7 @@ async function loadSiteList(select) {
 async function loadSite(id) {
   if (!id) return;
   SITE = await api('site_get', { id });
-  fillEditor();
+  fillEditor(); updateSums();
 }
 
 function spectrumText(sp) { return sp.map(b => `${+b.fraction.toFixed(3)}:${+b.share.toFixed(3)}`).join(', '); }
@@ -732,6 +1524,7 @@ $('siteSave').onclick = async () => {
     const r = await api('site_save', { preset: p });
     await loadSiteList(id);
     setOpStatus(`저장: ${r.path}`);
+    toast('현장 프리셋 저장', esc(r.path), 'ok');
   } catch (e) { setOpStatus('저장 실패: ' + e); }
 };
 $('siteDel').onclick = async () => {
@@ -750,15 +1543,42 @@ $('opRun').onclick = async () => {
       start_month: isFinite(m) && m ? m : null, start_day: isFinite(d) && d ? d : null,
       seed: Math.round(Number($('opSeed').value) || 1),
       policy: $('opPolicy').value, incidents: true, fresh: $('opFresh').checked,
+      weather: $('opWeather').value ? { era5: $('opWeather').value, from: $('opWeatherFrom').value || null, offline: $('opWeatherOff').checked } : null,
     };
     AUTO = config.policy !== 'ask'; SHOWN_ALERTS = 0;
-    $('opRun').disabled = true; setOpStatus('사이클 증분표 계산 중 (하중 구간마다 동역학)…');
+    $('opRun').disabled = true; $('menuOpBadge').textContent = '진행'; setOpStatus('사이클 증분표 계산 중 (하중 구간마다 동역학)…');
     const st = await api('op_start', { preset, config });
-    document.querySelector('#tabs button[data-t=op]').click();
+    switchView('op');
     handleOp(st);
     await step();
-  } catch (e) { setOpStatus('오류: ' + e); $('opRun').disabled = false; }
+  } catch (e) { setOpStatus('오류: ' + e); $('opRun').disabled = false; $('menuOpBadge').textContent = ''; }
 };
+
+// ---------- 날씨 출처 (합성 · ERA5 재생) ----------
+let WSRC = [];
+async function loadWeatherSources() {
+  const r = await api('weather_sources');
+  WSRC = r.sites || [];
+  const sel = $('opWeather'), kind = k => k === 'kma_station' ? '기상청 지점' : '항만';
+  sel.innerHTML = '<option value="">합성 (현장 기후로 생성)</option>' + WSRC.map(s => `<option value="${esc(s.id)}">ERA5 재생 · ${esc(s.name)} (${kind(s.kind)} ${esc(s.from.slice(0, 4))}${s.to.slice(0, 4) !== s.from.slice(0, 4) ? '–' + esc(s.to.slice(0, 4)) : ''})${s.cached ? '' : ' — 받기 필요'}</option>`).join('');
+  sel.dataset.cache = r.cache_dir || '';
+  weatherNote();
+}
+function weatherNote() {
+  const s = WSRC.find(x => x.id === $('opWeather').value);
+  $('opWeatherFromRow').style.display = s ? '' : 'none';
+  $('opWeatherOffRow').style.display = s ? '' : 'none';
+  if (!s) { $('opWeatherNote').textContent = ''; return; }
+  const f = $('opWeatherFrom');
+  f.min = s.from; f.max = s.to;
+  if (!f.value || f.value < s.from || f.value > s.to) {
+    // 시작 날짜(MM-DD)를 자료 첫해에 맞춘다
+    const md = ($('opStart').value || '').match(/^(\d{1,2})-(\d{1,2})$/);
+    f.value = md ? `${s.from.slice(0, 4)}-${md[1].padStart(2, '0')}-${md[2].padStart(2, '0')}` : s.from;
+  }
+  $('opWeatherNote').innerHTML = `시간별 실제 날씨(Open-Meteo ERA5, 기상청 6개 지점 보정)를 ${esc(s.from)} – ${esc(s.to)} 안에서 그대로 재생합니다. 기간이 자료 끝을 넘으면 오류. 예보는 재생 날씨에 오차를 더해 만듭니다.<br><span class="muted">${s.cached ? '캐시에 있음' : '캐시에 없음 — 실행하면 한 번 받아 저장합니다 (curl 필요)'} · ${esc($('opWeather').dataset.cache || '')}</span>`;
+}
+$('opWeather').onchange = weatherNote;
 
 async function step() {
   setOpStatus('진행 중…');
@@ -768,24 +1588,29 @@ async function step() {
 
 function handleOp(st) {
   OP = st.report;
-  renderOp();
+  if (VIEW === 'op') renderOp();
   const frac = st.finished ? 1 : Math.min(1, (st.hour_index || 0) / 24 / Math.max(1, Number($('opDays').value) || 1));
   $('opProg').style.width = `${(frac * 100).toFixed(1)}%`;
+  $('sb-op').textContent = `${OP.asset_id} · ${fmt(frac * 100, 0)}%`;
   toastNew();
   if (st.pending) {
     if (AUTO) { decide(st.pending.id, st.pending.prompt.recommended); return; }
     showDecision(st.pending);
   } else if (st.finished) {
-    hideDecision(); $('opRun').disabled = false;
+    hideDecision(); $('opRun').disabled = false; $('menuOpBadge').textContent = '';
     // 같은 자산으로 다시 돌리면 계절을 이어 가도록 다음 날짜를 채워 둔다
     if (OP.ledger && OP.ledger.next_doy != null) $('opStart').value = doyLabel(OP.ledger.next_doy);
+    // ERA5 재생이면 다음 실행이 실제 날짜로 이어지도록 시작 날짜를 기간만큼 넘긴다
+    if ($('opWeather').value && $('opWeatherFrom').value) { const t = new Date($('opWeatherFrom').value + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + OP.kpi.days); $('opWeatherFrom').value = t.toISOString().slice(0, 10); }
     setOpStatus(`끝: ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 결정 ${OP.kpi.decisions} 건 · 원장 누적 ${fmt(OP.ledger.day, 0)} 일`);
+    $('sb-op').textContent = `${OP.asset_id} · ${OP.kpi.days}일 끝 · 가동률 ${fmt(OP.kpi.availability * 100, 0)}%`;
+    toast('현장 운영 끝', `${esc(OP.site_name)} · ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 사고 ${OP.kpi.incidents}`, OP.kpi.incidents > 0 ? 'warn' : 'ok');
   }
 }
 
 async function decide(id, key) {
   try { const st = await api('op_decide', { id, key }); handleOp(st); }
-  catch (e) { setOpStatus('선택 오류: ' + e); }
+  catch (e) { setOpStatus('선택 오류: ' + e); $('opRun').disabled = false; }
 }
 
 function showDecision(d) {
@@ -794,18 +1619,19 @@ function showDecision(d) {
   $('decAt').innerHTML = `${esc(d.at)}${p.procedure ? ` · 절차 <b>${esc(p.procedure)}</b>` : ''}${p.situation ? ` · 지금 상황 ${stanceBadge(p.situation)}` : ''}`;
   $('decRisk').textContent = `위험 지수 ${fmt(d.risk_index, 0)}`;
   $('decQ').textContent = p.question;
-  $('decAttn').innerHTML = (p.attention || []).map(a => `· ${esc(a)}`).join('<br>');
+  $('decAttn').innerHTML = (p.attention || []).map(a => `<span>· ${esc(a)}</span>`).join('');
   let n = 0;
   $('decOpts').innerHTML = p.options.map(o => {
-    const oc = o.outcome ? `<span class="o">→ ${esc(o.outcome)}</span>` : '';
-    if (!o.enabled) return `<div class="dopt off" aria-disabled="true"><span class="n">✕</span><span class="l">${esc(o.label)}${stanceBadge(o.stance)}</span><span class="d">막힘: ${esc(o.blocked_by.join(', '))}</span>${oc}</div>`;
+    const oc = o.outcome ? `<div class="choice-out">→ ${esc(o.outcome)}</div>` : '';
+    const badges = `${o.recommended ? '<span class="choice-badge rec">권장</span>' : ''}${stanceBadge(o.stance)}`;
+    if (!o.enabled) return `<button class="choice-opt" disabled><span class="choice-num">✕</span><span><div class="choice-label">${esc(o.label)}</div><div class="choice-block">막힘: ${esc(o.blocked_by.join(', '))}</div>${oc}</span><span class="choice-badges">${stanceBadge(o.stance)}<span class="choice-badge block">막힘</span></span></button>`;
     n += 1;
-    return `<button class="dopt ${o.recommended ? 'rec' : ''}" data-k="${esc(o.key)}" data-n="${n}"><span class="n">${n}</span><span class="l">${esc(o.label)}${o.recommended ? ' (권장)' : ''}${stanceBadge(o.stance)}</span><span class="d">${esc(o.detail)}</span>${oc}</button>`;
+    return `<button class="choice-opt ${o.recommended ? 'rec' : ''}" data-k="${esc(o.key)}" data-n="${n}"><span class="choice-num">${n}</span><span><div class="choice-label">${esc(o.label)}</div><div class="choice-detail">${esc(o.detail)}</div>${oc}</span><span class="choice-badges">${badges}</span></button>`;
   }).join('');
   $('decOpts').querySelectorAll('button[data-k]').forEach(b => b.onclick = () => { hideDecision(); decide(d.id, b.dataset.k); });
   $('decOverlay').classList.remove('hidden');
   $('decOverlay').dataset.id = d.id; $('decOverlay').dataset.rec = p.recommended;
-  const first = $('decOpts').querySelector('button.rec') || $('decOpts').querySelector('button');
+  const first = $('decOpts').querySelector('button.rec') || $('decOpts').querySelector('button[data-k]');
   if (first) first.focus();
   setOpStatus(`결정 대기: ${p.header}`);
 }
@@ -822,49 +1648,44 @@ function toastNew() {
   if (!OP) return;
   const fresh = OP.alerts.slice(SHOWN_ALERTS).filter(a => lvRank(a.level) >= 2);
   SHOWN_ALERTS = OP.alerts.length;
-  for (const a of fresh.slice(-3)) {
-    const t = document.createElement('div');
-    t.className = `toast ${a.level}`;
-    t.innerHTML = `<span class="lv lv-${a.level}">${esc(a.level_label)}</span><b>${esc(a.title)}</b> <span class="muted">${esc(a.at)}</span><div>${esc(a.message)}</div><div class="muted">→ ${esc(a.action)}</div>`;
-    $('toasts').appendChild(t);
-    setTimeout(() => t.remove(), 6000);
-  }
+  for (const a of fresh.slice(-3)) toast(`<span class="lv lv-${a.level}">${esc(a.level_label)}</span>${esc(a.title)} <span class="muted" style="font-weight:400">${esc(a.at)}</span>`, `${esc(a.message)}\n→ ${esc(a.action)}`, lvRank(a.level) >= 3 ? 'err' : 'warn');
 }
 
 // ---------- 그리기 ----------
 function renderOp() {
   const r = OP; if (!r) return;
   const k = r.kpi;
-  $('opHead').innerHTML = `<b>${esc(r.site_name)}</b> · 자산 ${esc(r.asset_id)} · 크레인 ${esc(r.crane)} · ${esc(r.start_date)} 시작 ${k.days} 일 · 결정 방식 ${esc(r.policy)}${r.finished ? '' : ' · <span class="muted">진행 중</span>'}`;
-  const kp = (label, value, cls = '') => `<div class="kpi ${cls}"><div class="v">${value}</div><div class="k">${label}</div></div>`;
+  $('opHead').innerHTML = `<b>${esc(r.site_name)}</b> · 자산 ${esc(r.asset_id)} · 크레인 ${esc(r.crane)} · ${esc(r.start_date)} 시작 ${k.days} 일 · 결정 방식 ${esc(r.policy)}${r.finished ? '' : ' · <span class="sev-1">진행 중</span>'}`;
+  const kp = (label, value, cls = '') => `<div class="pv-chip ${cls}"><span class="k">${label}</span><span class="v">${value}</span></div>`;
   $('opKpis').innerHTML = [
     kp('가동률 (운전 / 계획)', `${fmt(k.availability * 100, 1)}%`, k.availability < 0.8 ? 'warn' : 'good'),
     kp('이동 / 수요', `${fmt(k.moves, 0)} / ${fmt(k.demand_moves, 0)}`),
     kp('운전 시간당 이동', fmt(k.moves_per_op_hour, 1)),
-    kp('에너지 (회생)', `${fmt(k.energy_kwh, 0)} (${fmt(k.regen_kwh, 0)}) kWh`),
+    kp('에너지 (회생) kWh', `${fmt(k.energy_kwh, 0)} (${fmt(k.regen_kwh, 0)})`),
     kp('사고 / 기대', `${k.incidents} / ${fmt(k.expected_incidents, 2)}`, k.incidents > 0 ? 'bad' : ''),
     kp('위험 지수 평균 · 최대', `${fmt(k.risk_mean, 0)} · ${fmt(k.risk_max, 0)}`, k.risk_max >= 60 ? 'bad' : k.risk_max >= 40 ? 'warn' : ''),
     kp('결정 (작업자)', `${k.decisions} (${k.decisions_by_operator})`),
     kp('결정으로 줄인 기대 사고', fmt(k.risk_avoided, 3), 'good'),
-    kp('돌발 고장 (참 상태 기준 초과)', `${k.breakdowns || 0}`, (k.breakdowns || 0) > 0 ? 'bad' : ''),
+    kp('돌발 고장 (참 상태 초과)', `${k.breakdowns || 0}`, (k.breakdowns || 0) > 0 ? 'bad' : ''),
     kp('기준 넘긴 채 운전 (모르고)', `${fmt(k.hidden_overdue_h || 0, 0)} h`, (k.hidden_overdue_h || 0) > 0 ? 'warn' : ''),
-    kp('화물 보류 이동 · 무게 재확인', `${fmt(k.cargo_held_moves || 0, 0)} · ${fmt(k.weight_rechecks || 0, 0)}`),
+    kp('화물 보류 · 무게 재확인', `${fmt(k.cargo_held_moves || 0, 0)} · ${fmt(k.weight_rechecks || 0, 0)}`),
   ].join('');
   const mz = r.marine;
-  $('opMarine').innerHTML = mz ? `<b>염해</b> ${esc(mz.setup.category)} (${esc(mz.setup.chloride_class)}) · 연평균 염화물 ${fmt(mz.mean_sd, 0)} mg/m²·d · 젖음 ${fmt(mz.tow_h_per_year, 0)} h/년 · 탄소강 ${fmt(mz.steel_um_per_year, 1)} µm/년 <span class="muted">(이 기간 속도의 연환산)</span> · 도장 열화 노출 ${fmt(mz.coat[0], 2)} · 차폐 ${fmt(mz.coat[1], 2)} · 녹 ${fmt(mz.rust_area_pct, 2)}% (Ri ${mz.ri}) · 세척 ${mz.washes} · 재도장 ${mz.repaints} <span class="muted">· 방지 ${esc(mz.protection)}</span>${(k.moves_by_cargo || []).length ? `<br><b>화물별 이동</b> ${k.moves_by_cargo.map(([n, v]) => `${esc(n)} ${fmt(v, 0)}`).join(' · ')}` : ''}` : ((k.moves_by_cargo || []).length ? `<b>화물별 이동</b> ${k.moves_by_cargo.map(([n, v]) => `${esc(n)} ${fmt(v, 0)}`).join(' · ')}` : '');
+  const byCargo = (k.moves_by_cargo || []).length ? `<b>화물별 이동</b> ${k.moves_by_cargo.map(([n, v]) => `${esc(n)} ${fmt(v, 0)}`).join(' · ')}` : '';
+  $('opMarine').innerHTML = mz ? `<b>염해</b> ${esc(mz.setup.category)} (${esc(mz.setup.chloride_class)}) · 연평균 염화물 ${fmt(mz.mean_sd, 0)} mg/m²·d · 젖음 ${fmt(mz.tow_h_per_year, 0)} h/년 · 탄소강 ${fmt(mz.steel_um_per_year, 1)} µm/년 <span class="muted">(이 기간 속도의 연환산)</span> · 도장 열화 노출 ${fmt(mz.coat[0], 2)} · 차폐 ${fmt(mz.coat[1], 2)} · 녹 ${fmt(mz.rust_area_pct, 2)}% (Ri ${mz.ri}) · 세척 ${mz.washes} · 재도장 ${mz.repaints} <span class="muted">· 방지 ${esc(mz.protection)}</span>${byCargo ? '<br>' + byCargo : ''}` : byCargo;
   const D = r.daily, x = D.map(d => d.day + 1);
-  chart($('cOpMoves'), { title: '하루 이동 · 수요 · 정지', xLabel: '일', series: [{ name: '이동', x, y: D.map(d => d.moves), color: UI.accent }, { name: '수요', x, y: D.map(d => d.demand), color: UI.muted, dash: [4, 3] }, { name: '정지 h ×10', x, y: D.map(d => d.downtime_h * 10), color: UI.amber }] }, $('lOpMoves'));
-  chart($('cOpWx'), { title: '날씨 (크레인 높이 최대 순간풍속 · 기온)', xLabel: '일', series: [{ name: '최대 순간풍속 m/s', x, y: D.map(d => d.max_gust_mps), color: UI.violet }, { name: '최고 기온 °C', x, y: D.map(d => d.temp_max_c), color: UI.danger }, { name: '최저 기온 °C', x, y: D.map(d => d.temp_min_c), color: UI.teal }, { name: '체감 최고 °C', x, y: D.map(d => d.feels_like_max_c), color: UI.amber, dash: [3, 3], width: 1 }] }, $('lOpWx'));
-  chart($('cOpRisk'), { title: '위험 지수 (하루 최대) · 기대 사고 ×1000', xLabel: '일', series: [{ name: '위험 지수', x, y: D.map(d => d.risk_max), color: UI.danger }, { name: '기대 사고 ×1000', x, y: D.map(d => d.expected_incidents * 1000), color: UI.accent }], hlines: [{ y: 40, label: '경고', color: UI.amber }] }, $('lOpRisk'));
+  chart($('cOpMoves'), { title: '하루 이동 · 수요 · 정지', xLabel: '일', series: [{ name: '이동', x, y: D.map(d => d.moves), color: UI.accent }, { name: '수요', x, y: D.map(d => d.demand), color: UI.muted, dash: [4, 3] }, { name: '정지 h ×10', x, y: D.map(d => d.downtime_h * 10), color: UI.warning }] }, $('lOpMoves'));
+  chart($('cOpWx'), { title: '날씨 (크레인 높이 최대 순간풍속 · 기온)', xLabel: '일', series: [{ name: '최대 순간풍속 m/s', x, y: D.map(d => d.max_gust_mps), color: UI.violet }, { name: '최고 기온 °C', x, y: D.map(d => d.temp_max_c), color: UI.danger }, { name: '최저 기온 °C', x, y: D.map(d => d.temp_min_c), color: UI.accent }, { name: '체감 최고 °C', x, y: D.map(d => d.feels_like_max_c), color: UI.warning, dash: [3, 3], width: 1 }] }, $('lOpWx'));
+  chart($('cOpRisk'), { title: '위험 지수 (하루 최대) · 기대 사고 ×1000', xLabel: '일', series: [{ name: '위험 지수', x, y: D.map(d => d.risk_max), color: UI.danger }, { name: '기대 사고 ×1000', x, y: D.map(d => d.expected_incidents * 1000), color: UI.accent }], hlines: [{ y: 40, label: '경고', color: UI.warning }] }, $('lOpRisk'));
   const L = r.ledger, H = L.history || [];
   const order = L.components.map((c, i) => [i, c.life_used]).sort((a, b) => b[1] - a[1]).slice(0, 6).map(v => v[0]);
-  const cols = [UI.danger, UI.amber, UI.violet, UI.accent, UI.teal, UI.success];
-  chart($('cOpLife'), { title: '부품 수명 사용 (원장 누적, %)', xLabel: '누적 일', series: order.map((ci, j) => ({ name: L.components[ci].label, x: H.map(h => h.day), y: H.map(h => (h.life[ci] || 0) * 100), color: cols[j % cols.length] })), hlines: [{ y: 80, label: '정비 계획', color: UI.amber }, { y: 100, label: '교체', color: UI.danger }] }, $('lOpLife'));
+  const cols = [UI.danger, UI.alert, UI.warning, UI.violet, UI.accent, UI.success];
+  chart($('cOpLife'), { title: '부품 수명 사용 (원장 누적, %)', xLabel: '누적 일', series: order.map((ci, j) => ({ name: L.components[ci].label, x: H.map(h => h.day), y: H.map(h => (h.life[ci] || 0) * 100), color: cols[j % cols.length] })), hlines: [{ y: 80, label: '정비 계획', color: UI.warning }, { y: 100, label: '교체', color: UI.danger }] }, $('lOpLife'));
   $('opSaltBox').style.display = r.marine ? '' : 'none';
-  if (r.marine) chart($('cOpSalt'), { title: '염해 (하루 염화물 · 탄소강 속도 · 녹 면적)', xLabel: '일', series: [{ name: '염화물 mg/m²·d', x, y: D.map(d => d.salt_mg_m2_d), color: UI.teal }, { name: '탄소강 µm/년', x, y: D.map(d => d.steel_rate_um_y), color: UI.amber }, { name: '녹 면적 % ×100', x, y: D.map(d => d.rust_area_pct * 100), color: UI.danger }] }, $('lOpSalt'));
+  if (r.marine) chart($('cOpSalt'), { title: '염해 (하루 염화물 · 탄소강 속도 · 녹 면적)', xLabel: '일', series: [{ name: '염화물 mg/m²·d', x, y: D.map(d => d.salt_mg_m2_d), color: UI.accent }, { name: '탄소강 µm/년', x, y: D.map(d => d.steel_rate_um_y), color: UI.warning }, { name: '녹 면적 % ×100', x, y: D.map(d => d.rust_area_pct * 100), color: UI.danger }] }, $('lOpSalt'));
   $('opLedger').textContent = `원장 누적 ${fmt(L.day, 0)} 일 · 운전 ${fmt(L.operating_hours, 0)} h · 이동 ${fmt(L.moves, 0)} · 실행 ${L.runs} 회`;
   const rows = r.durability.rows.map(c => {
-    const pct = Math.max(0, c.life_used * 100), col = c.status === 'good' ? UI.success : c.status === 'watch' ? UI.accent : c.status === 'plan' ? UI.amber : UI.danger;
+    const pct = Math.max(0, c.life_used * 100), col = c.status === 'good' ? UI.success : c.status === 'watch' ? UI.accent : c.status === 'plan' ? UI.warning : c.status === 'replace' ? UI.alert : UI.danger;
     const m = c.margin == null ? '—' : `${fmt(c.margin, 2)} <span class="muted">(최소 ${fmt(c.margin_min, 2)})</span>`;
     const rul = c.rul_days == null ? '—' : c.rul_days > 99999 ? '> 10만' : fmt(c.rul_days, 0);
     const pg = (L.components.find(x => x.id === c.id) || {}).prog;
@@ -882,7 +1703,7 @@ function renderOp() {
   renderAlerts();
   $('opDecisions').innerHTML = r.decisions.slice().reverse().map(d => {
     const ch = d.prompt.options.find(o => o.chosen);
-    return `<div class="it"><span class="at">${esc(d.at)}</span><span class="chip">${esc(d.prompt.header)}</span>${d.prompt.procedure ? ` <span class="muted">${esc(d.prompt.procedure)}</span>` : ''} → <b>${esc(ch ? ch.label : d.chosen || '')}</b>${stanceBadge(ch && ch.stance)} <span class="muted">(${esc(d.decided_by === 'operator' ? '작업자' : d.decided_by || '')})</span><div class="muted">${esc(d.outcome || '')}${d.risk_avoided > 0 ? ` · 줄인 기대 사고 ${fmt(d.risk_avoided, 4)}` : ''}</div></div>`;
+    return `<div class="it"><span class="at">${esc(d.at)}</span><span class="chip">${esc(d.prompt.header)}</span>${d.prompt.procedure ? ` <span class="muted">${esc(d.prompt.procedure)}</span>` : ''} → <b>${esc(ch ? ch.label : d.chosen || '')}</b> ${stanceBadge(ch && ch.stance)} <span class="muted">(${esc(d.decided_by === 'operator' ? '작업자' : d.decided_by || '')})</span><div class="muted">${esc(d.outcome || '')}${d.risk_avoided > 0 ? ` · 줄인 기대 사고 ${fmt(d.risk_avoided, 4)}` : ''}</div></div>`;
   }).join('') || '<div class="it muted">결정이 아직 없습니다</div>';
   const inc = r.incidents.map(i => `<div>${esc(i.at)} <span class="sev sev${i.severity === '중대' ? 3 : i.severity === '아차사고' ? 1 : 2}">${esc(i.severity)}</span> ${esc(i.kind)} — ${esc(i.detail)} (정지 ${fmt(i.downtime_h, 0)} h)</div>`).join('');
   const down = (k.downtime_by_reason || []).map(([why, h]) => `${esc(why)} ${fmt(h, 0)} h`).join(' · ');
@@ -898,7 +1719,7 @@ function renderAlerts() {
 $('alertFilter').onchange = renderAlerts; $('alertProc').onchange = renderAlerts;
 
 // ---------- 염해 진행 · 예측 점수 ----------
-const PCOL = [UI.accent, UI.amber, UI.teal, UI.violet, UI.danger, UI.success];
+const PCOL = [UI.accent, UI.warning, UI.success, UI.violet, UI.danger, UI.alert];
 function renderMarine() {
   const P = MR; if (!P || !P.length) return;
   const s = P[0].setup, last = p => p.rows[p.rows.length - 1] || {};
@@ -933,7 +1754,7 @@ function renderProg() {
   const has4 = r.folds.some(f => f.recal);
   $('pgFolds').innerHTML = `<tr><th>뺀 현장</th><th>퍼짐</th><th>v3 CRPS</th><th>80%</th><th>KS</th><th>BSS</th>${has4 ? '<th>v4 CRPS</th><th>80%</th><th>KS</th><th>BSS</th>' : ''}</tr>` + r.folds.map(f => `<tr><td>${esc(f.held_out)}</td><td class="num">${fmt(f.spread, 2)}</td>${fcell(f.score)}${has4 ? fcell(f.recal) : ''}</tr>`).join('');
   $('pgKinds').innerHTML = `<tr><th>부품</th><th>가속</th><th>건수</th><th>CRPS</th><th>80% 적중</th><th>PIT KS</th></tr>` + r.by_kind.map(k => { const m = k.methods[k.methods.length - 1] || {}; return `<tr><td>${esc(k.kind)}</td><td class="num">×${fmt(k.accel, 1)}</td><td class="num">${fmt(m.n_rul || 0, 0)}</td><td class="num">${fmt(m.crps, 1)}</td><td class="num">${fmt((m.coverage80 || 0) * 100, 0)}%</td><td class="num">${fmt(m.pit_ks, 3)}</td></tr>`; }).join('');
-  const cols = [UI.muted, UI.violet, UI.amber, UI.accent];
+  const cols = [UI.muted, UI.violet, UI.warning, UI.accent];
   chart($('cPgPit'), { title: 'PIT 히스토그램 (평평할수록 보정이 맞음, 밀도)', xLabel: 'PIT', yMin: 0, series: r.overall.map((m, i) => ({ name: m.label, ...stepXY(m.pit_hist || []), color: cols[i % cols.length], width: i === r.overall.length - 1 ? 2.2 : 1.2, dash: i === r.overall.length - 1 ? null : [4, 3] })), hlines: [{ y: 1, label: '균등', color: UI.success }] }, $('lPgPit'));
   const bins = (v3.brier && v3.brier.bins) || [];
   chart($('cPgRel'), { title: '30일 고장 확률 신뢰도 (v3)', xLabel: '예측 확률', xMin: 0, xMax: 1, yMin: 0, yMax: 1, series: [{ name: '완전 보정', x: [0, 1], y: [0, 1], color: UI.muted, dash: [4, 3] }, { name: '관측 빈도', x: bins.map(b => b.p_mean), y: bins.map(b => b.observed), color: UI.accent, width: 2 }] }, $('lPgRel'));
@@ -953,7 +1774,7 @@ function renderCal() {
   let html = '', g = '';
   const cls = e => Math.abs(e) <= 5 ? 'sev0' : Math.abs(e) <= 15 ? 'sev1' : 'sev2';
   for (const b of r.benchmarks) {
-    if (b.group !== g) { g = b.group; html += `<tr><th colspan="8" style="padding-top:12px;color:var(--text-dim)">${esc(GROUP[g] || g)}</th></tr><tr><th>항목</th><th>실데이터</th><th>보정 전</th><th>보정 뒤</th><th>전 오차</th><th>뒤 오차</th><th>맞춘 계수</th><th>출처 (신뢰도)</th></tr>`; }
+    if (b.group !== g) { g = b.group; html += `<tr><th colspan="8" class="group">${esc(GROUP[g] || g)}</th></tr><tr><th>항목</th><th>실데이터</th><th>보정 전</th><th>보정 뒤</th><th>전 오차</th><th>뒤 오차</th><th>맞춘 계수</th><th>출처 (신뢰도)</th></tr>`; }
     html += `<tr><td>${esc(b.label)}</td><td class="num">${fmt(b.reference, 3)} ${esc(b.unit)}</td><td class="num">${fmt(b.before, 3)}</td><td class="num">${fmt(b.after, 3)}</td><td class="num"><span class="sev ${cls(b.error_before_pct)}">${fmt(b.error_before_pct, 1)}%</span></td><td class="num"><span class="sev ${cls(b.error_after_pct)}">${fmt(b.error_after_pct, 1)}%</span></td><td class="muted">${esc(b.knob || '확인만')}</td><td class="muted">${esc(b.source)} (${esc(b.confidence)})</td></tr>`;
   }
   $('calTable').innerHTML = html;
@@ -968,22 +1789,322 @@ async function runCal(quick) {
 $('calQuick').onclick = () => runCal(true);
 $('calFull').onclick = () => runCal(false);
 
+// ---------- 환경 · 모델 설정 (endmill-sandbox 와 같은 모델 관리) ----------
+const MDL = { cat: null, timer: null, prev: {}, arm: {} };
+const MODEL_NAME = { ttm: 'TTM-R3', laya: 'LAYA' };
+const stVisible = () => VIEW === 'settings';
+function fmtBytes(b) { if (!b) return '0 B'; const u = ['B', 'KB', 'MB', 'GB']; let i = 0, v = b; while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; } return `${v.toFixed(i >= 2 ? 1 : 0)} ${u[i]}`; }
+function fmtEta(s) { if (s === null || s === undefined || !isFinite(s)) return '-'; if (s < 60) return `${Math.round(s)}초`; if (s < 3600) return `${Math.floor(s / 60)}분 ${Math.round(s % 60)}초`; return `${Math.floor(s / 3600)}시간 ${Math.round((s % 3600) / 60)}분`; }
+const jobActive = j => j && ['downloading', 'queued', 'verifying'].includes(j.state);
+function setHtml(el, html) { if (el && el.__h !== html) { el.__h = html; el.innerHTML = html; } }
+
+async function stEnter() {
+  if (!online()) { $('st-status').textContent = '파일 모드 — 모델 관리 · 설정은 데스크톱 앱 또는 crane_demo serve 에서 합니다.'; return; }
+  await stLoadSettings();
+  await mdlRefresh();
+  mqRender();
+  mdlEnsurePoll();
+}
+async function stLoadSettings() {
+  let s; try { s = await mcall('settings_get'); } catch (e) { $('st-status').textContent = `설정을 읽지 못했습니다: ${e}`; return; }
+  $('mdl-startup').checked = s.models.startup_download;
+  $('mdl-autoload').checked = s.models.auto_load;
+  $('mdl-auto').checked = s.models.auto_download;
+  if (document.activeElement !== $('mdl-endpoint')) $('mdl-endpoint').value = s.models.endpoint;
+  $('mdl-token').placeholder = s.models.token_set ? '설정됨 (바꾸려면 새 토큰 입력)' : 'hf_... (선택)';
+  if (document.activeElement !== $('mdl-root')) $('mdl-root').value = s.models_root;
+  const d = s.data_dir, sep = d.includes('\\') ? '\\' : '/';
+  $('st-paths').innerHTML = [['데이터 폴더', d], ['설정', d + sep + 'settings.json'], ['현장 프리셋', d + sep + 'presets'], ['내구도 원장', d + sep + 'health'], ['SDS 원장', d + sep + 'sds'], ['모델 폴더', s.models_root]].map(([k, v]) => `<span class="k">${k}</span><span class="v">${esc(v)}</span>`).join('');
+}
+function mdlStateOf(m) {
+  const j = m.job;
+  if (m.loading) return { label: '불러오는 중', cls: 'sev-1' };
+  if (jobActive(j)) return { label: j.state === 'verifying' ? '검증 중' : `다운로드 ${fmt(j.total ? j.done / j.total * 100 : 0, 1)}%`, cls: 'sev-1' };
+  if (m.loaded) return { label: '로드됨 · 사용 중', cls: 'sev-0' };
+  if (m.load_error) return { label: '로드 실패', cls: 'sev-3' };
+  if (m.installed || m.detected_dir) return { label: m.held ? '설치됨 (언로드함)' : '설치됨 (곧 불러옴)', cls: 'sev-0' };
+  if (j && j.state === 'failed') return { label: '다운로드 실패', cls: 'sev-3' };
+  if (j && j.state === 'cancelled') return { label: '중지됨 (이어받기 가능)', cls: 'sev-2' };
+  if (m.partial_bytes > 0) return { label: '일부 받음 (이어받기 가능)', cls: 'sev-2' };
+  return { label: '미설치', cls: 'sev-2' };
+}
+function mdlRender(cat) {
+  setHtml($('mdl-root-line'), `모델 폴더 <b>${esc(cat.root)}</b> · 연산 장치 ${esc(cat.device || 'CPU')} · 서버 ${esc(cat.endpoint)}${cat.token_set ? ' · 토큰 설정됨' : ''}${cat.ml_feature ? '' : ' · <span class="sev-3">ml 기능 없이 빌드됨</span>'}`);
+  const list = $('mdl-list'), keys = cat.entries.map(m => m.key).join(',');
+  if (list.__keys !== keys) {
+    list.__keys = keys;
+    list.innerHTML = cat.entries.map(m => `<div class="mdl-row" data-key="${esc(m.key)}">
+      <div class="mdl-head"><b>${esc(m.label)}</b><span data-p="state"></span><span class="mdl-actions" data-p="actions"></span></div>
+      <div class="mdl-meta" data-p="use"></div>
+      <div class="mdl-bar"><span data-p="bar"></span></div>
+      <div class="mdl-meta" data-p="bytes"></div>
+      <div class="mdl-meta" data-p="repo"></div>
+      <div data-p="extra"></div></div>`).join('');
+  }
+  cat.entries.forEach(m => {
+    const row = list.querySelector(`.mdl-row[data-key="${m.key}"]`); if (!row) return;
+    const part = n => row.querySelector(`[data-p="${n}"]`);
+    const st = mdlStateOf(m), j = m.job, active = jobActive(j);
+    const done = active ? j.done : (m.installed ? m.total_bytes : (m.on_disk_bytes || 0));
+    const total = active && j.total ? j.total : m.total_bytes;
+    const pct = total ? Math.min(100, done / total * 100) : 0;
+    const present = m.installed || m.detected_dir, armed = (MDL.arm[m.key] || 0) > Date.now();
+    const btn = (label, action, cls) => `<button class="btn btn-sm ${cls || 'btn-outline'}" data-act="${action}" data-key="${m.key}">${label}</button>`;
+    setHtml(part('actions'), [
+      !present && !active ? btn(m.partial_bytes > 0 || (j && j.state === 'cancelled') ? '이어받기' : (j && j.state === 'failed') ? '다시 받기' : '다운로드', 'download', '') : '',
+      active ? btn('중지', 'cancel') : '',
+      present && !m.loaded && !m.loading && !active ? btn('로드', 'load') : '',
+      m.loaded ? btn('언로드', 'unload') : '',
+      (m.installed || m.partial_bytes > 0) && !active && !m.loading ? btn(armed ? '한 번 더 누르면 삭제' : '삭제', 'delete', 'btn-danger') : '',
+    ].join(''));
+    const stEl = part('state'); if (stEl.className !== st.cls) stEl.className = st.cls; if (stEl.textContent !== st.label) stEl.textContent = st.label;
+    const use = `${m.used_for}${m.fallback ? ` · 없을 때: ${m.fallback}` : ''}`; if (part('use').textContent !== use) part('use').textContent = use;
+    part('bar').style.width = `${pct.toFixed(1)}%`;
+    const bytes = `${fmtBytes(done)} / ${fmtBytes(total)}${active ? ` · ${fmtBytes(j.speed_bps)}/s · 남은 시간 ${fmtEta(j.eta_s)} · ${j.file || ''}${j.attempt > 1 ? ` · 시도 ${j.attempt}` : ''}` : ''}`;
+    if (part('bytes').textContent !== bytes) part('bytes').textContent = bytes;
+    const repo = `${m.repo}@${m.revision.length > 16 ? m.revision.slice(0, 10) : m.revision} → ${m.detected_dir || m.dir}`;
+    if (part('repo').textContent !== repo) part('repo').textContent = repo;
+    setHtml(part('extra'), [
+      m.load_detail && m.loaded ? `<div class="mdl-meta sev-0">${esc(m.load_detail)}</div>` : '',
+      m.load_error ? `<div class="mdl-meta sev-3">${esc(m.load_error)}</div>` : '',
+      j && j.error ? `<div class="mdl-meta ${j.state === 'failed' ? 'sev-3' : 'sev-1'}">${esc(j.error)}</div>` : '',
+    ].join(''));
+  });
+  const sib = cat.sibling_root;
+  $('mdlSibling').classList.toggle('hidden', !sib);
+  $('mdl-sibling-note').innerHTML = sib ? `endmill-sandbox 가 같은 모델을 받아 둔 폴더가 있습니다: <b>${esc(sib)}</b> — 이 폴더를 쓰면 다시 받지 않습니다.` : '';
+  $('mdlPrepare').disabled = !cat.ml_feature || cat.entries.every(m => m.installed || m.detected_dir || jobActive(m.job));
+}
+// 상태 바 · 오른쪽 요약 · 뷰포트 알림줄
+function mdlSummary(cat) {
+  const dl = cat.entries.filter(m => jobActive(m.job)), ld = cat.entries.filter(m => m.loading);
+  const parts = [], waiting = typeof MQ !== 'undefined' ? MQ.tasks.filter(mqOpen).length : 0;
+  if (waiting) parts.push(`대기 작업 ${waiting}`);
+  if (dl.length) parts.push(dl.map(m => `${MODEL_NAME[m.key] || m.key} 받는 중 ${fmt(m.job.total ? m.job.done / m.job.total * 100 : 0, 0)}%`).join(' · '));
+  if (ld.length) parts.push(ld.map(m => `${MODEL_NAME[m.key] || m.key} 불러오는 중`).join(' · '));
+  if (!parts.length) {
+    const loaded = cat.entries.filter(m => m.loaded).length, inst = cat.entries.filter(m => m.installed || m.detected_dir).length;
+    parts.push(cat.ml_feature ? `로드 ${loaded}/${cat.entries.length} · 설치 ${inst}/${cat.entries.length}` : 'ml 기능 없음');
+  }
+  return parts.join(' · ');
+}
+function mdlChrome(cat) {
+  const sum = mdlSummary(cat);
+  $('sb-models').textContent = sum; $('sum-mdl').textContent = sum;
+  const dl = cat.entries.filter(m => jobActive(m.job));
+  $('menuMdlBadge').textContent = dl.length ? `${fmt(dl.reduce((a, m) => a + (m.job.total ? m.job.done / m.job.total : 0), 0) / dl.length * 100, 0)}%` : '';
+  $('mdlMini').innerHTML = cat.entries.map(m => { const st = mdlStateOf(m); return `<div class="mm-row"><b>${esc(MODEL_NAME[m.key] || m.key)}</b><span class="muted">${esc(m.loaded ? m.load_detail.split(' · ').slice(0, 2).join(' · ') : (m.fallback ? '없으면 ' + m.fallback : ''))}</span><span class="${st.cls}">${esc(st.label)}</span></div>`; }).join('');
+  const busy = $('vpBusy');
+  const missing = cat.ml_feature && cat.entries.some(m => !m.loaded);
+  if (dl.length || cat.entries.some(m => m.loading)) {
+    const speed = dl.reduce((a, m) => a + (m.job.speed_bps || 0), 0);
+    busy.textContent = `모델 준비 중 · ${sum}${speed ? ` (${fmtBytes(speed)}/s)` : ''} — 그동안은 Holt 예측 · 규칙 판정으로 실행됩니다`;
+    busy.classList.remove('hidden');
+  } else if (missing && cat.entries.some(m => m.job && m.job.state === 'failed')) {
+    busy.textContent = '모델 다운로드 실패 — 눌러서 설정에서 다시 받기'; busy.classList.remove('hidden');
+  } else busy.classList.add('hidden');
+}
+// 상태가 바뀌면 알린다 (다 받음 · 불러옴 · 실패)
+function mdlNotify(cat) {
+  for (const m of cat.entries) {
+    const p = MDL.prev[m.key], name = MODEL_NAME[m.key] || m.key, js = m.job ? m.job.state : '';
+    if (p) {
+      if (!p.loaded && m.loaded) { toast(`${name} 준비됨`, `${esc(m.load_detail)}\n다음 실행부터 사용합니다.`, 'ok'); appendLog(`${name} 로드: ${m.load_detail}`, 'ok'); }
+      if (p.js !== 'done' && js === 'done') appendLog(`${name} 다운로드 완료 (${fmtBytes(m.total_bytes)})`, 'ok');
+      if (p.js !== 'failed' && js === 'failed') { toast(`${name} 다운로드 실패`, esc(m.job.error || ''), 'err', 10000); appendLog(`${name} 다운로드 실패: ${m.job.error || ''}`, 'err'); }
+      if (!p.err && m.load_error) { toast(`${name} 로드 실패`, esc(m.load_error), 'err', 10000); appendLog(`${name} 로드 실패: ${m.load_error}`, 'err'); }
+      if (!jobActive(p.job) && jobActive(m.job)) appendLog(`${name} 다운로드 시작 (${fmtBytes(m.total_bytes)})`);
+    }
+    MDL.prev[m.key] = { loaded: m.loaded, js, err: m.load_error, job: m.job };
+  }
+}
+async function mdlRefresh() {
+  if (!online()) return null;
+  let cat; try { cat = await mcall('models_catalog'); } catch (e) { return null; }
+  MDL.cat = cat;
+  mdlNotify(cat); mdlChrome(cat);
+  if (stVisible()) mdlRender(cat);
+  return cat;
+}
+function mdlNeedsPoll(cat) {
+  return stVisible() || cat.any_active || MQ.tasks.some(mqOpen) || cat.entries.some(m => m.loading || (cat.auto_load && !m.loaded && !m.held && !m.load_error && (m.installed || m.detected_dir)));
+}
+function mdlEnsurePoll() {
+  if (MDL.timer) return;
+  MDL.timer = setInterval(async () => {
+    const cat = await mdlRefresh();
+    if (!cat || !mdlNeedsPoll(cat)) { clearInterval(MDL.timer); MDL.timer = null; }
+  }, 800);
+}
+$('mdl-list').onclick = async e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const key = b.dataset.key, action = b.dataset.act, name = MODEL_NAME[key] || key, status = $('st-status');
+  if (action === 'delete' && !((MDL.arm[key] || 0) > Date.now())) {
+    MDL.arm[key] = Date.now() + 4000; if (MDL.cat) mdlRender(MDL.cat);
+    setTimeout(() => { if ((MDL.arm[key] || 0) <= Date.now()) { delete MDL.arm[key]; if (MDL.cat) mdlRender(MDL.cat); } }, 4100);
+    return;
+  }
+  delete MDL.arm[key];
+  try {
+    if (action === 'download') { await mcall('models_download', { key }); status.textContent = `${name} 다운로드 시작`; }
+    else if (action === 'cancel') { await mcall('models_cancel', { key }); status.textContent = `${name} 다운로드 중지 (받은 부분은 이어받기용으로 보관)`; }
+    else if (action === 'unload') { await mcall('models_unload', { key }); status.textContent = `${name} 언로드 (다시 쓰려면 '로드')`; }
+    else if (action === 'delete') { await mcall('models_delete', { key }); status.textContent = `${name} 모델 파일 삭제`; }
+    else if (action === 'load') {
+      status.textContent = `${name} 불러오는 중… (LAYA 는 수십 초 걸릴 수 있습니다)`; b.disabled = true; mdlEnsurePoll();
+      const r = await mcall('models_ensure', { key, download: false });
+      status.textContent = r.state === 'ready' ? `${name} 로드 완료: ${r.detail}` : `${name}: ${r.detail}`;
+    }
+  } catch (err) { status.textContent = `${name} ${action} 실패: ${err}`; }
+  await mdlRefresh(); mdlEnsurePoll();
+};
+async function mdlSaveSettings(clearToken) {
+  const token = $('mdl-token').value.trim();
+  try {
+    await mcall('settings_set_models', { auto_download: $('mdl-auto').checked, startup_download: $('mdl-startup').checked, auto_load: $('mdl-autoload').checked, endpoint: $('mdl-endpoint').value.trim(), token: clearToken ? null : (token || null), clear_token: !!clearToken });
+  } catch (e) { $('st-status').textContent = `저장 실패: ${e}`; return; }
+  $('mdl-token').value = '';
+  $('st-status').textContent = clearToken ? '토큰을 삭제했습니다' : '다운로드 설정을 저장했습니다';
+  await stLoadSettings(); await mdlRefresh(); mdlEnsurePoll();
+}
+$('mdlSave').onclick = () => mdlSaveSettings(false);
+$('mdlClearToken').onclick = () => mdlSaveSettings(true);
+async function mdlSetRoot(rootDir) {
+  try { await mcall('models_set_root', { root: rootDir }); $('st-status').textContent = `모델 폴더: ${rootDir}`; appendLog(`모델 폴더를 바꿈: ${rootDir}`); }
+  catch (e) { $('st-status').textContent = `폴더 바꾸기 실패: ${e}`; return; }
+  await stLoadSettings(); await mdlRefresh(); mdlEnsurePoll();
+}
+$('mdlSetRoot').onclick = () => mdlSetRoot($('mdl-root').value.trim());
+$('mdlSibling').onclick = () => MDL.cat && MDL.cat.sibling_root && mdlSetRoot(MDL.cat.sibling_root);
+$('mdlPrepare').onclick = async () => {
+  try { const r = await mcall('models_prepare'); $('st-status').textContent = r.started && r.started.length ? `다운로드 시작: ${r.started.map(k => MODEL_NAME[k] || k).join(' · ')}` : '받을 모델이 없습니다'; }
+  catch (e) { $('st-status').textContent = `실패: ${e}`; }
+  await mdlRefresh(); mdlEnsurePoll();
+};
+$('vpBusy').onclick = () => switchView('settings');
+
+// ---------- 모델 대기 작업 (endmill-sandbox requireModels 와 같은 흐름) ----------
+// 실행이 쓰는 모델이 받는 중 · 불러오는 중이면 기다렸다가 준비되면 자동으로 이어서 실행한다. 없거나 실패하면 다운로드 · 모델 없이 진행 · 취소.
+const MQ = { tasks: [], seq: 0 };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const mqOpen = t => ['waiting', 'need_action', 'failed'].includes(t.state);
+async function requireModels(keys, label, opts = {}) {
+  if (!online()) return { ok: true };
+  let cat = MDL.cat;
+  try { cat = await mcall('models_catalog'); MDL.cat = cat; } catch (e) { }
+  if (!cat || !cat.ml_feature) return { ok: true };
+  // 작업자가 언로드해 둔 모델은 기다리지 않는다 (LAYA 를 빼고 빠르게 돌리려는 경우)
+  keys = keys.filter(k => { const m = cat.entries.find(x => x.key === k); return m && !m.loaded && !m.held; });
+  if (!keys.length) return { ok: true };
+  return new Promise(resolve => {
+    const t = { id: ++MQ.seq, label, keys, optional: !!opts.optional, state: 'waiting', msg: '모델 준비 확인 중…', resolve, pct: null };
+    MQ.tasks.push(t);
+    mqRender(); mdlEnsurePoll();
+    mqPump(t);
+  });
+}
+async function mqPump(t) {
+  while (t.state === 'waiting') {
+    let allReady = true;
+    for (const k of t.keys) {
+      const name = MODEL_NAME[k] || k;
+      t.msg = `${name} 준비 확인 · 로드 중…`; t.pct = null; mqRender();
+      let r;
+      try { r = await mcall('models_ensure', { key: k, download: null }); } catch (e) { r = { state: 'failed', detail: String(e) }; }
+      if (t.state !== 'waiting') return;
+      if (r.state === 'ready') continue;
+      allReady = false;
+      if (r.state === 'downloading') {
+        const j = r.job; t.pct = j && j.total ? j.done / j.total * 100 : 0;
+        t.msg = `${name} 다운로드 중 ${fmt(t.pct, 1)}%${j && j.speed_bps ? ` · ${fmtBytes(j.speed_bps)}/s · 남은 시간 ${fmtEta(j.eta_s)}` : ''} — 완료되면 자동으로 이어서 실행합니다`;
+      } else if (r.state === 'loading') {
+        t.msg = `${name} 불러오는 중 — 끝나면 자동으로 이어서 실행합니다`;
+      } else if (r.state === 'missing') {
+        t.state = 'need_action'; t.need = k;
+        t.msg = `${name} 모델이 없습니다 (자동 다운로드 꺼짐) — 다운로드하거나 ${t.optional ? '모델 없이 진행하세요' : '취소하세요'}`;
+      } else {
+        t.state = 'failed'; t.need = k;
+        t.msg = `${name}: ${r.detail}`;
+      }
+      break;
+    }
+    if (allReady) {
+      t.state = 'done'; t.msg = '모델 준비 완료 → 실행 재개'; t.pct = 100;
+      mqRender(); await mdlRefresh();
+      t.resolve({ ok: true });
+      setTimeout(() => { MQ.tasks = MQ.tasks.filter(x => x !== t); mqRender(); }, 4000);
+      return;
+    }
+    mqRender();
+    if (t.state !== 'waiting') return;
+    await sleep(800);
+  }
+}
+async function mqAction(id, action) {
+  const t = MQ.tasks.find(x => x.id === id); if (!t) return;
+  if (action === 'cancel') { t.state = 'cancelled'; t.msg = '사용자가 작업을 취소했습니다'; t.resolve({ ok: false, cancelled: true }); }
+  else if (action === 'fallback') { t.state = 'fallback'; t.msg = '모델 없이 대체 방식으로 진행 (Holt 예측 · 규칙 판정)'; t.resolve({ ok: false, fallback: true }); }
+  else if (action === 'download') {
+    try { await mcall('models_download', { key: t.need }); } catch (e) { t.msg = String(e); mqRender(); return; }
+    t.state = 'waiting'; t.msg = '다운로드 시작';
+    mqRender(); mdlEnsurePoll(); mqPump(t);
+    return;
+  }
+  mqRender();
+  setTimeout(() => { MQ.tasks = MQ.tasks.filter(x => x !== t); mqRender(); }, 3000);
+}
+function mqButtons(t) {
+  return [
+    (t.state === 'need_action' || t.state === 'failed') ? `<button class="btn btn-sm" data-mq="${t.id}" data-mqa="download">다운로드</button>` : '',
+    t.optional && mqOpen(t) ? `<button class="btn btn-sm btn-outline" data-mq="${t.id}" data-mqa="fallback">모델 없이 진행</button>` : '',
+    mqOpen(t) ? `<button class="btn btn-sm btn-outline" data-mq="${t.id}" data-mqa="cancel">취소</button>` : '',
+  ].join('');
+}
+function mqRender() {
+  const label = { waiting: '대기', need_action: '조치 필요', failed: '실패', done: '재개', cancelled: '취소', fallback: '대체 진행' };
+  const cls = { waiting: 'sev-1', need_action: 'sev-2', failed: 'sev-3', done: 'sev-0', cancelled: '', fallback: 'sev-1' };
+  setHtml($('mq-list'), MQ.tasks.length ? MQ.tasks.map(t => `<div class="mq-item"><span class="mq-state ${cls[t.state] || ''}">${label[t.state] || t.state}</span><b>${esc(t.label)}</b><span class="muted">필요 모델: ${t.keys.map(k => esc(MODEL_NAME[k] || k)).join(', ')}</span><span style="flex:1;min-width:160px">${esc(t.msg || '')}</span><span style="display:flex;gap:4px;flex-wrap:wrap">${mqButtons(t)}</span></div>`).join('')
+    : '<div class="note">대기 중인 작업이 없습니다. 사이클 해석이 시계열 예측(TTM-R3) · 판정 조언(LAYA) 모델을 기다리면 여기에 표시됩니다.</div>');
+  // 뷰포트 카드 — 열려 있는 첫 작업
+  const t = MQ.tasks.find(mqOpen) || MQ.tasks.find(x => x.state === 'done');
+  $('vpWait').classList.toggle('hidden', !t);
+  if (t) {
+    $('vpWaitMsg').textContent = t.msg || '';
+    $('vpWaitBar').style.width = `${t.pct == null ? 0 : Math.min(100, t.pct).toFixed(1)}%`;
+    $('vpWaitSteps').textContent = `${t.label} · 필요 모델 ${t.keys.map(k => MODEL_NAME[k] || k).join(', ')}`;
+    setHtml($('vpWaitBtns'), mqButtons(t) + `<button class="btn btn-sm btn-outline" data-goto="settings">모델 설정</button>`);
+  }
+  if (MDL.cat) mdlChrome(MDL.cat);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-mqa]'); if (b) { mqAction(Number(b.dataset.mq), b.dataset.mqa); return; }
+  const g = e.target.closest('button[data-goto]'); if (g) switchView(g.dataset.goto);
+});
+
 (async function init() {
   if (!TAURI && location.protocol.startsWith('http')) {
     try { const r = await fetch('/api/ping', { method: 'POST', body: '{}' }); const j = await r.json(); HTTP = !!(j && j.ok); } catch (_) { HTTP = false; }
   }
+  updateSums();
   if (online()) {
     $('src').textContent = TAURI ? '데스크톱 (Tauri)' : '브라우저 (crane_demo serve)';
-    try { const s = await invoke('models_status'); if (s && (s.ttm || s.advisor)) $('mstatus').textContent = s.notes.join(' · '); } catch (_) {}
+    appendLog(`${$('src').textContent} 연결`);
+    // 앱이 뜨면 백엔드가 없는 모델을 바로 받기 시작한다 — 진행률을 상태 바 · 뷰포트 알림줄에 보인다
+    mdlRefresh().then(cat => { if (cat) { mdlEnsurePoll(); if (cat.any_active) appendLog(`모델 준비: ${mdlSummary(cat)}`); } });
     try { const mr = await api('marine_refs'); PROTS = mr.protections; SALT_AREAS = mr.salt_areas; const cs = await api('cargo_scenarios'); CARGOS = cs.scenarios; window.CARGO_TYPES = cs.types; } catch (e) { setOpStatus('염해 · 화물 프리셋 불러오기 실패: ' + e); }
     try { CRANES = await api('cranes'); CLIMATES = await api('climates'); await loadSiteList(); } catch (e) { setOpStatus('프리셋 불러오기 실패: ' + e); }
+    try { await loadWeatherSources(); } catch (e) { setOpStatus('ERA5 위치 불러오기 실패: ' + e); }
     try { PG = await api('prognostics_saved'); renderProg(); } catch (_) {}
     try { CAL = await api('fieldcal_saved'); renderCal(); } catch (_) {}
   } else {
-    $('run').title = '데스크톱 앱 · crane_demo serve 에서 실행됩니다'; $('cmp').title = $('run').title; $('opRun').title = $('run').title;
+    const t = '데스크톱 앱 · crane_demo serve 에서 실행됩니다';
+    for (const id of ['run', 'cmp', 'vtRun', 'vtCmp', 'opRun']) $(id).title = t;
     $('siteDesc').textContent = '파일 모드: 프리셋 편집 · 실행은 데스크톱 앱 또는 crane_demo serve 에서 합니다.';
+    $('sb-models').textContent = '파일 모드'; $('sum-mdl').textContent = '파일 모드';
+    appendLog('파일 모드 — 왼쪽 ⑤ 에서 crane_demo 결과 JSON 을 여세요');
   }
-  drawScene(); renderCompare();
+  setHud('READY');
+  scheduleRedraw();
   requestAnimationFrame(tick);
 })();
 </script>

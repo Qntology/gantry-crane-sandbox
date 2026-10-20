@@ -59,6 +59,8 @@ cargo test --no-default-features --lib
 cargo run --release --bin crane_demo -- site list
 cargo run --release --bin crane_demo -- operate --site busan_newport_rmg --days 90 --start 07-01 --asset RMG-01 --policy ask
 cargo run --release --bin crane_demo -- health show RMG-01
+# 같은 운전을 ERA5 시간별 실제 날씨로 (부산 신항 2023년 8월, 캐시 먼저 · 없으면 Open-Meteo 에서 한 번 받음)
+cargo run --release --bin crane_demo -- operate --site busan_newport_rmg --days 30 --weather era5:busan_newport@2023-08-01 --asset RMG-E5 --fresh
 # 값을 바꿔 내 현장으로 저장
 cargo run --release --bin crane_demo -- site save my_yard --from incheon_steel_stockyard --set throughput.moves_per_hour=10
 # 실데이터 대조 · 보정 표 (약 4분, --quick 은 짧은 표본)
@@ -81,14 +83,21 @@ cargo run --release --bin crane_demo -- serve
 
 ### 화면
 
-- **데스크톱 (Tauri v1)**: `npm install` 후 `run.bat` (CPU) · `run_vulkan.bat` · `run_rocm.bat`, 또는 `cd src-tauri && cargo tauri dev`.
+- **데스크톱 (Tauri v1)**: `run.bat` (CPU, 처음이면 `npm install` 까지) · `run_vulkan.bat` · `run_rocm.bat`, 또는
+  `cd src-tauri && cargo tauri dev`. 개발 서버는 5174 번 포트라 endmill-sandbox(5173)를 켜 둔 채로도 띄울 수 있다.
 - **브라우저 (실행 모드)**: `crane_demo serve` 가 화면과 API 를 함께 연다 (http://localhost:8765). 데스크톱 앱과 같은 명령을 쓴다.
+  `--html index.html` 을 주면 화면 파일을 요청마다 디스크에서 읽는다 (다시 빌드하지 않고 화면 고치기).
 - **브라우저 (파일 모드)**: `npm run dev` 로 `index.html` 을 열고 `crane_demo pipeline … --compare` 가 저장한
   `out/pipeline.json` · `out/compare.json`, `crane_demo operate` 의 `operation.json`, `crane_demo fieldcal` 의 `fieldcal.json` 을
-  끌어다 놓는다. 3D 재생, 흔들림 · 모터 차트, 게이트, 근무 예측 띠, 방식 비교, 교차검증, **현장 운영 · 내구도**(알림 · 결정 기록 ·
-  부품 수명 · 건강 점수 · 예측 남은 일 · 30일 고장 확률 · 염해), **염해 · 예측 점수**(방지 프리셋 비교 · v0–v4 점수 · PIT ·
-  신뢰도), **실데이터 보정**(ERA5 교차검증 포함) 탭이 있다. 현장 운영 칸에서 프리셋(해안 노출 · 염해 방지 · 화물 시나리오 포함)을
-  바꿔 저장하고, 결정 카드는 버튼 · 숫자 키로 고른다 (선택지마다 안전 · 진행 · 위험 · 중단 배지).
+  끌어다 놓는다.
+
+화면 배치 · 색은 endmill-sandbox 와 같다 (무채색 zinc 단계, 색은 상태 · 데이터에만). 왼쪽은 화면 전환 메뉴와 ① 시나리오 ·
+② 근무 · 예측 · ③ 현장 프리셋 · ④ 운영 실행 · ⑤ 결과 파일 단계(접으면 아이콘 레일), 가운데는 3D 재생 뷰포트(상태 · 위치 HUD),
+오른쪽은 핵심 지표 · 판정 · 작업자 선택 카드 · 학습 모델 상태, 아래는 흔들림 · 모터 · 게이트 · 근무 예측 · 방식 비교 · 교차검증 ·
+로그 탭이다. 패널 사이 간격을 끌어 크기를 바꾸고 더블클릭하면 기본 크기로 돌아간다. 메뉴의 **현장 운영 · 내구도**(알림 · 결정
+기록 · 부품 수명 · 건강 점수 · 예측 남은 일 · 30일 고장 확률 · 염해), **염해 · 예측 점수**(방지 프리셋 비교 · v0–v4 점수 · PIT ·
+신뢰도), **실데이터 보정**(ERA5 교차검증 포함), **환경·모델 설정**은 가운데를 넓게 쓴다. 현장 운영 결정 카드는 버튼 · 숫자 키로
+고른다 (선택지마다 안전 · 진행 · 위험 · 중단 배지).
 
 ## 시나리오
 
@@ -99,9 +108,19 @@ cargo run --release --bin crane_demo -- serve
 
 ## 학습 모델 (선택)
 
-`ml` 기능(기본 켜짐)에서 endmill-sandbox 와 같은 candle 포크로 TTM-R3 · LAYA 를 불러온다. safetensors 폴더를 한 곳에 두고
-`--models <폴더>` (CLI) 또는 화면의 모델 폴더에 지정한다. 경로에 `ttm` · `laya` 가 들어간 폴더를 찾는다
-(예: `granite-timeseries-ttm-r3/52-16-dec-52-r3/`, `laya-typed-decisions/`). 모델이 없으면 Holt 예측과 규칙 판정만 쓴다.
+`ml` 기능(기본 켜짐)에서 endmill-sandbox 와 같은 candle 포크로 TTM-R3 · LAYA 를 불러온다.
+
+- **앱을 켜면 없는 모델을 바로 내려받는다** (Hugging Face, 합쳐 약 0.85 GB · 이어받기). 다 받은 모델은 백그라운드에서
+  불러온다. `crane_demo serve` 도 같다 (`--no-download` 로 끔).
+- 받는 중에 '실행'을 누르면 endmill-sandbox 의 **모델 대기 작업**처럼 뷰포트에 대기 카드가 뜨고, 준비되면 자동으로 이어서
+  실행한다 ('모델 없이 진행'이면 Holt 예측 · 규칙 판정, '취소'도 가능). 작업자가 언로드해 둔 모델은 기다리지 않는다.
+- 화면 **환경·모델 설정**: 모델별 진행률 · 속도 · 남은 시간, 다운로드 · 중지 · 이어받기 · 로드 · 언로드 · 삭제,
+  시작 시 받기 / 자동 로드 / 실행 때 받기 스위치, 사내 미러 주소 · 토큰, 모델 폴더 바꾸기 (endmill-sandbox 가 받아 둔
+  폴더가 있으면 그대로 쓰기). 설정은 앱 데이터 폴더의 `settings.json` · `models_root.txt` 에 남는다.
+- 폴더 배치: 경로에 `ttm` · `laya` 가 들어간 폴더를 찾는다 (예: `granite-timeseries-ttm-r3/52-16-dec-52-r3/`,
+  `laya-typed-decisions/` — LAYA 는 Hugging Face 배치 그대로 `encoder/config.json`). CLI 는 `--models <폴더>`.
+- LAYA(ModernBERT-large)는 CPU 에서 판정 한 번에 20초 안팎 걸린다. 빠르게 돌리려면 GPU 빌드(`run_vulkan.bat` ·
+  `run_rocm.bat`)를 쓰거나 설정에서 LAYA 를 언로드한다.
 GPU: `--features cuda | rocm | vulkan`, 장치 강제는 `CRANE_DEVICE=cpu|cuda|rocm|vulkan`.
 
 ## 실데이터로 보정하기
@@ -145,6 +164,8 @@ src/
   backend.rs              데스크톱 · `crane_demo serve` 공용 명령
   api.rs                  CLI · 데스크톱 공용 파이프라인
   ml/                     TTM-R3 · LAYA · ModernBERT (endmill-sandbox 이식)
+  modelhub.rs             모델 내려받기 (Hugging Face · 이어받기 · 매니페스트, endmill-sandbox 이식)
+  model_service.rs        모델 설정 · 시작 시 자동 받기 · 백그라운드 로드 · 설정 명령
   bin/main.rs             crane_demo
 crates/crane_mbd/   질점 로프 · 훅 · 하중 다물체 해석기 (교차검증)
 src-tauri/          데스크톱 셸 (Tauri v1)

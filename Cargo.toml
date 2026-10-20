@@ -14,6 +14,9 @@ candle-core = { version = "0.11.0", optional = true }
 candle-nn = { version = "0.11.0", optional = true }
 candle-rocm = { git = "https://github.com/Qntology/candle-rocm-vulkan.git", optional = true }
 tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"], optional = true }
+# 모델 내려받기 (Hugging Face, 이어받기) — endmill-sandbox modelhub 와 같은 구성
+tokio = { version = "1", features = ["rt", "time"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"], optional = true }
 # 실행 기록 저장소 (SQLite)
 rusqlite = { version = "0.40", features = ["bundled"], optional = true }
 
@@ -22,7 +25,7 @@ rusqlite = { version = "0.40", features = ["bundled"], optional = true }
 [features]
 default = ["ml", "store"]
 # 물리 엔진만 빠르게 빌드하려면 --no-default-features
-ml = ["dep:candle-core", "dep:candle-nn", "dep:tokenizers"]
+ml = ["dep:candle-core", "dep:candle-nn", "dep:tokenizers", "dep:tokio", "dep:reqwest"]
 store = ["dep:rusqlite"]
 cuda = ["ml", "candle-core/cuda", "candle-nn/cuda"]
 rocm = ["ml", "dep:candle-rocm", "candle-core/rocm", "candle-nn/rocm"]

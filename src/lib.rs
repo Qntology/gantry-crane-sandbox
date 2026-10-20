@@ -25,6 +25,8 @@ pub mod fieldcal;
 pub mod health;
 pub mod ingest;
 pub mod marine;
+pub mod model_service;
+pub mod modelhub;
 pub mod motion;
 pub mod motor;
 pub mod operation;

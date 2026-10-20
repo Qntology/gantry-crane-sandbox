@@ -103,6 +103,21 @@ pub fn climates() -> Vec<Climate> {
     sites().iter().filter(|s| s.kind == "port").filter_map(|s| climate(&s.id)).collect()
 }
 
+/// 위치의 시간별 자료 기간 (기상청 지점 2년 · 항만 1년)
+pub fn hourly_period(s: &PortSite) -> (&'static str, &'static str) {
+    if s.kind == "kma_station" {
+        KMA_HOURLY
+    } else {
+        PORT_HOURLY
+    }
+}
+
+/// 위치의 시간별 ERA5 (통계를 만든 것과 같은 캐시 파일). 캐시에 없으면 `f.offline` 이 아닐 때만 받는다
+pub fn hourly(f: &Fetcher, s: &PortSite) -> Result<weather_api::Hourly, String> {
+    let (h0, h1) = hourly_period(s);
+    f.hourly(s.lat, s.lon, h0, h1)
+}
+
 /// 위치 하나의 일별 · 시간별 · SO₂ · 파고를 받아 통계를 만든다 (캐시 우선)
 pub fn build_one(f: &Fetcher, s: &PortSite) -> Result<SiteStats, String> {
     let kma = s.kind == "kma_station";

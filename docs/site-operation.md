@@ -257,6 +257,8 @@ CLI 는 `presets/` (기본), 화면은 데이터 폴더의 `presets/` 에 JSON �
 crane_demo site list | show <id> | save <새 id> --from <id> --set 경로=값 … | delete <id>
 crane_demo climate list | check <id> --years 20          # 생성 날씨 vs 기상청 평년값
 crane_demo operate --site <id> --asset <이름> --days N --start MM-DD --policy ask|recommended|conservative|risky
+crane_demo operate --site <id> --days N --weather era5:<위치>[@YYYY-MM-DD] [--offline] [--cache DIR]
+                                                          # ERA5 시간별 실제 날씨 재생 (위치: weather ports, 캐시 먼저)
 crane_demo health list | show <자산> | replace <자산> <부품>
 crane_demo fieldcal [--quick]                             # 실데이터 대조 · 보정 (전체 약 4분)
 crane_demo weather ports | check | build --offline        # ERA5 항만 기후 · 기상청 교차검증 · 통계 파일 다시 만들기
