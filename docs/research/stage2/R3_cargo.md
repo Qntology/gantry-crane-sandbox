@@ -1,6 +1,6 @@
 # R3 — Cargo scenario presets: sourced numbers
 
-Status: IN PROGRESS (v1). Each value carries source URL + short quote/table ref + confidence.
+Status: COMPLETE (2026-10-20; v1 + continuation filling Q1 empties/reefer/OOG, Q2 TEU/T-S and productivity/downtime comparators, Q4 precast weights, Q6 corroboration, Q9 coil/project/tandem times, Unverified list). Each value carries source URL + short quote/table ref + confidence.
 Confidence: high = primary source/standard/statute opened; med = secondary but opened; low = indirect/derived.
 
 ---------------------------------------------------------------------------------------------------
@@ -94,8 +94,22 @@ General page quote: "20' containers: Up to 32,500 kg ... for general purpose con
 Spread-load limits: "for 20' containers: 4.8 tons ... per running meter in length" and "for 40' containers: 3 tons per running meter" (relevant to coil-in-container loading).
 Cross-check: Interpave gives 40' empty ≈ 3,700 kg (consistent).
 
-### 1d. Share of empties / reefers / OOG (Busan)
-NOT FOUND with sourced numbers in budget. (KOSHA A-G-18-2026 confirms reefers need plug check before lift and empties must be stacked low/stepped, lashed ≥3 high — handling rules only.)
+### 1d. Share of empties / reefers / OOG
+Busan-specific full/empty, reefer and OOG shares: NOT FOUND (no BPA breakdown opened; a BPA open-data set "부산항만공사_부산항 컨테이너 수송통계", data.go.kr 15055478, was seen only as a search hit, not opened). KOSHA A-G-18-2026 confirms reefers need a plug check before lift and empties must be stacked low/stepped, lashed ≥3 high — handling rules only. Comparators found (2026-10-20 continuation):
+
+| Item | Value | Source + quote | Conf. |
+|---|---|---|---|
+| World port throughput, full vs empty | 80 % full / 20 % empty (no year stated) | Notteboom, Pallis & Rodrigue, *Port Economics, Management and Policy*, "World Container Throughput, 1980-2024" (data credited to Drewry/UNCTAD): "both full and empty containers, which account for 80% and 20% of maritime traffic, respectively." https://porteconomicsmanagement.org/pemp/contents/part1/maritime-shipping-and-international-trade/world-container-throughput/ | med (textbook relaying Drewry) |
+| World throughput level | 849 M TEU (2021) | same page: "In 2021, container traffic resumed its growth, reaching 849 million TEUs." | med |
+| Gateway comparator — Port of Los Angeles, CY2024 | empties 3,446,471 of 10,297,352 TEU = **33.5 %** (my calc); empty exports = 69.7 % of exports; empty imports ≈ 0.14 % of imports | POLA "Historical TEU Statistics 2024", row "Total Calendar Year 2024": "Empty Imports" 7,529.30; "Empty Exports" 3,438,941.50; "Loaded Exports" 1,494,201.30; "Total TEUs" 10,297,352.25. https://www.portoflosangeles.org/business/statistics/container-statistics/historical-teu-statistics-2024 | high (port-authority table; trade-imbalance gateway, NOT a T/S hub like Busan) |
+| Reefer share — Antwerp 2021 | **8.2 %** of TEU; >1 M reefer TEU | IIR/IIF news 2022-04-25 citing Port of Antwerp: "The share of reefer container volumes (in TEUs) is 8.2% of the total container traffic in the port." / "The 1 million TEU mark of operational reefer containers has been passed for the second year in a row." https://iifiir.org/en/news/reefer-container-throughput-in-main-european-ports | med |
+| Reefer — Rotterdam | ~15 % "of container types" (metric not stated as TEU throughput; year not stated) | same page: "Reefer containers represent about 15% of container types." | low-med |
+| OOG / flat-rack share | see 1e | — | — |
+
+Sim note (DERIVED, low): a Busan preset could use empty share 20 % (world) as default, with a sensitivity range 20–35 % (world → gateway-with-imbalance); reefer 8 % (Antwerp-like). Both are comparators, not Busan data.
+
+### 1e. OOG / flat-rack share
+NOT FOUND as a share of port throughput (one English search; results were forwarder/glossary pages without statistics) → Unverified. What IS sourced: flat-rack tare and max gross (1c: 20' FR 2,740–2,940 kg tare, up to 45,000 kg gross; 40' HC FR 5,800–5,950 kg tare, 50,000–60,000 kg gross) and the KOSHA OOG handling rule (Q8b: sling worker fore and aft, 20–30 cm test lift). For a preset, OOG share must be an explicit ASSUMPTION parameter.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -105,8 +119,9 @@ NOT FOUND with sourced numbers in budget. (KOSHA A-G-18-2026 confirms reefers ne
 | Year | Total | Transshipment | T/S share | Source | Conf. |
 |---|---|---|---|---|---|
 | 2025 ("지난해" in a 2026-06-17 article) | 24,882 thousand (6 m container = TEU) | 14,097 thousand | 56.7% (my calc 14,097/24,882) | Kukinews 2026-06-17 citing 동남지방데이터청 "데이터로 본 부산과 세계 주요 항구 도시": "지난해 부산항 컨테이너 물동량은 2,488만2천개(약 6m짜리 컨테이너 기준)다." / "환적 물동량은 1,409만7천개로 세계 2위" https://www.kukinews.com/article/print/kuk202606170089 | med (statistics office via press; not BPA release) |
+| 2025 (BPA release, 2026-02-02) | 24.88 M TEU (+2.0 %) | 14.10 M TEU (+4.4 %) | **57 %** (printed) | TWIG24 2026-02-02 relaying 부산항만공사: "지난해 부산항 컨테이너 물동량이 2488만 TEU로 전년 2440만 TEU보다 2.0% 증가해 역대 최고치" ; "환적 물동량은 전년 1410만 TEU로 전년보다 4.4% 증가" ; "이는 전체 물동량의 57% 비중이다." ; "환적 화물의 80%는 외국 선사가" https://www.twig24.com/news/local_bs/2026/02/02/20260202500225 (the "전년" before 1410만 is a wording slip: 1,410만 is the 2025 value, matching Kukinews 1,409.7만 and 57 % = 1,410/2,488) | high (BPA figures via press; consistent with the Kukinews row above) |
+| 2024 (same BPA release, prior-year figure) | **24.40 M TEU** | ≈13.51 M TEU (DERIVED: 14.10 / 1.044) | ≈55.4 % (DERIVED) | same TWIG24 quote "전년 2440만 TEU" ; T/S only via the printed +4.4 % growth | total high; T/S share low-med (derived) |
 | 2018, Busan NEW PORT only | 14,559 thousand TEU | — | 58.89 %; inter-terminal T/S = 26.3 % of T/S (15.51 % of New Port volume) | 김환성 외, "부산신항 ITT 도입 평가요소에 관한 연구" (KMOU + BPA authors), KINPR conference, koreascience CFKO201922850135977: "부산항 신항은 2018년도 기준으로 컨테이너 14,559천TEU를 처리하였으며, 환적은 58.89%을 점유" https://koreascience.kr/article/CFKO201922850135977.pdf | high (abstract) |
-| 2024 (not confirmed) | ~24.4 M TEU | — | — | only seen in search snippets of press items; BPA release not opened → see Unverified | low |
 
 ### 2b. Korean wind stop limits used for container handling (KOSHA guide)
 Source: KOSHA GUIDE A-G-18-2026 "항만하역작업 안전에 관한 기술지원규정" (공표 2026-01-30), PDF:
@@ -132,6 +147,17 @@ Source text mirror: https://www.nepla.ai/law/산업안전보건기준에-관한-
 - Hours/days per year of wind-related cargo-handling suspension at Busan: no BPA/terminal statistic found. Papers found are on design wind (Typhoon Maemi "60m/s", design "75m/s" — 권순규 외 2006, koreascience CFKO200617054768283) and berthing limits, not handling downtime.
 - Generic quay-crane productivity reference (Liftech, 2002, see Q9): conventional post-Panamax "computed average period ... 72 seconds"; with yard and normal delays "about 140 percent of this, or 100 seconds (36 lifts per hour)"; real terminals "as low as 65 percent and as high as 80 percent of the computed number." (high, but US/2002 context)
 
+### 2e. Continuation (2026-10-20): productivity, berthing wind, weather-downtime comparators
+
+| Item | Value | Source + quote | Conf. |
+|---|---|---|---|
+| Busan New Port QC productivity vs ship size | QC productivity falls as ship size rises; robust when yard congestion is controlled; monthly panel, 5 terminal operators, 2013–2023 (abstract gives NO moves/h figures) | Jeong (HMM PSA New-Port Terminal) & Kim (KMOU), "Containership size and quay crane productivity: empirical evidence from Busan New Port", *Maritime Economics & Logistics* 27(2) 293-303, 2025: "quay crane productivity is negatively affected by containership size" https://ideas.repec.org/a/pal/marecl/v27y2025i2d10.1057_s41278-024-00286-0.html | high (direction only) |
+| Busan STS net cycle (Hutchison Korea Terminal, 14 STS, 2013–18) | 1.44–1.56 min per move (avg 1.50) → ≈40 net moves/h per crane (DERIVED 60/1.5) | cross-reference: R4_stats_gaps.md Q4a (Jo & Kim, JMSE 2020 8(1) 6, Table 2 "Net cycle (min)") | high (as recorded in R4) |
+| Berthing wind limit, large container ship at Busan (vessel side, not crane) | mean ≤ 13.5 m/s workable with 2 tugs; ≥ 16.9 m/s (incl. 25 % gust) "difficult", 3 tugs | Yoo, Yun & Lee (Korea Maritime Univ.), KOSOMES 2006 fall conf. pp.303-308: "difficult to conduct and get her alongside to the piers under rough weather conditions of wind force 16.9m/sec or more"; "정상풍속 13.5m/sec 이하의 바람에서는" https://koreascience.or.kr/article/CFKO200601436761083.page | med (abstract only) |
+| Wind-downtime comparator — Cape Town Container Terminal, Feb 2025 | > 200 operational hours lost in two weeks; 80 km/h (22.2 m/s) "threshold for safe cargo handling"; winds 100–120 km/h | FreshPlaza 2025-02-19: "lost over 200 operational hours"; "the 80 km/h threshold for safe cargo handling." https://www.freshplaza.com/north-america/article/9706519/additional-resources-deployed-to-counter-windy-conditions-at-cape-town-container-terminal/ | med (trade press; notoriously windy port — not transferable to Busan) |
+
+Searches for a Busan per-year wind-downtime statistic and for Busan New Port ARMG/RTG moves/h (Korean "부산항 강풍 하역 중단 시간", "부산신항 장치장 크레인 시간당 처리" and English equivalents) returned only typhoon whole-port closure news (seen as snippets, not opened) and no numbers → Unverified. Busan fog: 14.4 fog days/yr (KMA 1991–2020) is in R4_stats_gaps.md Q5; fog-closure hours not found there either.
+
 ---------------------------------------------------------------------------------------------------
 
 ## Q3 Steel coils / slabs / coil tongs
@@ -143,8 +169,9 @@ Source text mirror: https://www.nepla.ai/law/산업안전보건기준에-관한-
 | Single HR coil example | 20 – 24 t | TIS (GDV transport information service), "Photo of the month – April 2008": "This coil would weigh somewhere between 20 and 24 tonnes and is not secured at all." https://www.tis-gdv.de/?p=29638 | med |
 | Forklift for coils | much heavier than coil | Standard Club §07: "A forklift capable of lifting a 20-tonne coil will itself weigh much more than 20 tonnes." | high |
 | Coil stowage rule of thumb | key coil gap ≤ 60 % of key coil diameter; 50 % of upper-tier coil weight passes to each coil below | Standard Club §07 (Fig. 27: "50% of the weight of a coil in an upper tier is assumed to pass to the coils below") | high |
-| Slab weights | NOT FOUND (Standard Club only says slabs are "loaded eight high, with the top three slabs lashed together") | — | — |
-| C-hook / coil-tong self-weight; coil-yard crane cycle time | NOT FOUND in budget | — | — |
+| Slab weights | NOT FOUND (Standard Club only says slabs are "loaded eight high, with the top three slabs lashed together") → Unverified U12 | — | — |
+| C-hook / coil-tong self-weight | NOT FOUND → Unverified U13 | — | — |
+| Coil-yard crane pick/drop time and kinematics | 35 s pick + drop per loaded move; portal 1.667 / trolley 0.833 / hook 0.2 m/s | see Q9d (Weckenborg et al. 2025) | med |
 
 ## Q4 Precast concrete
 
@@ -170,7 +197,34 @@ Change summary: https://www.worksafe.qld.gov.au/__data/assets/pdf_file/0019/1630
 | Rotation geometry limits | aux pick ≤ 1/4 length from end; rope included angle ≤ 45°; aux block+gear ≤ 200 kg | verbatim conditions in §14.2 | §14.2 |
 | Hollow-core plank geometry | 1,200 mm wide; 150–400 mm thick; beds 120–170 m | "Planks are normally 1200 mm wide; thicknesses range from 150 mm to 400 mm" | §12.4 |
 
-NOT FOUND: unit weights of hollow-core (kN/m²), double-tee and bridge-girder/segment weight ranges (PCI handbook not accessible) → Unverified.
+### 4b. Element weights (2026-10-20 continuation)
+
+Hollow-core planks (width 1,200 mm per Qld code §12.4 above):
+| Product | Depth | Weight | Source + quote | Conf. |
+|---|---|---|---|---|
+| Mannok Precast Hollowcore 200 (UK/IE) | 200 mm | 276 kg/m² (page also prints "Density" 2.89 kN/m²) | NBS Source product page: "276 kg/m²" https://source.thenbs.com/en/product/mannok-precast-hollowcore-200/cA2VsQoyxaFUgRyYk6yfgn/t77f18LG8ZRKHrvUbptSK1 | med (manufacturer listing) |
+| Mannok Hollowcore 300 | 300 mm | 380 kg/m² ("Density" 3.95 kN/m²) | https://source.thenbs.com/en/product/mannok-precast-hollowcore-300/sYZ7ozwhn1SdKGZFXuyRPG/tpFNyJXdXXdRyk9i4y1mCv — "380 kg/m²" | med |
+| Mannok Hollowcore 400 | 400 mm | 482 kg/m² ("Density" 5.02 kN/m²) | https://source.thenbs.com/en/product/mannok-precast-hollowcore-400/7KNJv7b4Y62m2LKyVFGq7s/bJHHYmXzbqfR8kpXjeXKJj — "482 kg/m²" | med |
+| Milbank propped composite hollowcore (UK), self-weight INCLUDING structural topping | unit 150 / 200 / 250 mm (overall 200 / 250 / 300 mm) | 3.68 / 4.17 / 4.66 kN/m²; span with 1.5 kN/m² finishes + 0.75 kN/m² imposed: 8.85 / 10.20 / 11.35 (m — unit not printed in the extracted text, inferred) | Milbank "Propped Composite Hollowcore Load/Span Table" (PDF dated 2023-04): column "Self Weight inc. Topping (Kn/m2)". https://www.milbank.co.uk/app/uploads/2023/04/propped-composite-Hollowcore-load-table.pdf | high (table opened via pdftotext) |
+Note: Mannok's kN/m² values are ≈6 % above kg/m² × g (276 kg/m² → 2.71 kN/m²), probably including joint fill — use kg/m² for lifted mass. DERIVED lift masses (1.2 m wide, my calc): 200 mm × 12 m ≈ 4.0 t; 300 mm × 12 m ≈ 5.5 t; 400 mm × 16 m ≈ 9.3 t.
+
+Double-tees (PCI Design Handbook 8th ed. (2017) pretopped load tables, normalweight f'c 5,000 psi; "typically used in parking structures"):
+| Section | Size | Weight | Spans in table | Source + quote | Conf. |
+|---|---|---|---|---|---|
+| 12DT30 | 12 ft 0 in × 30 in | wt = 939 lb/ft (1,397 kg/m) NW; 720 lb/ft LW; DL 78 psf (3.73 kN/m²) NW / 60 psf LW | 40 – 82 ft | PCI table §3.5 "Pretopped Double-Tee Load Tables": "wt = 939 lb/ft"; "DL = 78 lb/ft2" https://ems-www.pci.org/PCI_Docs/Design_Resources/Design_Tables/PCI-DH-2017/PretoppedDoubleTees_12DT30and12LDT30.pdf | high |
+| 15DT34 | 15 ft 0 in × 34 in | wt = 1,234 lb/ft (1,836 kg/m) NW; 946 lb/ft LW; DL 82 psf (3.93 kN/m²) NW / 63 psf LW | 32 – 88 ft | same series: "wt = 1234 lb/ft  946 lb/ft"; "DL = 82 lb/ft2  63 lb/ft2" https://ems-www.pci.org/PCI_Docs/Design_Resources/Design_Tables/PCI-DH-2017/PretoppedDoubleTees_15DT34and15LDT34.pdf | high |
+DERIVED piece masses (my calc, NW): 12DT30 × 60 ft (18.3 m) ≈ 25.6 t; 15DT34 × 60 ft ≈ 33.6 t; 15DT34 × 88 ft (26.8 m) ≈ 49.3 t.
+
+Bridge girders:
+| Item | Value | Source + quote | Conf. |
+|---|---|---|---|
+| California standard I-girders CA I36 … CA I66 | 450 … 669 lb/ft (670 … 996 kg/m) | Caltrans Bridge Design Memo 5.3 (Sept 2023), Table 5.3.4.1-1, column "Weight (lbs/ft)" https://dot.ca.gov/-/media/dot-media/programs/engineering/documents/bridgedesignmemos/09/092023bdm-53--precast-prestressed-girders-a11y.pdf | high |
+| California bulb-tee CA BT49 … CA BT85 | 892 … 1,205 lb/ft (1,327 … 1,793 kg/m) | same memo, Table 5.3.4.1-2: "CA BT49 ... 892" … "1,205" | high |
+| Span ranges (possible / preferred) | I-girder 50–125 / 50–95 ft; bulb-tee 80–150 / 95–150 ft; wide-flange 80–200 / 80–180 ft; precast double-T girder 30–100 / 30–60 ft; segmental precast 200–450 ft | same memo, Table 5.3.4.3.1/2; "The preferred span lengths take into account the girder weight for transportation and erection." | high |
+| WSDOT wide-flange (thin-)deck girders: single-piece shipping weight | normal-weight tables: WF36TDG 98–102 kips (44–46 t) at 100–120 ft … 261–270 kips (118–122 t) for the deepest sections at 195–225 ft; lightweight-concrete WF36TDG as low as 65 kips (29.5 t); spans up to 225 ft (TDG) / 195 ft (DG) | WSDOT Design Memorandum (B. Khaleghi), 2014-12-18, shipping-weight tables; "Shipping weight < 270 kip"; "The shipping weight limits shown above are for a single girder segment and do not include the weight of the hauler." ; "Girders of 270+ kips could be shipped to some specific projects." https://wsdot.wa.gov/publications/fulltext/Bridge/designmemos/12-2014.PDF | high |
+DERIVED (my calc): CA I48 × 95 ft ≈ 23 t; CA BT73 × 150 ft ≈ 75 t; CA BT85 × 150 ft ≈ 82 t. With the Qld §1.4 trigger (bridge beams ≥ 10 t = high-risk) essentially every bridge girder is a planned heavy lift, often by two cranes (§12.3).
+
+Precast segmental box-girder SEGMENT weights: NOT FOUND (no opened source) → Unverified.
 
 ## Q5 Shipyard blocks, goliath cranes
 
@@ -237,7 +291,16 @@ Height factor table (§2.2.1, p.14; extracted columns realigned so that the 100 
 | 200 | 1.921 | 1.372 |
 (confidence med for the row alignment — pdftotext shifted the column; 100 m row verified by Liebherr's own example.)
 
-(pending: EN 13001-2 default hoist-load wind area and shape coefficient; c values for containers/panels)
+Corroboration (2026-10-20 continuation) that 1.2 m²/t is the wind-exposed area INCLUDING the shape coefficient:
+| Source | Quote | Conf. |
+|---|---|---|
+| Liebherr UpLoad magazine 01/2020, expert tip "Safe to use even in high winds" (J. Henkel pictured) https://www.liebherr.com/en-at/mobile-and-crawler-cranes/customer-magazine/my-tip/safe-to-use-in-high-winds-5924163 | load charts assume "an area exposed to the wind (including cw value) on the load of 1.2 m² per tonne" | high (manufacturer) |
+| Cranes Today, "High wind load, high workload", 2011-01-25 https://www.cranestodaymagazine.com/?p=5059 | EN 13000 guidance: sail area per tonne "in the order of, or less than, 1.2m2 of sail area per tonne"; sail area is multiplied by the load's "Cw factor" | med (trade press) |
+Neither page prints the formula as text; the formula form stands on the Liebherr brochure's worked example (back-calculated above). Typical c_W for box-shaped cargo (containers, panels, blocks): only the generic Liebherr "Plate / cube 1.1 – 2.0" band above — no container- or panel-specific c_W found.
+
+DERIVED illustration (my calc, low — inputs are assumptions except the formula): a 40' HC side-on (broadside) area ≈ 12.2 m × 2.9 m ≈ 35 m² (nominal external dims; end-on only ≈ 2.44 × 2.9 ≈ 7 m²), m_H 30 t incl. spreader share, c_W 1.2 → A_W ≈ 42 m² = 1.4 m²/t > 1.2 → v_max ≈ v_max_TAB·sqrt(1.2·30/42.4) ≈ 0.92·v_max_TAB. A 10 t, 3 m × 10 m precast panel lifted flat-face to wind (c_W 1.2): A_W 36 m² → 3.6 m²/t → v_max ≈ 0.58·v_max_TAB. An EMPTY 40' HC side-on (≈3.9 t box; ≈3–10 m²/t depending on how much spreader mass is counted) is far above 1.2 m²/t — consistent with the KOSHA empty-stack wind rule.
+Caveat: EN 13000 is the MOBILE-crane standard; STS/RTG/RMG and goliaths are designed to EN 13001 / FEM 1.001 in-service wind, so for yard/quay cranes this formula is only a scaling heuristic for sail-area-heavy loads, not a code rule.
+(Still open → Unverified U8: EN 13001-2 default hoist-load wind area/shape coefficient when the load is not specified.)
 
 ---------------------------------------------------------------------------------------------------
 
@@ -334,9 +397,56 @@ M. A. Jordan (Liftech Consultants), "Quay Crane Productivity", TOC Americas, Mia
 - KOSHA A-G-18-2026: stop at ~20 cm on every container pick ("스토핑(Stopping) 작업"), 20–30 cm for OOG/special containers; shift start "2～3회 반복하는 시험운전".
 - OSHA 1910.179(n)(3)(vii): near-rated loads → raise "a few inches" and apply brakes.
 
-NOT FOUND: coil-tong/C-hook attach-detach seconds; project-cargo rigging time (minutes) — no sourced numbers.
+### 9d. Steel coils (2026-10-20 continuation)
+| Item | Value | Source + quote | Conf. |
+|---|---|---|---|
+| Coil-storage gantry crane: hook closing at pick-up + opening at drop | **35 s per loaded move** (pick + drop combined) | Weckenborg, Oetjegerdes & Spengler, "Energy-oriented crane scheduling in a steel coil storage", *Flexible Services and Manufacturing Journal* 37:97-124 (2025, open access), §6.1: "a loaded move requires an additional closing and opening of the hook for pickup and dropping of the coil"; "we assume the time for pickup and dropping of coils as [δ] = 35 s" (symbol lost in text extraction). https://epub.uni-regensburg.de/78566/1/s10696-024-09534-0.pdf | med (study assumption; settings "derived from applications observed in practice") |
+| Same study: crane kinematics & storage geometry | portal 1.667 m/s, trolley 0.833 m/s, hook 0.2 m/s; lifting height 5 m; row pitch 2.2 m, position pitch 0.8 m, layer 1.0 m; portal+trolley simultaneous, no travel while hook moves; coils in 2-layer triangular (saddle) stacks | same §6.1: "velocities are v1 = 1.667 m/s, v2 = 0.833 m/s, and v3 = 0.2 m/s."; "neither portal nor trolley movement may co-occur during hook movements" | med |
+| RTG with rotating hook + C-hook, hot-band coils to railcar | 4 coils per railcar in < 30 min → ≈ 7.5 min per coil incl. car spotting/positioning (DERIVED) | Mi-Jack, "Product Spotlight: Specialized Coil Handling Solutions", 2024-11-11 (70-ton Travelift RTG, Ghent KY): "load four steel coils per railcar in under 30 minutes" https://mi-jack.com/specialized-coil-handling-solutions-with-mi-jack-products/ | low-med (vendor) |
+DERIVED example (my calc from the study's parameters): lift 4 m at 0.2 m/s = 20 s, lower 4 m = 20 s, travel 10 rows × 2.2 m at 1.667 m/s ≈ 13 s, + 35 s pick/drop → ≈ 90 s per coil move (excluding the empty return).
+
+### 9e. Project / heavy-lift cargo and tandem lifts
+| Item | Value | Source + quote | Conf. |
+|---|---|---|---|
+| 680 t component, ship's-gear tandem lift (2 × 700 t SWL), Port Canaveral | whole heavy-lift operation ≈ 5 days (includes preparation; NOT hook time) | AJOT 2023-10-23: "this component was tandem lifted off the vessel utilising the ship's gear"; "The heavy lift operation took approximately 5 days." https://www.ajot.com/news/gt-usas-canaveral-cargo-terminal-records-heaviest-lift-crane-operations-boosting-capacity-at-its-facility | med (press release) |
+| Tandem vs single lift time multipliers | planning ×2–3; lift ×1.5–2 | S.K. Kunatham Group blog, 2026-03-02: "Planning typically requires 2–3 times more preparation."; "The lift itself may take 1.5–2x longer due to the controlled pace required for synchronisation." https://www.skkunathamgroup.com/en/blog/tandem-lift-explained-when-one-crane-isnt-enough | low (vendor blog, no method) |
+| Tandem = critical lift when any crane > 75 % of its rating | see Q8c (WorkSafeBC / WorkSafeNB) | — | high |
+| Test lift for OOG/special boxes | lift 20–30 cm, hold, then raise slowly on signal; one sling worker fore and aft | see Q8b (KOSHA A-G-18-2026) — duration of the hold not specified | high |
+Per-lift rigging/slinging minutes for project cargo, precast or ship blocks: NOT FOUND → Unverified.
+
+### 9f. What the presets can draw on (summary of sourced elements; blank = no source)
+| Cargo | Attach | Detach | Test-lift stop | Other per-cycle overhead | Rows |
+|---|---|---|---|---|---|
+| Container (STS / RTG spreader) | 3 s lock | 5–10 s (incl. set-down) | at ≈0.2 m on every pick (time not given) | ≈30 s dwell/positioning per STS cycle; STS ≈86–102 s/box, RTG ≈184 s/box | 9a, 9b, 8b |
+| Steel coil (C-hook / tong, storage gantry) | 35 s pick + drop combined (study assumption) | (incl.) | — | hook 0.2 m/s; coil→railcar ≈7.5 min/coil (vendor) | 9d |
+| Precast element | — | — | stop if not released at panel + rigging weight (Qld §14.1.1) | rotation needs aux winch ≥ 75 % of mass (Qld §14.2) | Q4 |
+| Project / OOG | — | — | 20–30 cm (KOSHA) | whole 680 t tandem job ≈ 5 days | 9e, 8b |
+| Tandem (any cargo) | — | — | — | lift ×1.5–2, planning ×2–3 (low) | 9e |
 
 ---------------------------------------------------------------------------------------------------
 
 ## Unverified (remembered, not confirmed from an opened source)
-(pending)
+Do NOT use these as sourced values in a preset; each needs an opened source first. "Recollection" = model memory, not a citation.
+
+| # | Item | Recollection / lead | Why unverified | Conf. |
+|---|---|---|---|---|
+| U1 | Busan full/empty split, reefer share, OOG share | no Busan value recalled. Lead: BPA open data "부산항만공사_부산항 컨테이너 수송통계" (data.go.kr 15055478) | seen only as a search hit, not opened | — |
+| U2 | Busan 2024 transshipment volume/share | ≈13.5 M TEU / ≈55 % (DERIVED in 2a from the 2025 growth rate); a community post (damoang.net, Perplexity-generated) gave "1,350만 TEU" | BPA 2024 year-end release not opened; post seen only in a search summary | low |
+| U3 | Busan New Port STS productivity (moves/h, GMPH) | recollection: ≈25–30 gross moves/h per STS is the range usually quoted for Asian hub terminals | 2023 KINPR papers omit the numbers ("(중략)"); Jeong & Kim 2025 abstract has none; R4 Q4a HKT net cycle (≈40 net moves/h) is the only Busan figure | low |
+| U4 | Busan New Port ARMG/ATC and RTG moves/h | recollection: ≈20–25 moves/h per automated yard crane, ≈15–20 per manned RTG | no opened source; only BCT Gdynia RTG ≈184 s/box (≈20 boxes/h) in 9a | low |
+| U5 | Busan wind/weather cargo-handling downtime (h or days per year) | no value recalled. Typhoon whole-port closures (태풍 다나스 2013 and 2019: "하역작업도 전면 금지") seen only as search snippets | not opened; no annual statistic found anywhere | — |
+| U6 | Terminal-operator internal wind limits (PNC, HJNC, HPNT, BNCT, BCT, DGT …) | recollection: stop at ≈20 m/s gust, i.e., same as KOSHA 2b | no terminal SOP opened | low |
+| U7 | Hutchison Busan (HBCT) vessel-rate record | "260 boxes per hour" with four twin-lift QCs (2005) | seen only as a search result title (hutchisonports.com), not opened | low |
+| U8 | EN 13001-2 / FEM 1.001 default hoist-load wind area when the load is not specified | recollection: 0.5 m² per t of hoist load with aerodynamic coefficient 2.4 (note 0.5 × 2.4 = 1.2 m²/t, the EN 13000 constant) | standard text not opened; targeted search returned only the EN 13000 1.2 m²/t statements (Q6) | low |
+| U9 | Container- or panel-specific c_W | recollection: ≈1.1–1.3 for a box broadside to the wind, i.e., inside Liebherr's generic "Plate / cube 1.1 – 2.0" | no container-specific source opened | low |
+| U10 | Precast segmental box-girder SEGMENT weights | recollection: tens of tonnes per segment (≈30–80 t), pier segments heavier | no opened source (girder weights ARE sourced in 4b) | low |
+| U11 | Korean PC (프리캐스트) element weights; Korean tilt-up/precast wind rule | not searched (budget) | — | — |
+| U12 | Steel slab weights | recollection: cast slabs ≈200–300 mm × 1–2.5 m × 5–12 m → ≈8–70 t (my arithmetic at 7.85 t/m³ on recalled dimensions) | Standard Club gives only the stacking rule (Q3) | low |
+| U13 | C-hook / coil-tong self-weight | no value recalled | not found (9d gives only pick + drop time) | — |
+| U14 | Goliath (shipyard) in-service wind limit; ship-block weight distribution | no reliable value recalled | not found (Q5) | — |
+| U15 | Lightning rule for DG handling | recollection: some terminals suspend DG/fuel work with lightning within ≈10 km, or use the "30-30" rule | no port SOP or statute opened (Q7 found none in Korean law) | low |
+| U16 | Test-lift HOLD duration | recollection: lift-plan templates often hold a few minutes at 100–300 mm | KOSHA/OSHA give only the height (Q8b/8d) | low |
+| U17 | Rigging/slinging minutes per lift — project cargo, precast, ship blocks | no value recalled | not found (9e) | — |
+| U18 | OOG share of container throughput | recollection: well under 1–2 % of container volumes; a forwarder page (SINO Shipping, Danish) reportedly says flat racks/open tops carry 65–70 % of containerized OOG from China | neither opened; no statistic found | low |
+| U19 | USACE EM 385-1-1 75 % critical-lift threshold | quoted second-hand by Maxim Crane (Q8c) | EM 385 returned HTTP 403 | med-low |
+| U20 | Modern loaded gross-weight distribution for Busan / Asian hubs | only Interpave Table 16 (1970s UK, 1a) is sourced; VGM data (1b) give misdeclaration rates, not a distribution | not found | — |

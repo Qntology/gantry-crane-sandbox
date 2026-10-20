@@ -83,6 +83,7 @@ fn climate(
             source: format!("기상청 지점 {station} 최대 순간풍속 순위값 상위 10개의 굼벨 꼬리 회귀"),
         }),
         wind_rose: Vec::new(),
+        rh_daily_sd: 4.0,
     }
 }
 

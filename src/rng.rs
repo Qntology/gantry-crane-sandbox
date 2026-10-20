@@ -65,6 +65,30 @@ impl Rng {
         -mean * (1.0 - self.uniform()).max(1e-300).ln()
     }
 
+    /// 감마 분포 (모양 `shape`, 척도 `scale`, 평균 = shape·scale) — Marsaglia & Tsang (2000), shape < 1 은 U^(1/a) 승수
+    pub fn gamma(&mut self, shape: f64, scale: f64) -> f64 {
+        if shape <= 0.0 || scale <= 0.0 {
+            return 0.0;
+        }
+        if shape < 1.0 {
+            let u = self.uniform().max(1e-300);
+            return self.gamma(shape + 1.0, scale) * u.powf(1.0 / shape);
+        }
+        let d = shape - 1.0 / 3.0;
+        let c = 1.0 / (9.0 * d).sqrt();
+        loop {
+            let x = self.normal();
+            let v = (1.0 + c * x).powi(3);
+            if v <= 0.0 {
+                continue;
+            }
+            let u = self.uniform().max(1e-300);
+            if u.ln() < 0.5 * x * x + d - d * v + d * v.ln() {
+                return d * v * scale;
+            }
+        }
+    }
+
     pub fn poisson(&mut self, lambda: f64) -> u32 {
         if lambda <= 0.0 {
             return 0;

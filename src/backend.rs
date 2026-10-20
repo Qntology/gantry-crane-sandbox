@@ -6,13 +6,17 @@
 use crate::antisway::AntiSwayMode;
 use crate::api::{self, Models, PipelineConfig, PipelineReport};
 use crate::calib;
+use crate::cargo;
 use crate::climate_data;
 use crate::crane_profile;
 use crate::cyclesim::{self, Scenario};
 use crate::decision::{self, Action};
+use crate::era5cal;
 use crate::fieldcal;
 use crate::health::{self, HealthStore};
+use crate::marine;
 use crate::operation::{DecisionPolicy, OpSim, OperationConfig, StepOutcome};
+use crate::prognostics;
 use crate::sds::{Scope, SdsStore};
 use crate::site::{self, SitePreset, SiteStore};
 use serde::Deserialize;
@@ -229,6 +233,43 @@ impl Backend {
             }
             "fieldcal_saved" => to_value(&fieldcal::saved_report().ok_or("저장된 보정 보고서를 읽지 못했습니다")?),
             "site_defaults" => to_value(&site::builtin()),
+
+            // ---- 염해 · 화물 · 예측 점수 ----
+            "marine_refs" => Ok(json!({
+                "protections": to_value(&marine::protection_presets())?,
+                "salt_areas": marine::KR_SALT_100M.iter().map(|(a, r, v)| json!({"id": a, "region": r, "mdd_100m": v})).collect::<Vec<_>>(),
+                "coast_types": ["harbor", "bay", "open", "tidal", "strait", "river"],
+                "ports": to_value(&crate::ports::sites())?,
+            })),
+            "cargo_scenarios" => Ok(json!({"scenarios": to_value(&cargo::scenarios())?, "types": to_value(&cargo::types())?})),
+            "marine_project" => {
+                let preset: SitePreset = match opt_arg::<SitePreset>(args, "preset")? {
+                    Some(p) => p,
+                    None => self.sites().get(&arg::<String>(args, "site")?)?,
+                };
+                let years: u32 = opt_arg::<u32>(args, "years")?.unwrap_or(10).clamp(1, 40);
+                let seed: u64 = opt_arg(args, "seed")?.unwrap_or(1);
+                let maintain: bool = opt_arg(args, "maintain")?.unwrap_or(true);
+                // 현장 프리셋의 방지 조치를 먼저, 비교용으로 나머지 프리셋을 뒤에
+                let mine = preset.environment.protection()?;
+                let mut prots = vec![mine.clone()];
+                if opt_arg::<bool>(args, "compare")?.unwrap_or(true) {
+                    prots.extend(marine::protection_presets().into_iter().filter(|p| p.id != mine.id));
+                }
+                let out: Vec<marine::Projection> = prots.iter().map(|p| marine::project(&preset, p, years, seed, maintain)).collect::<Result<_, _>>()?;
+                to_value(&out)
+            }
+            "prognostics_saved" => to_value(&prognostics::saved_report().ok_or("저장된 예측 점수 보고서를 읽지 못했습니다")?),
+            "prognostics_run" => {
+                let ids: Vec<String> = opt_arg(args, "sites")?.unwrap_or_else(|| ["busan_newport_rmg", "gwangyang_coil_warehouse", "ulsan_shipyard_goliath"].iter().map(|s| s.to_string()).collect());
+                let sites: Vec<SitePreset> = ids.iter().map(|i| self.sites().get(i)).collect::<Result<_, _>>()?;
+                let days: u32 = opt_arg::<u32>(args, "days")?.unwrap_or(1095).clamp(400, 3650);
+                let replicas: u32 = opt_arg::<u32>(args, "replicas")?.unwrap_or(4).clamp(1, 50);
+                let every: u32 = opt_arg::<u32>(args, "every")?.unwrap_or(30).clamp(7, 365);
+                let seed: u64 = opt_arg(args, "seed")?.unwrap_or(2026);
+                to_value(&prognostics::run(&sites, days, replicas, every, seed)?)
+            }
+            "weather_check" => to_value(&era5cal::run()),
             other => Err(format!("모르는 명령: {other}")),
         }
     }
@@ -261,6 +302,27 @@ mod tests {
         let h = b.call("health_get", &json!({"asset": "B-1"})).unwrap();
         assert_eq!(h["ledger"]["day"].as_f64().unwrap(), 3.0);
         assert!(b.call("nope", &json!({})).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn marine_cargo_and_scores_commands_answer() {
+        let dir = std::env::temp_dir().join(format!("crane_backend_m_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut b = Backend::new(&dir);
+        let refs = b.call("marine_refs", &json!({})).unwrap();
+        assert!(refs["protections"].as_array().unwrap().len() >= 4);
+        assert_eq!(refs["salt_areas"].as_array().unwrap().len(), 27);
+        let cargo = b.call("cargo_scenarios", &json!({})).unwrap();
+        assert!(cargo["scenarios"].as_array().unwrap().len() >= 6);
+        let proj = b.call("marine_project", &json!({"site": "busan_newport_rmg", "years": 2})).unwrap();
+        let rows = proj.as_array().unwrap();
+        assert_eq!(rows.len(), refs["protections"].as_array().unwrap().len());
+        assert_eq!(rows[0]["rows"].as_array().unwrap().len(), 2);
+        let saved = b.call("prognostics_saved", &json!({})).unwrap();
+        let overall = saved["overall"].as_array().unwrap();
+        assert!(overall.len() >= 4);
+        assert!(overall.iter().any(|m| m["method"] == "v3"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -34,9 +34,9 @@
       "label": "부산 (159) — 항만 · 해안 눈 일수",
       "reference": 4.2,
       "unit": "일/년",
-      "before": 4.025,
+      "before": 4.15,
       "after": 4.2,
-      "error_before_pct": -4.1666666666666625,
+      "error_before_pct": -1.1904761904761862,
       "error_after_pct": 0.0,
       "knob": "snow_flurry_prob",
       "source": "기상청 지점 159 1991–2020 연 일수 평균",
@@ -76,10 +76,10 @@
       "label": "부산 (159) — 항만 · 해안 연평균 기온",
       "reference": 15.01095890410959,
       "unit": "°C",
-      "before": 14.947781778022986,
-      "after": 14.909878136429926,
-      "error_before_pct": -0.42087335319602864,
-      "error_after_pct": -0.6733798175411053,
+      "before": 14.968820176434502,
+      "after": 14.93076505739104,
+      "error_before_pct": -0.2807197591058045,
+      "error_after_pct": -0.5342353358691437,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -113,15 +113,29 @@
       "confidence": "med"
     },
     {
+      "id": "tow_busan",
+      "group": "weather",
+      "label": "부산 (159) — 항만 · 해안 젖음 시간 (RH > 80 %, ISO 9223 τ)",
+      "reference": 2105.1998750000002,
+      "unit": "h/년",
+      "before": 2274.8,
+      "after": 2274.8,
+      "error_before_pct": 8.056248103282826,
+      "error_after_pct": 8.056248103282826,
+      "knob": "rh_daily_sd",
+      "source": "Open-Meteo ERA5 시간 자료 2022–2023 (기상청 평균 습도 차 보정, ERA5 일교차 과소로 목표가 낮을 수 있음)",
+      "confidence": "low"
+    },
+    {
       "id": "storm_days_incheon",
       "group": "weather",
       "label": "인천 (112) — 항만 · 해안 폭풍일 (10분 평균 ≥ 13.9 m/s)",
       "reference": 2.2,
       "unit": "일/년",
       "before": 4.050000000000001,
-      "after": 2.45,
+      "after": 2.05,
       "error_before_pct": 84.09090909090911,
-      "error_after_pct": 11.363636363636363,
+      "error_after_pct": -6.818181818181834,
       "knob": "weibull_k",
       "source": "기상청 지점 112 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -132,10 +146,10 @@
       "label": "인천 (112) — 항만 · 해안 한파일 (최저 ≤ −12 °C)",
       "reference": 1.8,
       "unit": "일/년",
-      "before": 0.775,
-      "after": 2.325,
-      "error_before_pct": -56.94444444444444,
-      "error_after_pct": 29.166666666666675,
+      "before": 0.8250000000000001,
+      "after": 2.1,
+      "error_before_pct": -54.166666666666664,
+      "error_after_pct": 16.666666666666668,
       "knob": "temp_anomaly_sd_winter_c",
       "source": "기상청 지점 112 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -146,10 +160,10 @@
       "label": "인천 (112) — 항만 · 해안 눈 일수",
       "reference": 22.1,
       "unit": "일/년",
-      "before": 13.950000000000001,
-      "after": 22.650000000000002,
-      "error_before_pct": -36.87782805429864,
-      "error_after_pct": 2.488687782805433,
+      "before": 14.125000000000002,
+      "after": 22.025,
+      "error_before_pct": -36.08597285067873,
+      "error_after_pct": -0.3393665158371169,
       "knob": "snow_flurry_prob",
       "source": "기상청 지점 112 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -161,9 +175,9 @@
       "reference": 47.5,
       "unit": "일/년",
       "before": 46.5,
-      "after": 49.050000000000004,
+      "after": 47.30000000000001,
       "error_before_pct": -2.1052631578947367,
-      "error_after_pct": 3.2631578947368514,
+      "error_after_pct": -0.4210526315789234,
       "knob": null,
       "source": "기상청 지점 112 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -175,9 +189,9 @@
       "reference": 18.8,
       "unit": "일/년",
       "before": 18.725,
-      "after": 18.775,
+      "after": 19.025000000000002,
       "error_before_pct": -0.3989361702127622,
-      "error_after_pct": -0.13297872340426667,
+      "error_after_pct": 1.1968085106383053,
       "knob": null,
       "source": "기상청 지점 112 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -188,10 +202,10 @@
       "label": "인천 (112) — 항만 · 해안 연평균 기온",
       "reference": 12.546575342465754,
       "unit": "°C",
-      "before": 12.609401079510574,
-      "after": 12.462697694722552,
-      "error_before_pct": 0.5007401249341477,
-      "error_after_pct": -0.6685302200298913,
+      "before": 12.63156139507727,
+      "after": 12.637809239691164,
+      "error_before_pct": 0.6773645420505136,
+      "error_after_pct": 0.7271617531886546,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -203,9 +217,9 @@
       "reference": 1207.3999999999999,
       "unit": "mm",
       "before": 1218.7248212547538,
-      "after": 1167.967468249171,
+      "after": 1227.305971647775,
       "error_before_pct": 0.9379510729463263,
-      "error_after_pct": -3.265904567734716,
+      "error_after_pct": 1.6486642080317404,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -217,12 +231,26 @@
       "reference": 31.715017245050067,
       "unit": "m/s",
       "before": 33.18087214825558,
-      "after": 31.781854567799506,
+      "after": 31.76673146147615,
       "error_before_pct": 4.62195839869612,
-      "error_after_pct": 0.21074345390706312,
+      "error_after_pct": 0.16305908341940428,
       "knob": "storm_rate_scale",
       "source": "기상청 최대 순간풍속 순위값 상위 10개의 굼벨 꼬리",
       "confidence": "med"
+    },
+    {
+      "id": "tow_incheon",
+      "group": "weather",
+      "label": "인천 (112) — 항만 · 해안 젖음 시간 (RH > 80 %, ISO 9223 τ)",
+      "reference": 2867.9117499999998,
+      "unit": "h/년",
+      "before": 2802.4,
+      "after": 2868.0,
+      "error_before_pct": -2.2843014608102803,
+      "error_after_pct": 0.003077151868436808,
+      "knob": "rh_daily_sd",
+      "source": "Open-Meteo ERA5 시간 자료 2022–2023 (기상청 평균 습도 차 보정, ERA5 일교차 과소로 목표가 낮을 수 있음)",
+      "confidence": "low"
     },
     {
       "id": "storm_days_ulsan",
@@ -245,9 +273,9 @@
       "reference": 0.1,
       "unit": "일/년",
       "before": 0.05,
-      "after": 0.05,
+      "after": 0.1,
       "error_before_pct": -50.0,
-      "error_after_pct": -50.0,
+      "error_after_pct": 0.0,
       "knob": null,
       "source": "기상청 지점 152 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -258,10 +286,10 @@
       "label": "울산 (152) — 조선 · 석유화학 해안 눈 일수",
       "reference": 6.2,
       "unit": "일/년",
-      "before": 6.275,
-      "after": 6.600000000000001,
-      "error_before_pct": 1.2096774193548416,
-      "error_after_pct": 6.451612903225826,
+      "before": 6.4,
+      "after": 6.7250000000000005,
+      "error_before_pct": 3.2258064516129057,
+      "error_after_pct": 8.467741935483875,
       "knob": "snow_flurry_prob",
       "source": "기상청 지점 152 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -300,10 +328,10 @@
       "label": "울산 (152) — 조선 · 석유화학 해안 연평균 기온",
       "reference": 14.447671232876713,
       "unit": "°C",
-      "before": 14.438168041690197,
-      "after": 14.352394415287632,
-      "error_before_pct": -0.06577662955736975,
-      "error_after_pct": -0.6594614180607307,
+      "before": 14.464577011555857,
+      "after": 14.37892926578513,
+      "error_before_pct": 0.1170138661563219,
+      "error_after_pct": -0.475799635689077,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -337,6 +365,20 @@
       "confidence": "med"
     },
     {
+      "id": "tow_ulsan",
+      "group": "weather",
+      "label": "울산 (152) — 조선 · 석유화학 해안 젖음 시간 (RH > 80 %, ISO 9223 τ)",
+      "reference": 2335.71955,
+      "unit": "h/년",
+      "before": 2507.0,
+      "after": 2507.0,
+      "error_before_pct": 7.333091423582948,
+      "error_after_pct": 7.333091423582948,
+      "knob": "rh_daily_sd",
+      "source": "Open-Meteo ERA5 시간 자료 2022–2023 (기상청 평균 습도 차 보정, ERA5 일교차 과소로 목표가 낮을 수 있음)",
+      "confidence": "low"
+    },
+    {
       "id": "storm_days_pohang",
       "group": "weather",
       "label": "포항 (138) — 제철 해안 폭풍일 (10분 평균 ≥ 13.9 m/s)",
@@ -356,10 +398,10 @@
       "label": "포항 (138) — 제철 해안 한파일 (최저 ≤ −12 °C)",
       "reference": 0.2,
       "unit": "일/년",
-      "before": 0.025,
-      "after": 0.025,
-      "error_before_pct": -87.5,
-      "error_after_pct": -87.5,
+      "before": 0.07500000000000001,
+      "after": 0.07500000000000001,
+      "error_before_pct": -62.5,
+      "error_after_pct": -62.5,
       "knob": null,
       "source": "기상청 지점 138 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -370,10 +412,10 @@
       "label": "포항 (138) — 제철 해안 눈 일수",
       "reference": 7.0,
       "unit": "일/년",
-      "before": 5.800000000000001,
-      "after": 6.950000000000001,
-      "error_before_pct": -17.14285714285713,
-      "error_after_pct": -0.7142857142856991,
+      "before": 6.125000000000001,
+      "after": 7.0,
+      "error_before_pct": -12.499999999999988,
+      "error_after_pct": 0.0,
       "knob": "snow_flurry_prob",
       "source": "기상청 지점 138 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -412,10 +454,10 @@
       "label": "포항 (138) — 제철 해안 연평균 기온",
       "reference": 14.614794520547946,
       "unit": "°C",
-      "before": 14.574788448841895,
-      "after": 14.58182671685587,
-      "error_before_pct": -0.27373680587711013,
-      "error_after_pct": -0.2255782908594715,
+      "before": 14.597695370605006,
+      "after": 14.604789040251335,
+      "error_before_pct": -0.11699890764046628,
+      "error_after_pct": -0.06846131351722787,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -447,6 +489,20 @@
       "knob": "storm_rate_scale",
       "source": "기상청 최대 순간풍속 순위값 상위 10개의 굼벨 꼬리",
       "confidence": "med"
+    },
+    {
+      "id": "tow_pohang",
+      "group": "weather",
+      "label": "포항 (138) — 제철 해안 젖음 시간 (RH > 80 %, ISO 9223 τ)",
+      "reference": 2029.3810833333323,
+      "unit": "h/년",
+      "before": 2216.4,
+      "after": 2216.4,
+      "error_before_pct": 9.215564203421193,
+      "error_after_pct": 9.215564203421193,
+      "knob": "rh_daily_sd",
+      "source": "Open-Meteo ERA5 시간 자료 2022–2023 (기상청 평균 습도 차 보정, ERA5 일교차 과소로 목표가 낮을 수 있음)",
+      "confidence": "low"
     },
     {
       "id": "storm_days_yeosu",
@@ -482,9 +538,9 @@
       "label": "여수 (168) — 광양만 제철 · 항만 눈 일수",
       "reference": 9.4,
       "unit": "일/년",
-      "before": 4.525,
+      "before": 4.575,
       "after": 9.375,
-      "error_before_pct": -51.86170212765957,
+      "error_before_pct": -51.329787234042556,
       "error_after_pct": -0.2659574468085144,
       "knob": "snow_flurry_prob",
       "source": "기상청 지점 168 1991–2020 연 일수 평균",
@@ -524,10 +580,10 @@
       "label": "여수 (168) — 광양만 제철 · 항만 연평균 기온",
       "reference": 14.630958904109589,
       "unit": "°C",
-      "before": 14.668472879386822,
-      "after": 14.637226411003102,
-      "error_before_pct": 0.25640134404790604,
-      "error_after_pct": 0.04283729408707962,
+      "before": 14.686401314099768,
+      "after": 14.656402020561094,
+      "error_before_pct": 0.3789390042959314,
+      "error_after_pct": 0.17389917242101535,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -553,12 +609,26 @@
       "reference": 40.01736380623385,
       "unit": "m/s",
       "before": 45.41079300300199,
-      "after": 42.792276983677944,
+      "after": 40.012053082911144,
       "error_before_pct": 13.477722377924248,
-      "error_after_pct": 6.934272809374361,
+      "error_after_pct": -0.01327104740937683,
       "knob": "storm_rate_scale",
       "source": "기상청 최대 순간풍속 순위값 상위 10개의 굼벨 꼬리",
       "confidence": "med"
+    },
+    {
+      "id": "tow_yeosu",
+      "group": "weather",
+      "label": "여수 (168) — 광양만 제철 · 항만 젖음 시간 (RH > 80 %, ISO 9223 τ)",
+      "reference": 1889.5075333333336,
+      "unit": "h/년",
+      "before": 2183.8,
+      "after": 2183.8,
+      "error_before_pct": 15.575088295493423,
+      "error_after_pct": 15.575088295493423,
+      "knob": "rh_daily_sd",
+      "source": "Open-Meteo ERA5 시간 자료 2022–2023 (기상청 평균 습도 차 보정, ERA5 일교차 과소로 목표가 낮을 수 있음)",
+      "confidence": "low"
     },
     {
       "id": "storm_days_seosan",
@@ -580,10 +650,10 @@
       "label": "서산 (129) — 당진 · 평택 서해안 내륙 한파일 (최저 ≤ −12 °C)",
       "reference": 2.9,
       "unit": "일/년",
-      "before": 2.575,
-      "after": 2.95,
-      "error_before_pct": -11.206896551724128,
-      "error_after_pct": 1.7241379310344922,
+      "before": 2.7,
+      "after": 2.6,
+      "error_before_pct": -6.896551724137923,
+      "error_after_pct": -10.344827586206891,
       "knob": "temp_anomaly_sd_winter_c",
       "source": "기상청 지점 129 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -594,10 +664,10 @@
       "label": "서산 (129) — 당진 · 평택 서해안 내륙 눈 일수",
       "reference": 27.4,
       "unit": "일/년",
-      "before": 21.325,
-      "after": 27.4,
-      "error_before_pct": -22.171532846715326,
-      "error_after_pct": 0.0,
+      "before": 21.900000000000002,
+      "after": 27.300000000000004,
+      "error_before_pct": -20.072992700729916,
+      "error_after_pct": -0.3649635036496143,
       "knob": "snow_flurry_prob",
       "source": "기상청 지점 129 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -609,9 +679,9 @@
       "reference": 36.6,
       "unit": "일/년",
       "before": 36.35,
-      "after": 37.074999999999996,
+      "after": 35.050000000000004,
       "error_before_pct": -0.6830601092896175,
-      "error_after_pct": 1.2978142076502577,
+      "error_after_pct": -4.2349726775956205,
       "knob": null,
       "source": "기상청 지점 129 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -623,9 +693,9 @@
       "reference": 14.0,
       "unit": "일/년",
       "before": 14.950000000000001,
-      "after": 13.950000000000001,
+      "after": 14.325,
       "error_before_pct": 6.785714285714294,
-      "error_after_pct": -0.35714285714284955,
+      "error_after_pct": 2.3214285714285663,
       "knob": null,
       "source": "기상청 지점 129 1991–2020 연 일수 평균",
       "confidence": "high"
@@ -636,10 +706,10 @@
       "label": "서산 (129) — 당진 · 평택 서해안 내륙 연평균 기온",
       "reference": 12.149041095890412,
       "unit": "°C",
-      "before": 12.17056654728833,
-      "after": 12.087497538336818,
-      "error_before_pct": 0.1771781923200353,
-      "error_after_pct": -0.5065713175866426,
+      "before": 12.203441987383687,
+      "after": 12.181648828856071,
+      "error_before_pct": 0.4477793026124248,
+      "error_after_pct": 0.2683975855237536,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -651,9 +721,9 @@
       "reference": 1253.9,
       "unit": "mm",
       "before": 1286.7238968083482,
-      "after": 1209.838480858072,
+      "after": 1243.2811217348024,
       "error_before_pct": 2.6177443821953967,
-      "error_after_pct": -3.513957982449007,
+      "error_after_pct": -0.8468680329530055,
       "knob": null,
       "source": "기상청 1991–2020 평년값",
       "confidence": "high"
@@ -665,12 +735,26 @@
       "reference": 29.387621652944453,
       "unit": "m/s",
       "before": 28.920840693655254,
-      "after": 31.717238805638015,
+      "after": 29.59528689735417,
       "error_before_pct": -1.5883590880598895,
-      "error_after_pct": 7.927205475166953,
+      "error_after_pct": 0.7066418877381696,
       "knob": "storm_rate_scale",
       "source": "기상청 최대 순간풍속 순위값 상위 10개의 굼벨 꼬리",
       "confidence": "med"
+    },
+    {
+      "id": "tow_seosan",
+      "group": "weather",
+      "label": "서산 (129) — 당진 · 평택 서해안 내륙 젖음 시간 (RH > 80 %, ISO 9223 τ)",
+      "reference": 3372.418591666667,
+      "unit": "h/년",
+      "before": 3411.8,
+      "after": 3372.8,
+      "error_before_pct": 1.1677497102716032,
+      "error_after_pct": 0.011309637963556881,
+      "knob": "rh_daily_sd",
+      "source": "Open-Meteo ERA5 시간 자료 2022–2023 (기상청 평균 습도 차 보정, ERA5 일교차 과소로 목표가 낮을 수 있음)",
+      "confidence": "low"
     },
     {
       "id": "derate_ambient_30",
@@ -888,10 +972,10 @@
       "label": "야드 크레인 기술 처리 능력 (베이 안 이동)",
       "reference": 30.0,
       "unit": "회/h",
-      "before": 28.26433433568565,
-      "after": 30.00775200261789,
-      "error_before_pct": -5.785552214381167,
-      "error_after_pct": 0.025840008726305538,
+      "before": 28.379398438349394,
+      "after": 30.01185889973219,
+      "error_before_pct": -5.402005205502019,
+      "error_after_pct": 0.039529665773964474,
       "knob": "handling_overhead_s (컨테이너)",
       "source": "Konecranes EAS RTG 기술 문서: 30 boxes/h",
       "confidence": "med"
@@ -916,10 +1000,10 @@
       "label": "컨테이너 야드 크레인 권상 로프 교체 주기",
       "reference": 270.0,
       "unit": "일",
-      "before": 201.73464887743492,
-      "after": 269.7192255491304,
-      "error_before_pct": -25.283463378727806,
-      "error_after_pct": -0.10399053735911652,
+      "before": 436.72612448097493,
+      "after": 269.43155392744205,
+      "error_before_pct": 61.750416474435156,
+      "error_after_pct": -0.21053558242886927,
       "knob": "rope_field_factor",
       "source": "UM Surabaya RTG 로프 논문: 6×29Fi IWRC Ø30, 9개월",
       "confidence": "low"
@@ -930,13 +1014,335 @@
       "label": "컨테이너 크레인 권상 브레이크 패드 교체 주기",
       "reference": 730.0,
       "unit": "일",
-      "before": 74.72899049022278,
-      "after": 756.0738903654716,
-      "error_before_pct": -89.76315198764071,
-      "error_after_pct": 3.5717658034892583,
+      "before": 69.37799872814988,
+      "after": 728.737531687071,
+      "error_before_pct": -90.49616455778768,
+      "error_after_pct": -0.17294086478478699,
       "knob": "brake_wear_per_set_mm",
       "source": "Pintsch Bubenzer SB 28: 동적 시험이 없으면 2년마다 패드 교체",
       "confidence": "low"
+    },
+    {
+      "id": "corr_0",
+      "group": "corrosion",
+      "label": "초시 (일본, NIMS 노출) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 42.0,
+      "unit": "µm/년",
+      "before": 30.46769914038867,
+      "after": 49.627421845730254,
+      "error_before_pct": -27.45785918955078,
+      "error_after_pct": 18.160528204119654,
+      "knob": null,
+      "source": "Yan et al. 2020 표 2 · 그림 1 (저합금강 13종 평균)",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_1",
+      "group": "corrosion",
+      "label": "미야코지마 (일본, NIMS 노출) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 57.0,
+      "unit": "µm/년",
+      "before": 34.94618613755895,
+      "after": 56.05824908724769,
+      "error_before_pct": -38.69090151305446,
+      "error_after_pct": -1.6521945837759857,
+      "knob": null,
+      "source": "Yan et al. 2020 표 2 · 그림 1",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_2",
+      "group": "corrosion",
+      "label": "카메트 (아르헨티나, MICAT) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 51.6,
+      "unit": "µm/년",
+      "before": 35.838040801002386,
+      "after": 58.14448314190328,
+      "error_before_pct": -30.54643255619693,
+      "error_after_pct": 12.68310686415364,
+      "knob": null,
+      "source": "Chico et al. 2017 표 5–6",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_3",
+      "group": "corrosion",
+      "label": "아라이알두카부 (브라질, MICAT) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 168.2,
+      "unit": "µm/년",
+      "before": 123.6400603460339,
+      "after": 201.6338029199756,
+      "error_before_pct": -26.492235228279483,
+      "error_after_pct": 19.87740958381428,
+      "knob": null,
+      "source": "Chico et al. 2017 표 6",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_4",
+      "group": "corrosion",
+      "label": "우바투바 (브라질, MICAT) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 301.9,
+      "unit": "µm/년",
+      "before": 72.42556883846588,
+      "after": 106.68087164460518,
+      "error_before_pct": -76.01007988126337,
+      "error_after_pct": -64.66350723928281,
+      "knob": null,
+      "source": "Chico et al. 2017 표 6",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_5",
+      "group": "corrosion",
+      "label": "리몬 (코스타리카, MICAT) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 371.5,
+      "unit": "µm/년",
+      "before": 210.90017143424103,
+      "after": 335.95390435445887,
+      "error_before_pct": -43.23010190195396,
+      "error_after_pct": -9.568262623295055,
+      "knob": null,
+      "source": "Chico et al. 2017 표 6",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_6",
+      "group": "corrosion",
+      "label": "푼타레나스 (코스타리카, MICAT) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 61.6,
+      "unit": "µm/년",
+      "before": 50.414776233721234,
+      "after": 83.02374752527403,
+      "error_before_pct": -18.15783078941358,
+      "error_after_pct": 34.77881091765265,
+      "knob": null,
+      "source": "Chico et al. 2017 표 6",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_7",
+      "group": "corrosion",
+      "label": "코히마르 (쿠바, MICAT) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 231.4,
+      "unit": "µm/년",
+      "before": 82.30822626389124,
+      "after": 125.6573747428388,
+      "error_before_pct": -64.43032572865548,
+      "error_after_pct": -45.69689941968937,
+      "knob": null,
+      "source": "Chico et al. 2017 표 6 (9개 계열 범위의 중앙)",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_8",
+      "group": "corrosion",
+      "label": "카르타헤나 (콜롬비아, MICAT) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 35.0,
+      "unit": "µm/년",
+      "before": 78.027778418105,
+      "after": 140.75302482538632,
+      "error_before_pct": 122.9365097660143,
+      "error_after_pct": 302.1514995011038,
+      "knob": null,
+      "source": "Chico et al. 2017 표 6",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_9",
+      "group": "corrosion",
+      "label": "라파누이 500 m (칠레) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 51.95,
+      "unit": "µm/년",
+      "before": 37.63219306672917,
+      "after": 61.289425181207335,
+      "error_before_pct": -27.56074481861565,
+      "error_after_pct": 17.97771930935001,
+      "knob": null,
+      "source": "Vera et al. 2023",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_10",
+      "group": "corrosion",
+      "label": "보나솔라 10 m (이탈리아) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 77.5,
+      "unit": "µm/년",
+      "before": 74.45185398540686,
+      "after": 124.40761857462974,
+      "error_before_pct": -3.9330916317330886,
+      "error_after_pct": 60.52595945113515,
+      "knob": null,
+      "source": "Paterlini et al. 2024 (LPR×TOW 추정)",
+      "confidence": "med"
+    },
+    {
+      "id": "corr_11",
+      "group": "corrosion",
+      "label": "동중국해 해상 26 m (중국) 탄소강 첫해 부식 (ISO 9223 식 · 지역 배수 확인)",
+      "reference": 217.2,
+      "unit": "µm/년",
+      "before": 52.683131129649766,
+      "after": 77.6785362623926,
+      "error_before_pct": -75.74441476535462,
+      "error_after_pct": -64.23640135248961,
+      "knob": null,
+      "source": "Chen et al. 2026 (SO₂ 값 없음 → 2 가정)",
+      "confidence": "med"
+    },
+    {
+      "id": "shelter_ratio",
+      "group": "corrosion",
+      "label": "차폐 / 노출 첫해 부식 비 (NIMS 초시 1.29 · 미야코지마 1.47 평균)",
+      "reference": 1.3796992481203008,
+      "unit": "배",
+      "before": 1.2257158416983165,
+      "after": 1.3803090823472335,
+      "error_before_pct": -11.160650165735099,
+      "error_after_pct": 0.04420051890030113,
+      "knob": "shelter_factor",
+      "source": "Yan et al. 2020 그림 1 (NIMS MatNavi)",
+      "confidence": "med"
+    },
+    {
+      "id": "zinc_rapanui",
+      "group": "corrosion",
+      "label": "라파누이 500 m 용융아연 첫해 부식",
+      "reference": 2.0,
+      "unit": "µm/년",
+      "before": 2.167242530785852,
+      "after": 2.167242530785852,
+      "error_before_pct": 8.362126539292603,
+      "error_after_pct": 8.362126539292603,
+      "knob": null,
+      "source": "Vera et al. 2023",
+      "confidence": "high"
+    },
+    {
+      "id": "hdg_life_c5",
+      "group": "corrosion",
+      "label": "용융아연 85 µm 첫 보수까지 (C5 대표: Cl 300 · SO₂ 5 · RH 80 % · 18 °C, 탄소강 114 µm/년 C5)",
+      "reference": 15.0,
+      "unit": "년",
+      "before": 18.698410350650555,
+      "after": 18.698410350650555,
+      "error_before_pct": 24.65606900433703,
+      "error_after_pct": 24.65606900433703,
+      "knob": null,
+      "source": "GAA 수명표 (AS/NZS 2312.2): 85 µm C5 10–20년",
+      "confidence": "high"
+    },
+    {
+      "id": "kds_busan",
+      "group": "storm",
+      "label": "부산 (159) — 항만 · 해안 100년 순간풍속 (KDS 기본풍속 38 m/s × 1.5)",
+      "reference": 57.0,
+      "unit": "m/s",
+      "before": 45.421774227898126,
+      "after": 45.421774227898126,
+      "error_before_pct": -20.312676793161184,
+      "error_after_pct": -20.312676793161184,
+      "knob": null,
+      "source": "KDS 41 12 00:2019 기본풍속 (100년 · 10분 · 10 m · 노출 C)",
+      "confidence": "med"
+    },
+    {
+      "id": "kds_pohang",
+      "group": "storm",
+      "label": "포항 (138) — 제철 해안 100년 순간풍속 (KDS 기본풍속 36 m/s × 1.5)",
+      "reference": 54.0,
+      "unit": "m/s",
+      "before": 40.469584061050575,
+      "after": 40.469584061050575,
+      "error_before_pct": -25.056325812869307,
+      "error_after_pct": -25.056325812869307,
+      "knob": null,
+      "source": "KDS 41 12 00:2019 기본풍속 (100년 · 10분 · 10 m · 노출 C)",
+      "confidence": "med"
+    },
+    {
+      "id": "kds_ulsan",
+      "group": "storm",
+      "label": "울산 (152) — 조선 · 석유화학 해안 100년 순간풍속 (KDS 기본풍속 34 m/s × 1.5)",
+      "reference": 51.0,
+      "unit": "m/s",
+      "before": 41.168638968154156,
+      "after": 41.168638968154156,
+      "error_before_pct": -19.27717849381538,
+      "error_after_pct": -19.27717849381538,
+      "knob": null,
+      "source": "KDS 41 12 00:2019 기본풍속 (100년 · 10분 · 10 m · 노출 C)",
+      "confidence": "med"
+    },
+    {
+      "id": "kds_yeosu",
+      "group": "storm",
+      "label": "여수 (168) — 광양만 제철 · 항만 100년 순간풍속 (KDS 기본풍속 34 m/s × 1.5)",
+      "reference": 51.0,
+      "unit": "m/s",
+      "before": 40.01736380623385,
+      "after": 40.01736380623385,
+      "error_before_pct": -21.534580772090486,
+      "error_after_pct": -21.534580772090486,
+      "knob": null,
+      "source": "KDS 41 12 00:2019 기본풍속 (100년 · 10분 · 10 m · 노출 C)",
+      "confidence": "med"
+    },
+    {
+      "id": "kds_seosan",
+      "group": "storm",
+      "label": "서산 (129) — 당진 · 평택 서해안 내륙 100년 순간풍속 (KDS 기본풍속 34 m/s × 1.5)",
+      "reference": 51.0,
+      "unit": "m/s",
+      "before": 29.387621652944453,
+      "after": 29.387621652944453,
+      "error_before_pct": -42.37721244520695,
+      "error_after_pct": -42.37721244520695,
+      "knob": null,
+      "source": "KDS 41 12 00:2019 기본풍속 (100년 · 10분 · 10 m · 노출 C)",
+      "confidence": "med"
+    },
+    {
+      "id": "kds_incheon",
+      "group": "storm",
+      "label": "인천 (112) — 항만 · 해안 100년 순간풍속 (KDS 기본풍속 28 m/s × 1.5)",
+      "reference": 42.0,
+      "unit": "m/s",
+      "before": 39.03766162358554,
+      "after": 39.03766162358554,
+      "error_before_pct": -7.053186610510613,
+      "error_after_pct": -7.053186610510613,
+      "knob": null,
+      "source": "KDS 41 12 00:2019 기본풍속 (100년 · 10분 · 10 m · 노출 C)",
+      "confidence": "med"
+    },
+    {
+      "id": "tech_availability",
+      "group": "availability",
+      "label": "크레인 기술 가용률 (정비 · 점검 정지만, 날씨 제외)",
+      "reference": 0.95,
+      "unit": "",
+      "before": 0.9962842545285648,
+      "after": 0.9962842545285648,
+      "error_before_pct": 4.872026792480514,
+      "error_after_pct": 4.872026792480514,
+      "knob": null,
+      "source": "Jo & Kim 2020 (부산 HKT 안벽 크레인 14기, 2013–2018): 95.0 %",
+      "confidence": "med"
+    },
+    {
+      "id": "weight_recheck",
+      "group": "cargo",
+      "label": "적재 컨테이너 시험 인양 무게 재확인 비율 (신고와 1 t 넘게 차이)",
+      "reference": 0.085,
+      "unit": "",
+      "before": 0.09559145607339857,
+      "after": 0.09559145607339857,
+      "error_before_pct": 12.460536556939486,
+      "error_after_pct": 12.460536556939486,
+      "knob": null,
+      "source": "VICT 2017 VGM 계근: 수출 530개 중 ±1 t 넘는 8.5 %",
+      "confidence": "high"
     },
     {
       "id": "rope_sf_gantry_10t_20m",
@@ -1029,64 +1435,1141 @@
         "id": "busan",
         "weibull_k": 2.2108535766601562,
         "temp_sd_winter_c": 3.5,
-        "snow_flurry_prob": 0.06780624389648439,
-        "storm_rate_scale": 0.7082275390624999
+        "snow_flurry_prob": 0.046657562255859375,
+        "storm_rate_scale": 0.7082275390624999,
+        "rh_daily_sd": 4.0,
+        "gust_factor": 1.5
       },
       {
         "id": "incheon",
         "weibull_k": 2.2868118286132812,
-        "temp_sd_winter_c": 4.445247650146484,
-        "snow_flurry_prob": 0.17907028198242192,
-        "storm_rate_scale": 0.8015380859375001
+        "temp_sd_winter_c": 4.259273529052734,
+        "snow_flurry_prob": 0.17941360473632817,
+        "storm_rate_scale": 0.6798583984375,
+        "rh_daily_sd": 12.77197265625,
+        "gust_factor": 1.5
       },
       {
         "id": "ulsan",
         "weibull_k": 2.3944290161132815,
         "temp_sd_winter_c": 3.5,
         "snow_flurry_prob": 6.866455078125e-6,
-        "storm_rate_scale": 1.0746337890625
+        "storm_rate_scale": 1.0746337890625,
+        "rh_daily_sd": 4.0,
+        "gust_factor": 1.5
       },
       {
         "id": "pohang",
         "weibull_k": 2.761289978027344,
         "temp_sd_winter_c": 3.5,
-        "snow_flurry_prob": 0.04735794067382813,
-        "storm_rate_scale": 1.0377197265625
+        "snow_flurry_prob": 0.03476486206054687,
+        "storm_rate_scale": 1.0377197265625,
+        "rh_daily_sd": 4.0,
+        "gust_factor": 1.5
       },
       {
         "id": "yeosu",
         "weibull_k": 2.0510513305664064,
         "temp_sd_winter_c": 3.5,
-        "snow_flurry_prob": 0.29130935668945307,
-        "storm_rate_scale": 0.1001708984375
+        "snow_flurry_prob": 0.2881782531738281,
+        "storm_rate_scale": 0.1001708984375,
+        "rh_daily_sd": 4.0,
+        "gust_factor": 1.39420166015625
       },
       {
         "id": "seosan",
-        "weibull_k": 1.5714706420898437,
-        "temp_sd_winter_c": 3.9981040954589844,
-        "snow_flurry_prob": 0.1376243591308594,
-        "storm_rate_scale": 0.1001708984375
+        "weibull_k": 1.5949539184570312,
+        "temp_sd_winter_c": 3.8124656677246094,
+        "snow_flurry_prob": 0.0842033386230469,
+        "storm_rate_scale": 0.1001708984375,
+        "rh_daily_sd": 8.60693359375,
+        "gust_factor": 1.41837158203125
       }
     ],
     "motor_allow_winding_c": 123.12487140805555,
     "altitude_rise_per_100m": 0.010315241197696872,
-    "rope_field_factor": 1.3383918008256483,
-    "brake_wear_per_set_mm": 2.0473696024718576e-6,
+    "rope_field_factor": 0.6182364298011258,
+    "brake_wear_per_set_mm": 1.9007670884424624e-6,
     "handling_overhead_s": [
       [
         "busan_newport_rmg",
-        12.631000000068838
+        13.14741685520437
       ],
       [
         "gwangyang_coil_warehouse",
         9.99755859375
       ]
+    ],
+    "shelter_factor": 2.0680566326368535,
+    "drf_regional_scale": 1.6086319629290662
+  },
+  "era5": {
+    "stations": [
+      "busan",
+      "incheon",
+      "ulsan",
+      "pohang",
+      "yeosu",
+      "seosan"
+    ],
+    "adjust": {
+      "temp_offset_c": 0.5615694444444446,
+      "rh_offset_pct": -5.504763888888891,
+      "range_scale": 1.2191438906090708,
+      "wind_scale": 0.8725032388076142,
+      "gust_scale": 1.0125435754996488,
+      "precip_scale": 1.101884320183774,
+      "rain_day_mm": 0.6787457196169705,
+      "snow_day_cm": 0.01,
+      "fog_rh_pct": 99.0,
+      "thunder_mm_h": 4.8,
+      "source": "기상청 6개 지점 맞춤 (era5cal)"
+    },
+    "folds": [
+      [
+        "busan",
+        {
+          "temp_offset_c": 0.4997333333333335,
+          "rh_offset_pct": -5.271816666666669,
+          "range_scale": 1.2067443066925865,
+          "wind_scale": 0.8426349665233509,
+          "gust_scale": 1.0125435754996488,
+          "precip_scale": 1.0778588438727685,
+          "rain_day_mm": 0.6675394245816784,
+          "snow_day_cm": 0.01,
+          "fog_rh_pct": 99.0,
+          "thunder_mm_h": 4.592207792207793,
+          "source": "기상청 5개 지점 맞춤 (era5cal)"
+        }
+      ],
+      [
+        "incheon",
+        {
+          "temp_offset_c": 0.4662000000000001,
+          "rh_offset_pct": -5.476883333333335,
+          "range_scale": 1.2599932254108401,
+          "wind_scale": 0.8596877067701172,
+          "gust_scale": 0.9759624447831357,
+          "precip_scale": 1.1106878689116748,
+          "rain_day_mm": 0.6744722459008178,
+          "snow_day_cm": 0.01,
+          "fog_rh_pct": 99.0,
+          "thunder_mm_h": 5.092537313432835,
+          "source": "기상청 5개 지점 맞춤 (era5cal)"
+        }
+      ],
+      [
+        "ulsan",
+        {
+          "temp_offset_c": 0.48371666666666685,
+          "rh_offset_pct": -5.238266666666669,
+          "range_scale": 1.2397004197595498,
+          "wind_scale": 0.9175717157713444,
+          "gust_scale": 1.0125435754996488,
+          "precip_scale": 1.111551179280999,
+          "rain_day_mm": 0.6602447700305968,
+          "snow_day_cm": 0.01,
+          "fog_rh_pct": 98.82784810126583,
+          "thunder_mm_h": 4.7405405405405405,
+          "source": "기상청 5개 지점 맞춤 (era5cal)"
+        }
+      ],
+      [
+        "pohang",
+        {
+          "temp_offset_c": 0.523666666666667,
+          "rh_offset_pct": -5.460283333333334,
+          "range_scale": 1.2545706884169032,
+          "wind_scale": 0.8796136102579448,
+          "gust_scale": 1.0125435754996488,
+          "precip_scale": 1.1005613435883783,
+          "rain_day_mm": 0.699640069067828,
+          "snow_day_cm": 0.01,
+          "fog_rh_pct": 98.97380952380952,
+          "thunder_mm_h": 4.854054054054054,
+          "source": "기상청 5개 지점 맞춤 (era5cal)"
+        }
+      ],
+      [
+        "yeosu",
+        {
+          "temp_offset_c": 0.6234833333333334,
+          "rh_offset_pct": -4.900583333333335,
+          "range_scale": 1.2040963237221145,
+          "wind_scale": 0.8224812132905032,
+          "gust_scale": 0.9759624447831357,
+          "precip_scale": 1.1182292104166915,
+          "rain_day_mm": 0.646896905862263,
+          "snow_day_cm": 0.01,
+          "fog_rh_pct": 99.0,
+          "thunder_mm_h": 4.684848484848485,
+          "source": "기상청 5개 지점 맞춤 (era5cal)"
+        }
+      ],
+      [
+        "seosan",
+        {
+          "temp_offset_c": 0.7726166666666665,
+          "rh_offset_pct": -6.680750000000002,
+          "range_scale": 1.157155054965094,
+          "wind_scale": 0.909209230751128,
+          "gust_scale": 0.9759624447831357,
+          "precip_scale": 1.0927189479762203,
+          "rain_day_mm": 0.7260000764633172,
+          "snow_day_cm": 0.01,
+          "fog_rh_pct": 99.0,
+          "thunder_mm_h": 4.865671641791045,
+          "source": "기상청 5개 지점 맞춤 (era5cal)"
+        }
+      ]
+    ],
+    "items": [
+      {
+        "name": "연평균 기온",
+        "unit": "°C",
+        "kma_mean": 13.9,
+        "mae_before": 0.7251502283105014,
+        "mae_loso": 0.5443063546423126,
+        "mae_all": 0.4533193176052747
+      },
+      {
+        "name": "평균 일교차",
+        "unit": "K",
+        "kma_mean": 8.15013698630137,
+        "mae_before": 1.6493456621004565,
+        "mae_loso": 1.2418980078258712,
+        "mae_all": 1.0331986750781061
+      },
+      {
+        "name": "연평균 풍속",
+        "unit": "m/s",
+        "kma_mean": 2.9088127853881276,
+        "mae_before": 0.5183707762557078,
+        "mae_loso": 0.5835833364108843,
+        "mae_all": 0.4785500751693191
+      },
+      {
+        "name": "연평균 상대습도",
+        "unit": "%",
+        "kma_mean": 66.3465296803653,
+        "mae_before": 5.630153424657532,
+        "mae_loso": 2.3523062024353187,
+        "mae_all": 1.9603108320649436
+      },
+      {
+        "name": "연 강수량",
+        "unit": "mm",
+        "kma_mean": 1328.6833333333332,
+        "mae_before": 122.85499999999986,
+        "mae_loso": 83.5990210459518,
+        "mae_all": 69.01779730945668
+      },
+      {
+        "name": "연 강수일수",
+        "unit": "일",
+        "kma_mean": 102.05,
+        "mae_before": 32.77183333333335,
+        "mae_loso": 4.3559898053524835,
+        "mae_all": 3.61754109167709
+      },
+      {
+        "name": "눈 일수",
+        "unit": "일",
+        "kma_mean": 12.716666666666667,
+        "mae_before": 2.5280000000000005,
+        "mae_loso": 2.5280000000000005,
+        "mae_all": 2.5280000000000005
+      },
+      {
+        "name": "폭풍일 (10분 13.9 m/s)",
+        "unit": "일",
+        "kma_mean": 4.8999999999999995,
+        "mae_before": 4.584666666666667,
+        "mae_loso": 4.7843333333333335,
+        "mae_all": 4.767666666666667
+      },
+      {
+        "name": "10년 순간풍속",
+        "unit": "m/s",
+        "kma_mean": 32.80166666666667,
+        "mae_before": 3.2657621233032352,
+        "mae_loso": 4.097873684621142,
+        "mae_all": 3.4139514064058267
+      },
+      {
+        "name": "안개 일수",
+        "unit": "일",
+        "kma_mean": 21.083333333333332,
+        "mae_before": 33.666666666666664,
+        "mae_loso": 10.356396925858936,
+        "mae_all": 9.766666666666667
+      },
+      {
+        "name": "뇌전 일수",
+        "unit": "일",
+        "kma_mean": 13.583333333333334,
+        "mae_before": 3.266666666666667,
+        "mae_loso": 2.814442762203956,
+        "mae_all": 2.3333333333333335
+      }
+    ],
+    "detail": [
+      [
+        "busan",
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 15.010958904109588,
+            "era5": 14.140095890410958
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 7.475068493150683,
+            "era5": 5.653197260273972
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 3.4589041095890414,
+            "era5": 3.3763643835616444
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 63.410958904109584,
+            "era5": 70.08698356164382
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1576.6999999999998,
+            "era5": 1301.5400000000002
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 99.0,
+            "era5": 129.36800000000002
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 4.2,
+            "era5": 3.533
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 6.2,
+            "era5": 0.30000000000000004
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 36.54,
+            "era5": 38.78764324897584
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 14.4,
+            "era5": 46.5
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 12.4,
+            "era5": 18.0
+          }
+        ],
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 15.010958904109588,
+            "era5": 14.639829223744293
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 7.475068493150683,
+            "era5": 6.821963608445744
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 3.4589041095890414,
+            "era5": 2.8450426893131
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 63.410958904109584,
+            "era5": 64.81516689497717
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1576.6999999999998,
+            "era5": 1402.876399654163
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 99.0,
+            "era5": 101.18607921030456
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 4.2,
+            "era5": 3.533
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 6.2,
+            "era5": 0.1
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 36.54,
+            "era5": 39.71424481734351
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 14.4,
+            "era5": 14.0
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 12.4,
+            "era5": 16.815584415584414
+          }
+        ]
+      ],
+      [
+        "incheon",
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 12.546575342465754,
+            "era5": 11.509561643835616
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 7.52958904109589,
+            "era5": 7.114613698630137
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.872602739726027,
+            "era5": 3.029832876712329
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 68.84739726027397,
+            "era5": 74.49883013698629
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1207.3999999999999,
+            "era5": 1144.42
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 100.6,
+            "era5": 135.16600000000003
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 22.1,
+            "era5": 16.967
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 2.2,
+            "era5": 0.199
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 31.89,
+            "era5": 28.623958141021067
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 47.5,
+            "era5": 91.0
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 18.8,
+            "era5": 17.5
+          }
+        ],
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 12.546575342465754,
+            "era5": 11.975761643835614
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 7.52958904109589,
+            "era5": 8.964365061689135
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.872602739726027,
+            "era5": 2.604710077677529
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 68.84739726027397,
+            "era5": 69.02194680365298
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1207.3999999999999,
+            "era5": 1271.0934109398988
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 100.6,
+            "era5": 101.43365215865215
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 22.1,
+            "era5": 16.967
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 2.2,
+            "era5": 0.066
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 31.89,
+            "era5": 27.85761582976185
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 47.5,
+            "era5": 45.0
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 18.8,
+            "era5": 12.583582089552241
+          }
+        ]
+      ],
+      [
+        "ulsan",
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 14.447671232876711,
+            "era5": 13.498630136986304
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 9.201643835616437,
+            "era5": 7.864230136986301
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.0824657534246573,
+            "era5": 3.2831753424657535
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 63.6013698630137,
+            "era5": 70.44323287671233
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1292.6000000000001,
+            "era5": 1225.8000000000002
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 100.8,
+            "era5": 134.26500000000001
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 6.2,
+            "era5": 5.7
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 0.2,
+            "era5": 0.199
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 27.86,
+            "era5": 36.53422069080368
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 5.4,
+            "era5": 64.0
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 12.2,
+            "era5": 15.5
+          }
+        ],
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 14.447671232876711,
+            "era5": 13.982346803652968
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 9.201643835616437,
+            "era5": 9.74928940190762
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.0824657534246573,
+            "era5": 3.0125488321644727
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 63.6013698630137,
+            "era5": 65.20496621004565
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1292.6000000000001,
+            "era5": 1362.5394355626486
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 100.8,
+            "era5": 104.40909124151139
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 6.2,
+            "era5": 5.7
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 0.2,
+            "era5": 0.099
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 27.86,
+            "era5": 37.30556139471523
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 5.4,
+            "era5": 31.184810126582164
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 12.2,
+            "era5": 13.463513513513513
+          }
+        ]
+      ],
+      [
+        "pohang",
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 14.614794520547944,
+            "era5": 13.866301369863015
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 8.052602739726028,
+            "era5": 7.339457534246574
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.5997260273972604,
+            "era5": 3.0921452054794525
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 62.95780821917808,
+            "era5": 68.68491506849315
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1192.3999999999999,
+            "era5": 1074.75
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 102.30000000000001,
+            "era5": 131.299
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 7.0,
+            "era5": 9.200000000000001
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 0.5,
+            "era5": 0.033
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 30.24,
+            "era5": 31.101850496434224
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 2.8,
+            "era5": 34.0
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 11.3,
+            "era5": 12.5
+          }
+        ],
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 14.614794520547944,
+            "era5": 14.38996803652968
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 8.052602739726028,
+            "era5": 9.207868291346355
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.5997260273972604,
+            "era5": 2.719893007633576
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 62.95780821917808,
+            "era5": 63.22463173515982
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1192.3999999999999,
+            "era5": 1182.8283040216095
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 102.30000000000001,
+            "era5": 98.22401388652446
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 7.0,
+            "era5": 9.200000000000001
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 0.5,
+            "era5": 0.0
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 30.24,
+            "era5": 31.666933919430477
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 2.8,
+            "era5": 14.353571428571463
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 11.3,
+            "era5": 10.151351351351352
+          }
+        ]
+      ],
+      [
+        "yeosu",
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 14.630958904109589,
+            "era5": 14.377035616438357
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 6.533972602739726,
+            "era5": 4.561904109589041
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 4.089041095890411,
+            "era5": 3.933950684931507
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 65.38219178082191,
+            "era5": 73.89899452054794
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1449.1,
+            "era5": 1401.6399999999999
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 98.49999999999999,
+            "era5": 134.6
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 9.4,
+            "era5": 6.165
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 18.3,
+            "era5": 0.9630000000000002
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 39.68000000000001,
+            "era5": 35.411252044061754
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 19.8,
+            "era5": 25.5
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 12.8,
+            "era5": 18.5
+          }
+        ],
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 14.630958904109589,
+            "era5": 15.000518949771687
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 6.533972602739726,
+            "era5": 5.4929719675289705
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 4.089041095890411,
+            "era5": 3.2356005323674712
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 65.38219178082191,
+            "era5": 68.99841118721461
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1449.1,
+            "era5": 1567.3547904884515
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 98.49999999999999,
+            "era5": 104.71293919201325
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 9.4,
+            "era5": 6.165
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 18.3,
+            "era5": 0.29700000000000004
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 39.68000000000001,
+            "era5": 34.15768954580345
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 19.8,
+            "era5": 6.5
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 12.8,
+            "era5": 15.246969696969696
+          }
+        ]
+      ],
+      [
+        "seosan",
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 12.149041095890412,
+            "era5": 12.640608219178084
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 10.107945205479451,
+            "era5": 6.471345205479452
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.3501369863013695,
+            "era5": 3.3723726027397256
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 73.87945205479453,
+            "era5": 73.51176164383563
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1253.9,
+            "era5": 1086.8200000000002
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 111.09999999999998,
+            "era5": 144.233
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 27.4,
+            "era5": 23.967
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 2.0,
+            "era5": 0.198
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 30.6,
+            "era5": 30.32393151131152
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 36.6,
+            "era5": 67.5
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 14.0,
+            "era5": 16.5
+          }
+        ],
+        [
+          {
+            "name": "연평균 기온",
+            "unit": "°C",
+            "kma": 12.149041095890412,
+            "era5": 13.413224885844748
+          },
+          {
+            "name": "평균 일교차",
+            "unit": "K",
+            "kma": 10.107945205479451,
+            "era5": 7.488349816944671
+          },
+          {
+            "name": "연평균 풍속",
+            "unit": "m/s",
+            "kma": 2.3501369863013695,
+            "era5": 3.0661922999431654
+          },
+          {
+            "name": "연평균 상대습도",
+            "unit": "%",
+            "kma": 73.87945205479453,
+            "era5": 66.83101164383561
+          },
+          {
+            "name": "연 강수량",
+            "unit": "mm",
+            "kma": 1253.9,
+            "era5": 1187.5888070395156
+          },
+          {
+            "name": "연 강수일수",
+            "unit": "일",
+            "kma": 111.09999999999998,
+            "era5": 101.881809083842
+          },
+          {
+            "name": "눈 일수",
+            "unit": "일",
+            "kma": 27.4,
+            "era5": 23.967
+          },
+          {
+            "name": "폭풍일 (10분 13.9 m/s)",
+            "unit": "일",
+            "kma": 2.0,
+            "era5": 0.132
+          },
+          {
+            "name": "10년 순간풍속",
+            "unit": "m/s",
+            "kma": 30.6,
+            "era5": 29.614192648197076
+          },
+          {
+            "name": "안개 일수",
+            "unit": "일",
+            "kma": 36.6,
+            "era5": 28.0
+          },
+          {
+            "name": "뇌전 일수",
+            "unit": "일",
+            "kma": 14.0,
+            "era5": 12.604477611940297
+          }
+        ]
+      ]
+    ],
+    "notes": [
+      "ERA5 = Open-Meteo era5_seamless (ERA5-Land 0.1° + ERA5), 기상청 = 1991–2020 평년값 · 연 일수 · 순위값",
+      "안개 · 뇌전은 ERA5 에 없어 시간 자료(2022–2023)의 습도 · 강수 문턱으로 판정 — 2년 표본"
     ]
   },
-  "mean_abs_error_before_pct": 28.67200675774878,
-  "mean_abs_error_after_pct": 3.412003650644084,
-  "mean_abs_error_all_after_pct": 5.097925378578031,
+  "mean_abs_error_before_pct": 25.760186136352388,
+  "mean_abs_error_after_pct": 3.1789672433861105,
+  "mean_abs_error_all_after_pct": 11.308502386215364,
   "notes": [
+    "ISO 9223 용량–반응식: 실측 12곳 중 범주 일치 5 → 지역 배수(지점 하나 빼기, 평균 ×1.61) 5곳. 배수는 열대 해안 자료가 많아 국내에는 적용하지 않고 확인만 한다 (ISO 불확실성 −33 % ~ +50 %)",
+    "ERA5 연평균 기온: 기상청 평균 13.9 °C · 평균 절대 오차 보정 전 0.73 → 지점 하나 빼기 0.54 (전체 맞춤 0.45)",
+    "ERA5 평균 일교차: 기상청 평균 8.2 K · 평균 절대 오차 보정 전 1.65 → 지점 하나 빼기 1.24 (전체 맞춤 1.03)",
+    "ERA5 연평균 풍속: 기상청 평균 2.9 m/s · 평균 절대 오차 보정 전 0.52 → 지점 하나 빼기 0.58 (전체 맞춤 0.48)",
+    "ERA5 연평균 상대습도: 기상청 평균 66.3 % · 평균 절대 오차 보정 전 5.63 → 지점 하나 빼기 2.35 (전체 맞춤 1.96)",
+    "ERA5 연 강수량: 기상청 평균 1328.7 mm · 평균 절대 오차 보정 전 122.85 → 지점 하나 빼기 83.60 (전체 맞춤 69.02)",
+    "ERA5 연 강수일수: 기상청 평균 102.0 일 · 평균 절대 오차 보정 전 32.77 → 지점 하나 빼기 4.36 (전체 맞춤 3.62)",
+    "ERA5 눈 일수: 기상청 평균 12.7 일 · 평균 절대 오차 보정 전 2.53 → 지점 하나 빼기 2.53 (전체 맞춤 2.53)",
+    "ERA5 폭풍일 (10분 13.9 m/s): 기상청 평균 4.9 일 · 평균 절대 오차 보정 전 4.58 → 지점 하나 빼기 4.78 (전체 맞춤 4.77)",
+    "ERA5 10년 순간풍속: 기상청 평균 32.8 m/s · 평균 절대 오차 보정 전 3.27 → 지점 하나 빼기 4.10 (전체 맞춤 3.41)",
+    "ERA5 안개 일수: 기상청 평균 21.1 일 · 평균 절대 오차 보정 전 33.67 → 지점 하나 빼기 10.36 (전체 맞춤 9.77)",
+    "ERA5 뇌전 일수: 기상청 평균 13.6 일 · 평균 절대 오차 보정 전 3.27 → 지점 하나 빼기 2.81 (전체 맞춤 2.33)",
     "기후 통계는 생성 40 년 · 재현 순간풍속은 300 년, 운영은 90 일 (시드 2026)",
     "기준이 0 인 일수(예: 부산 한파일)는 모델 1 일/년을 100% 오차로 셉니다",
     "신뢰도 low 항목(로프 · 브레이크 교체 주기)은 사례 하나에 맞춘 값입니다 — 현장 기록으로 다시 맞추세요"

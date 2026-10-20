@@ -934,6 +934,7 @@ pub fn climate_from_stats(s: &SiteStats, adj: &Era5Adjust, id: &str, name: &str)
         snow_flurry_prob: 0.0,
         typhoon: storm_climate(s, adj.gust_scale),
         wind_rose: rose,
+        rh_daily_sd: crate::field_constants::RH_DAILY_SD_PORTS,
     }
 }
 

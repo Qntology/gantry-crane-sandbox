@@ -16,6 +16,7 @@
 //! | 레일 클램프 | 체결 횟수 ÷ 설계 횟수 + 부식 시간 | 계류 · 폭풍 고정 장치 |
 
 use crate::crane_profile::{Axis, CraneSpec};
+use crate::marine::{MarineDay, MarineState};
 use crate::site::{corrosivity_index, dust_index, SitePreset};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -128,6 +129,10 @@ pub enum ComponentKind {
     Hook,
     Coating,
     RailClamp,
+    /// 전장 · 제어반 (드라이브 · PLC)
+    Electrical,
+    /// 통로 · 난간 · 계단
+    Walkway,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -181,6 +186,27 @@ pub struct Component {
     #[serde(default)]
     pub margin_label: String,
     pub basis: String,
+    /// 관측으로 낸 예측 (열화 시계열 · v3) — 건강 점수 · 남은 수명 · 고장 확률
+    #[serde(default)]
+    pub prog: Option<ProgView>,
+}
+
+/// 부품 예측 요약 (화면 · CLI)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProgView {
+    pub method: String,
+    /// 건강 점수 P10 · P50 · P90 (0–100)
+    pub health: [f64; 3],
+    /// 남은 수명 P10 · P50 · P90 (일)
+    pub rul: [f64; 3],
+    /// 7 · 30 · 90 일 안 교체 기준 도달 확률
+    pub p_fail: [f64; 3],
+    pub indicator: String,
+    pub unit: String,
+    pub last_z: Option<f64>,
+    pub n_obs: usize,
+    /// 시뮬레이션의 참 상태 (실제 현장에서는 모르는 값 — 검증용)
+    pub truth_sim: f64,
 }
 
 impl Component {
@@ -205,6 +231,7 @@ impl Component {
             margin_min: None,
             margin_label: margin_label.into(),
             basis: basis.into(),
+            prog: None,
         }
     }
 
@@ -245,6 +272,9 @@ pub struct DayUsage {
     pub clamp_ops: f64,
     /// 안정성 여유 (그날 최소)
     pub margins: Margins,
+    /// 염해 모델의 하루 결과 (해안 현장만)
+    #[serde(default)]
+    pub marine: Option<MarineDay>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -332,6 +362,15 @@ pub struct HealthLedger {
     pub components: Vec<Component>,
     pub events: Vec<HealthEvent>,
     pub history: Vec<Snapshot>,
+    /// 염해 상태 (해안 현장) — 도장 · 녹 자리 · 차폐면 염 · 모터 오염 · 오일 수분
+    #[serde(default)]
+    pub marine: Option<MarineState>,
+    /// 마지막 하루의 부품별 물리 소비 (수명 비율 증분) — 열화 시계열 · 예측 백테스트용, 저장하지 않음
+    #[serde(skip)]
+    pub last_dose: Vec<(String, f64)>,
+    /// 열화 시계열 상태 (참 상태 · 관측 · 예측) — 확률 열화를 켠 운영
+    #[serde(default)]
+    pub degradation: Option<crate::degradation::DegState>,
 }
 
 fn now_unix() -> i64 {
@@ -400,6 +439,10 @@ impl HealthLedger {
         if !site.environment.indoor {
             c.push(Component::new("rail_clamp", ComponentKind::RailClamp, Some(Axis::Travel), "레일 클램프 · 계류 장치", "회", 0.0, "제동 · 클램프 저항 / 풍하중", "EN 13001-2 비운전 폭풍, 계류 장치 점검"));
         }
+        c.push(Component::new("electrical", ComponentKind::Electrical, None, "전장 · 제어반 (드라이브 · PLC)", "년", 0.0, "", "ISA-71.04 부식 등급(습도 50 % 위 10 % 마다 한 단계) × 기준 15년 (가정)"));
+        if !site.environment.indoor {
+            c.push(Component::new("walkway", ComponentKind::Walkway, None, "통로 · 난간 · 계단", "비율", 0.0, "", "용융아연 소모 (ISO 9223 아연 속도, GAA 수명표) 또는 도장 열화"));
+        }
         let t = now_unix();
         Self {
             recipe: HEALTH_RECIPE.into(),
@@ -420,6 +463,20 @@ impl HealthLedger {
             components: c,
             events: Vec::new(),
             history: Vec::new(),
+            marine: None,
+            last_dose: Vec::new(),
+            degradation: None,
+        }
+    }
+
+    /// 예전 원장에 없던 부품을 끝에 더한다 (기록의 부품 순서는 그대로)
+    pub fn ensure_components(&mut self, spec: &CraneSpec, site: &SitePreset) {
+        let fresh = HealthLedger::new(&self.asset_id, spec, site);
+        for mut c in fresh.components {
+            if !self.components.iter().any(|x| x.id == c.id) {
+                c.installed_day = self.day;
+                self.components.push(c);
+            }
         }
     }
 
@@ -455,13 +512,15 @@ impl HealthLedger {
         let class_cycles = spec.class.design_cycles.max(1.0);
         let design_h = spec.class.design_full_load_hours.max(1.0);
         let mut changes = Vec::new();
+        let mut doses = Vec::with_capacity(self.components.len());
         let operated = u.op_hours > 0.0;
         for c in self.components.iter_mut() {
             let before = c.life_used;
             let old_status = c.status;
             match c.kind {
                 ComponentKind::Rope => {
-                    let k = m.rope_field_factor.max(1e-6) * m.rope_env(&corr);
+                    let env_k = u.marine.as_ref().map(|md| md.rope_mult).unwrap_or_else(|| m.rope_env(&corr));
+                    let k = m.rope_field_factor.max(1e-6) * env_k;
                     c.value += u.rope_damage;
                     c.life_used += u.rope_damage / k;
                     c.margin = u.margins.rope_sf;
@@ -480,7 +539,11 @@ impl HealthLedger {
                 }
                 ComponentKind::Motor => {
                     let k = c.axis.unwrap_or(Axis::Hoist).index();
-                    let ins = c.sub_value("insulation") + u.insulation_aging_h[k] / m.insulation_life_h.max(1.0);
+                    let extra = u.marine.as_ref().map(|md| md.motor_aging_h[k]).unwrap_or(0.0);
+                    let ins = c.sub_value("insulation") + (u.insulation_aging_h[k] + extra) / m.insulation_life_h.max(1.0);
+                    if let Some(md) = u.marine.as_ref() {
+                        c.set_sub("ir_mohm", md.motor_ir_mohm[k]);
+                    }
                     let brg = c.sub_value("bearing") + u.bearing_h[k] / (m.motor_bearing_l10_h.max(1.0) * dust);
                     c.set_sub("insulation", ins);
                     c.set_sub("bearing", brg);
@@ -490,8 +553,12 @@ impl HealthLedger {
                 }
                 ComponentKind::Gearbox => {
                     let k = c.axis.unwrap_or(Axis::Hoist).index();
+                    let gm = u.marine.as_ref().map(|md| md.gear_mult).unwrap_or(1.0);
+                    if let Some(md) = u.marine.as_ref() {
+                        c.set_sub("water_ppm", md.gear_ppm);
+                    }
                     c.value += u.flh_h[k];
-                    c.life_used += u.flh_h[k] / (design_h * dust);
+                    c.life_used += u.flh_h[k] * gm / (design_h * dust);
                 }
                 ComponentKind::Wheel => {
                     let k = c.axis.unwrap_or(Axis::Travel).index().min(1);
@@ -502,6 +569,9 @@ impl HealthLedger {
                 }
                 ComponentKind::Girder => {
                     // 도장이 깨진 뒤 부식 두께 감소 → 판 두께가 줄어 응력이 커진다 (σ ∝ 1/t)
+                    if let Some(md) = u.marine.as_ref() {
+                        c.set_sub("corrosion_um", md.local_loss_um);
+                    }
                     let loss_um = c.sub_value("corrosion_um");
                     let t0 = m.girder_plate_mm.max(1.0) * 1000.0;
                     let mag = t0 / (t0 - loss_um).max(0.5 * t0);
@@ -518,20 +588,49 @@ impl HealthLedger {
                 }
                 ComponentKind::Coating => {
                     c.value += 1.0 / 365.0;
-                    c.life_used += 1.0 / (365.0 * coat_years);
+                    match u.marine.as_ref() {
+                        Some(md) => {
+                            c.life_used = md.coat_now[0].max(md.coat_now[1]);
+                            c.set_sub("rust_area_pct", md.rust_area_pct);
+                        }
+                        None => c.life_used += 1.0 / (365.0 * coat_years),
+                    }
                 }
                 ComponentKind::RailClamp => {
                     c.value += u.clamp_ops;
-                    let years = m.rail_clamp_years.max(0.5) * (m.corrosion_rate("C3").max(1.0) / rate_corr.max(1.0)).min(3.0);
-                    c.life_used += u.clamp_ops / m.rail_clamp_ops.max(1.0) + 1.0 / (365.0 * years);
+                    let corr_inc = match u.marine.as_ref() {
+                        Some(md) => md.clamp_inc,
+                        None => {
+                            let years = m.rail_clamp_years.max(0.5) * (m.corrosion_rate("C3").max(1.0) / rate_corr.max(1.0)).min(3.0);
+                            1.0 / (365.0 * years)
+                        }
+                    };
+                    c.life_used += u.clamp_ops / m.rail_clamp_ops.max(1.0) + corr_inc;
                     c.margin = u.margins.runaway;
+                }
+                ComponentKind::Electrical => {
+                    let base = 1.0 / (crate::marine::ELECTRICAL_LIFE_YEARS * 365.0);
+                    let inc = u.marine.as_ref().map(|md| md.electrical_inc).unwrap_or(base);
+                    c.value += 1.0 / 365.0;
+                    c.life_used += inc;
+                    if let Some(md) = u.marine.as_ref() {
+                        c.set_sub("isa_level", md.isa_level as f64);
+                    }
+                }
+                ComponentKind::Walkway => {
+                    match u.marine.as_ref() {
+                        Some(md) => c.life_used = md.access_used,
+                        None => c.life_used += 1.0 / (365.0 * coat_years),
+                    }
+                    c.value = c.life_used;
                 }
             }
             if let Some(v) = c.margin {
                 c.margin_min = Some(c.margin_min.map(|x| x.min(v)).unwrap_or(v));
             }
             let d = (c.life_used - before).max(0.0);
-            if operated || matches!(c.kind, ComponentKind::Coating | ComponentKind::RailClamp) {
+            doses.push((c.id.clone(), d));
+            if operated || matches!(c.kind, ComponentKind::Coating | ComponentKind::RailClamp | ComponentKind::Electrical | ComponentKind::Walkway) {
                 c.rate_per_day = if c.rate_per_day == 0.0 { d } else { 0.9 * c.rate_per_day + 0.1 * d };
             }
             c.rul_days = if c.rate_per_day > 1e-12 { Some(((m.replace_at - c.life_used) / c.rate_per_day).max(0.0)) } else { None };
@@ -543,15 +642,16 @@ impl HealthLedger {
                 changes.push(StatusChange { id: c.id.clone(), label: c.label.clone(), from: old_status, to: c.status, life_used: c.life_used, rul_days: c.rul_days });
             }
         }
-        // 도장 수명이 다하면 거더 부식이 시작된다 (ISO 9224: d = r·t^b, t = 도장 파괴 뒤 년)
+        // 도장 수명이 다하면 거더 부식이 시작된다 (ISO 9224: d = r·t^b, t = 도장 파괴 뒤 년) — 염해 모델이 없을 때
         let coat_life = self.component("coating").map(|c| c.life_used).unwrap_or(0.0);
-        if coat_life > 1.0 {
+        if coat_life > 1.0 && u.marine.is_none() {
             let t_exposed = (coat_life - 1.0) * coat_years;
             let loss = rate_corr * t_exposed.max(0.0).powf(m.corrosion_exponent.clamp(0.3, 1.0));
             if let Some(g) = self.component_mut("girder") {
                 g.set_sub("corrosion_um", loss);
             }
         }
+        self.last_dose = doses;
         self.day = day;
         self.operating_hours += u.op_hours;
         self.moves += u.moves;

@@ -6,6 +6,8 @@
 use crate::alerts::AlertPolicy;
 use crate::antisway::AntiSwayMode;
 use crate::crane_profile::CraneRef;
+use crate::cargo::CargoRef;
+use crate::marine::{CoastalExposure, ProtectionRef};
 use crate::site::{mk_bins, ClimateRef, LoadProfile, OperationsProfile, SiteEnvironment, SitePreset, Throughput};
 
 #[allow(clippy::too_many_arguments)]
@@ -20,14 +22,50 @@ fn env(indoor: bool, corr: &str, dust: &str, height: f64, base: f64, coupling: f
         indoor_coupling: coupling,
         heat_source_c: heat,
         rail_condition: rail.into(),
+        coastal: None,
+        protection: None,
     }
+}
+
+/// 해안 노출과 염해 방지 조치를 붙인다. `salt` = 국내 비래염분 지역 이름 또는 ("", 100 m mdd, 감쇠 b)
+#[allow(clippy::too_many_arguments)]
+fn with_coast(mut e: SiteEnvironment, distance_m: f64, sea_bearing: f64, coast_type: &str, salt_area: Option<&str>, salt_mdd_b: Option<(f64, f64)>, port_id: &str, protection: &str) -> SiteEnvironment {
+    e.coastal = Some(CoastalExposure {
+        distance_to_sea_m: distance_m,
+        sea_bearing_deg: sea_bearing,
+        coast_type: coast_type.into(),
+        salt_area: salt_area.map(String::from),
+        salt_100m_mdd: salt_mdd_b.map(|x| x.0),
+        decay_b: salt_mdd_b.map(|x| x.1),
+        chloride_mg_m2_d: None,
+        so2_ug_m3: None,
+        port_id: Some(port_id.into()),
+    });
+    e.protection = Some(ProtectionRef::Preset(protection.into()));
+    e
 }
 
 /// 컨테이너 하중 스펙트럼 (41 t 대비): 빈 컨테이너 20% (Drewry) + 적재 60:40 (40ft:20ft) 무게 분포
 /// (Interpave/Knapton 표 16: 평균 16 t, 중앙 17, P90 22, P99 27 t), 빈 컨테이너 자중 2.3 · 3.7 t (Eurostat)
 const CONTAINER_SPECTRUM: [(f64, f64); 6] = [(0.08, 0.20), (0.16, 0.12), (0.30, 0.18), (0.42, 0.23), (0.52, 0.25), (0.66, 0.02)];
 
+/// 내장 현장 6곳 — 컨테이너 · 코일 · 프리캐스트 · 블록 현장은 화물 시나리오를 붙인다
 pub fn all() -> Vec<SitePreset> {
+    let mut v = base();
+    for p in v.iter_mut() {
+        let c = match p.id.as_str() {
+            "busan_newport_rmg" => Some("busan_transship"),
+            "gwangyang_coil_warehouse" => Some("steel_coil"),
+            "dangjin_precast_yard" => Some("precast_mix"),
+            "ulsan_shipyard_goliath" => Some("ship_blocks"),
+            _ => None,
+        };
+        p.cargo = c.map(|x| CargoRef::Preset(x.into()));
+    }
+    v
+}
+
+fn base() -> Vec<SitePreset> {
     vec![
         SitePreset {
             id: "busan_newport_rmg".into(),
@@ -45,8 +83,8 @@ pub fn all() -> Vec<SitePreset> {
                 days_per_week: 7,
                 break_min_per_shift: 30.0,
                 demand_cv: 0.3,
-                // 보정: 베이 안 이동 기술 능력 30 회/h (Konecranes EAS RTG) 에 맞춘 스프레더 착지 · 잠금 · 정렬 시간 (보정 전 20 s)
-                handling_overhead_s: 12.6,
+                // 보정: 베이 안 이동 기술 능력 30 회/h (Konecranes EAS RTG) 에 맞춘 스프레더 착지 · 잠금 · 정렬 시간 (보정 전 20 s, fieldcal 2026-10-20)
+                handling_overhead_s: 13.1,
                 travel_m: 60.0,
                 trolley_m: 15.0,
                 lift_m: 12.0,
@@ -61,7 +99,8 @@ pub fn all() -> Vec<SitePreset> {
                 overweight_share: 0.0,
                 note: "ISO 668 최대 총중량 30,480 kg (2016 개정 36,000 kg) < 정격 41 t — 정격 초과 들기 없음".into(),
             },
-            environment: env(false, "C5", "dusty", 25.0, 18.0, 0.45, 0.0, "good"),
+            // 야드 블록은 안벽 물가에서 약 250 m (가정), 신항은 부산 2.2 · 진해 0.9 mdd 사이 → 1.55, 남해안 감쇠 0.25
+            environment: with_coast(env(false, "C5", "dusty", 25.0, 18.0, 0.45, 0.0, "good"), 250.0, 180.0, "bay", None, Some((1.55, 0.25)), "busan_newport", "port_standard"),
             climate: ClimateRef::Preset("busan".into()),
             operations: OperationsProfile {
                 operator_experience: "standard".into(),
@@ -80,6 +119,7 @@ pub fn all() -> Vec<SitePreset> {
                 max_overtime_h: 0.0,
             },
             alerts: AlertPolicy::default(),
+            cargo: None,
             sources: vec![
                 "Kalmar RMG data sheet (SWL 41 t, U7/Q2/A7, 권상 M7)".into(),
                 "ABB Port Technology PT47 (2010): ASC 기술 능력의 70%, RTG 40% 미만 사용".into(),
@@ -120,7 +160,8 @@ pub fn all() -> Vec<SitePreset> {
                 overweight_share: 0.0,
                 note: "C-훅 무게는 크레인 훅 질량에 포함".into(),
             },
-            environment: env(true, "C3", "severe", 16.0, 18.0, 0.6, 6.0, "good"),
+            // 광양만 제철소 코일 창고 (실내), 물가에서 약 800 m (가정)
+            environment: with_coast(env(true, "C3", "severe", 16.0, 18.0, 0.6, 6.0, "good"), 800.0, 180.0, "bay", Some("gwangyang"), None, "gwangyang", "none"),
             climate: ClimateRef::Preset("yeosu".into()),
             operations: OperationsProfile {
                 operator_experience: "standard".into(),
@@ -139,6 +180,7 @@ pub fn all() -> Vec<SitePreset> {
                 max_overtime_h: 0.0,
             },
             alerts: AlertPolicy::default(),
+            cargo: None,
             sources: vec![
                 "Hoist magazine, Running the mill (2023): 하루 1,000 코일 · 크레인 3대 · 평균 28 t".into(),
                 "G Steel 코일 질량 · 치수표: 7.4–27.5 t".into(),
@@ -177,7 +219,8 @@ pub fn all() -> Vec<SitePreset> {
                 overweight_share: 0.001,
                 note: "리프팅 빔 1.5 t. 정격 초과 비율 0.1% 는 가정 (부재 무게 추정 오류)".into(),
             },
-            environment: env(false, "C3", "severe", 14.0, 18.0, 0.45, 0.0, "fair"),
+            // 당진 프리캐스트 야드, 아산만에서 약 1.5 km (가정)
+            environment: with_coast(env(false, "C3", "severe", 14.0, 18.0, 0.45, 0.0, "fair"), 1500.0, 280.0, "bay", Some("asan_bay"), None, "pyeongtaek_dangjin", "none"),
             climate: ClimateRef::Preset("seosan".into()),
             operations: OperationsProfile {
                 operator_experience: "standard".into(),
@@ -196,6 +239,7 @@ pub fn all() -> Vec<SitePreset> {
                 max_overtime_h: 2.0,
             },
             alerts: AlertPolicy::default(),
+            cargo: None,
             sources: vec![
                 "Hanson 중공 슬래브 하중-스팬 표, PCI Design Handbook 12DT30".into(),
                 "BFT International (2025) 40 t 갠트리, KHL (2013) 45 t 부족 → 70 t".into(),
@@ -233,7 +277,8 @@ pub fn all() -> Vec<SitePreset> {
                 overweight_share: 0.0,
                 note: "리프팅 빔 · 러그 20 t (가정). 블록 정면 15 × 15 m".into(),
             },
-            environment: env(false, "C4", "dusty", 95.0, 18.0, 0.45, 0.0, "good"),
+            // 울산 미포만 도크 가장자리 약 60 m (가정), 동해안 외해
+            environment: with_coast(env(false, "C4", "dusty", 95.0, 18.0, 0.45, 0.0, "good"), 60.0, 110.0, "open", Some("ulsan"), None, "ulsan_mipo", "port_standard"),
             climate: ClimateRef::Preset("ulsan".into()),
             operations: OperationsProfile {
                 operator_experience: "expert".into(),
@@ -252,6 +297,7 @@ pub fn all() -> Vec<SitePreset> {
                 max_overtime_h: 2.0,
             },
             alerts: AlertPolicy::default(),
+            cargo: None,
             sources: vec![
                 "Konecranes 조선소 크레인 기술 정보 (2024): 700–1,200 t 급 속도 · Q2-U3 (A3) · M5".into(),
                 "KHL (2017) Rosyth 1,000 t 골리앗: 항모 2척에 140회".into(),
@@ -290,7 +336,8 @@ pub fn all() -> Vec<SitePreset> {
                 overweight_share: 0.002,
                 note: "무게를 모르는 가공물 · 금형 — 정격 초과 비율 0.2% 는 가정".into(),
             },
-            environment: env(true, "C2", "normal", 8.0, 18.0, 0.45, 0.0, "good"),
+            // 창원 기계 공장 (실내), 마산만에서 약 1.2 km (가정)
+            environment: with_coast(env(true, "C2", "normal", 8.0, 18.0, 0.45, 0.0, "good"), 1200.0, 170.0, "bay", Some("masan"), None, "changwon_masan", "none"),
             climate: ClimateRef::Preset("busan".into()),
             operations: OperationsProfile {
                 operator_experience: "standard".into(),
@@ -309,6 +356,7 @@ pub fn all() -> Vec<SitePreset> {
                 max_overtime_h: 2.0,
             },
             alerts: AlertPolicy::default(),
+            cargo: None,
             sources: vec![
                 "CMAA 사용 등급 · 하중 계수 (Ace Industries / CMCO)".into(),
                 "Konecranes CXT 사양: 권상 5/0.8, 횡행 20/5, 주행 32/8 m/min".into(),
@@ -346,7 +394,8 @@ pub fn all() -> Vec<SitePreset> {
                 overweight_share: 0.002,
                 note: "강판 · 코일 · 묶음 화물. 정격 초과 비율 0.2% 는 가정".into(),
             },
-            environment: env(false, "C4", "dusty", 14.0, 18.0, 0.45, 0.0, "fair"),
+            // 인천 철강 야적장, 물가에서 약 400 m (가정), 서해 갯벌 해안
+            environment: with_coast(env(false, "C4", "dusty", 14.0, 18.0, 0.45, 0.0, "fair"), 400.0, 250.0, "tidal", Some("incheon"), None, "incheon_newport", "none"),
             climate: ClimateRef::Preset("incheon".into()),
             operations: OperationsProfile {
                 operator_experience: "standard".into(),
@@ -365,6 +414,7 @@ pub fn all() -> Vec<SitePreset> {
                 max_overtime_h: 2.0,
             },
             alerts: AlertPolicy::default(),
+            cargo: None,
             sources: vec![
                 "CMAA 사용 등급 D (Ace Industries / MHI)".into(),
                 "기상청 인천 112 평년값: 안개 47.5 · 눈 22.1 · 결빙 101.8 일/년".into(),

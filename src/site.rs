@@ -92,6 +92,21 @@ pub struct SiteEnvironment {
     /// 레일 · 주행로 상태: "good" · "fair" · "poor"
     #[serde(default = "default_rail")]
     pub rail_condition: String,
+    /// 해안 노출 (바다와의 거리 · 방위 · 해안 형태) — 있으면 염해 모델이 부식을 계산한다 (`marine`)
+    #[serde(default)]
+    pub coastal: Option<crate::marine::CoastalExposure>,
+    /// 염해 방지 조치 — 프리셋 이름 또는 전체 값 (없으면 "none")
+    #[serde(default)]
+    pub protection: Option<crate::marine::ProtectionRef>,
+}
+
+impl SiteEnvironment {
+    pub fn protection(&self) -> Result<crate::marine::MarineProtection, String> {
+        match &self.protection {
+            Some(p) => p.resolve(),
+            None => crate::marine::protection_preset("none").ok_or_else(|| "염해 방지 프리셋 none 이 없습니다".to_string()),
+        }
+    }
 }
 
 fn default_indoor_base() -> f64 {
@@ -208,6 +223,9 @@ pub struct SitePreset {
     /// 알림 문턱 (바람 · 낙뢰 · 시정 · 폭염 · 한파 · 부품 상태)
     #[serde(default)]
     pub alerts: AlertPolicy,
+    /// 화물 시나리오 (프리셋 이름 또는 전체 값) — 있으면 하중 분포 · 화물별 바람 제한 · 위험물 · 물동 패턴을 쓴다
+    #[serde(default)]
+    pub cargo: Option<crate::cargo::CargoRef>,
     #[serde(default)]
     pub sources: Vec<String>,
 }
@@ -264,11 +282,31 @@ impl SitePreset {
         if dust_index(&self.environment.dust).is_none() {
             return Err(format!("분진 범주 '{}' 를 모릅니다 (clean · normal · dusty · severe)", self.environment.dust));
         }
+        if let Some(c) = &self.environment.coastal {
+            c.validate()?;
+        }
+        if let Some(c) = &self.cargo {
+            c.resolve()?.validate()?;
+        }
+        self.environment.protection()?.validate()?;
         let lift_room = spec.structure.rope_max_m - spec.structure.rope_min_m;
         if t.lift_m > lift_room + 1e-9 {
             return Err(format!("권상 행정 {} m 가 로프 범위 {:.1} m 보다 깁니다", t.lift_m, lift_room));
         }
         Ok(())
+    }
+
+    /// 화물 시나리오가 있으면 하중 분포 · 정격 초과 비율을 화물에서 다시 만든 사본 (없으면 그대로)
+    pub fn effective(&self) -> Result<SitePreset, String> {
+        let mut p = self.clone();
+        if let Some(c) = &self.cargo {
+            let s = c.resolve()?;
+            let rated = self.crane.resolve()?.structure.rated_load_kg;
+            p.loads.spectrum = s.spectrum(rated)?;
+            p.loads.overweight_share = s.overweight_share(rated)?;
+            p.loads.note = format!("화물 시나리오 '{}' 에서 만든 하중 분포", s.name);
+        }
+        Ok(p)
     }
 
     pub fn spec(&self) -> Result<CraneSpec, String> {

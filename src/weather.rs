@@ -17,6 +17,12 @@ use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
 pub const DAYS_IN_MONTH: [u32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+/// 비 오는 날의 일교차 배수 — 구름 · 증발 냉각이 일교차를 25–50 % 줄인다 (Dai, Trenberth & Karl 1999, J. Climate 12).
+/// 월평균 일교차는 평년값과 같도록 맑은 날을 그만큼 키운다
+pub const WET_DAY_DTR: f64 = 0.6;
+/// 비가 내리는 시간 · 안개 시간의 상대습도 하한 (%) — 강수 중 공기는 거의 포화 (가정: 층운형 비 90–98 %), 안개는 97 % 이상
+pub const RAIN_RH: f64 = 94.0;
+pub const FOG_RH: f64 = 97.0;
 
 /// 연중 날짜(0 = 1월 1일, 평년) → 월(0–11)
 pub fn month_of(doy: u32) -> usize {
@@ -151,6 +157,9 @@ pub struct Climate {
     /// 강수 없는 추운 날(일평균 2 °C 이하)에 눈발이 날릴 확률 — 기상청 눈 일수는 강수량이 없는 눈도 센다
     #[serde(default)]
     pub snow_flurry_prob: f64,
+    /// 하루 평균 상대습도 이상치 표준편차 (%) — 젖음 시간(RH > 80 %)을 정한다. fieldcal 이 ERA5 시간 자료에 맞춘다
+    #[serde(default = "default_rh_sd")]
+    pub rh_daily_sd: f64,
     #[serde(default)]
     pub typhoon: Option<TyphoonClimate>,
     /// 월별 바람장미: 12달 × 8방위(북 · 북동 · … · 북서, 바람이 불어오는 쪽) 빈도. 비어 있으면 풍향을 고르게 뽑는다
@@ -176,6 +185,21 @@ fn default_temp_sd() -> f64 {
 fn default_temp_sd_winter() -> f64 {
     3.5
 }
+fn default_rh_sd() -> f64 {
+    4.0
+}
+
+/// 이슬점 (Magnus, Alduchov & Eskridge 1996 계수 17.625 · 243.04 °C)
+pub fn dew_point(t: f64, rh: f64) -> f64 {
+    let g = (rh.clamp(1.0, 100.0) / 100.0).ln() + 17.625 * t / (243.04 + t);
+    243.04 * g / (17.625 - g)
+}
+
+/// 기온 · 이슬점 → 상대습도 (%)
+pub fn rel_humidity(t: f64, td: f64) -> f64 {
+    100.0 * ((17.625 * td / (243.04 + td)) - (17.625 * t / (243.04 + t))).exp()
+}
+
 fn default_snow_temp() -> f64 {
     1.5
 }
@@ -424,14 +448,21 @@ pub fn generate(c: &Climate, o: &WeatherOptions) -> Vec<HourWeather> {
         let (th_start, th_len) = (12 + (rng.uniform() * 8.0) as usize, 1 + (rng.uniform() * 3.0) as usize);
         let fog = rng.chance(mc.fog_days / dim);
         let (fog_start, fog_len) = (2 + (rng.uniform() * 4.0) as usize, 2 + (rng.uniform() * 5.0) as usize);
-        let rh_day = (mc.humidity_pct + if wet { 12.0 } else { 0.0 } + 4.0 * rng.normal()).clamp(15.0, 100.0);
+        // 비 오는 날 +12 % (가정) 를 넣되 월평균이 평년값과 같도록 맑은 날에서 그만큼 뺀다
+        let wet_bias = 12.0 * (mc.rain_days / dim).clamp(0.0, 1.0);
+        let rh_day = (mc.humidity_pct - wet_bias + if wet { 12.0 } else { 0.0 } + c.rh_daily_sd * rng.normal()).clamp(15.0, 99.0);
+        // 하루 이슬점은 그대로, 시간 습도는 기온을 따라 Magnus 식으로 (낮에 낮고 새벽에 높다)
+        let td_day = dew_point(t_mean, rh_day);
+        // 일교차: 비 오는 날은 작게, 맑은 날은 월평균이 맞도록 크게 (비 내리는 시간은 더 평평하게)
+        let dtr_norm = 1.0 / (1.0 - (1.0 - WET_DAY_DTR) * p_wet.min(0.95));
+        let day_r = if wet { WET_DAY_DTR * dtr_norm } else { dtr_norm };
         for h in 0..24usize {
             let idx = d as usize * 24 + h;
             let hr = h as f64;
             let in_rain = wet && h >= rain_start && h < rain_start + rain_len;
-            let r = if in_rain { 0.5 } else { 1.0 };
+            let r = if in_rain { 0.5 * dtr_norm } else { day_r };
             let temp = t_mean + 0.5 * range * r * (2.0 * PI * (hr - 15.0) / 24.0).cos();
-            let rh = (rh_day - 2.0 * (temp - t_mean)).clamp(10.0, 100.0);
+            let rh_dew = rel_humidity(temp, td_day).clamp(10.0, 100.0);
             // 시간 바람
             x_h = 0.7 * x_h + (1.0f64 - 0.49).sqrt() * rng.normal();
             let sd = c.hourly_wind_sd.max(0.0);
@@ -464,6 +495,8 @@ pub fn generate(c: &Climate, o: &WeatherOptions) -> Vec<HourWeather> {
                 last_wet_h = Some(idx);
             }
             let fog_now = fog && h >= fog_start && h < fog_start + fog_len && rain < 1.0;
+            // 비 · 안개 중에는 거의 포화 (난수를 더 뽑지 않는다)
+            let rh = if fog_now { rh_dew.max(FOG_RH) } else if rain > 0.0 { rh_dew.max(RAIN_RH) } else { rh_dew };
             let mut vis: f64 = 20_000.0;
             if rain > 0.0 {
                 vis = if snow { 600.0 + 1500.0 * rng.uniform() } else if rain > 10.0 { 1200.0 } else { 4000.0 + 4000.0 * rng.uniform() };
@@ -666,6 +699,7 @@ mod tests {
             snow_flurry_prob: 0.0,
             typhoon: None,
             wind_rose: Vec::new(),
+            rh_daily_sd: 4.0,
         }
     }
 

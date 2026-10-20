@@ -1,4 +1,4 @@
-# 실데이터 소스 (2026-10-19 조사)
+# 실데이터 소스 (2026-10-19 조사, 10-20 보강)
 
 물리 엔진 모듈별로 보정 · 검증에 쓸 논문, 공개 데이터셋, 현장 데이터, 표준 · 카탈로그를 모은 목록이다.
 모든 항목은 조사 중에 페이지를 직접 열어 확인했다. 수치는 각 출처에 적힌 값이다.
@@ -132,9 +132,68 @@ Feyrer 식의 항 배치는 OCR 이 깨진 갱신 자료에서 재구성한 것�
 | [Korea JoongAng Daily (매미)](https://www.koreajoongangdaily.com/business/shoddy-work-suspected-in-fallen-port-cranes/11210735) | 부산 크레인 8대 전도 · 3대 손상, 설계 약 50 m/s | 폭풍 일주 사례 |
 | [위험성평가 지침](https://www.law.go.kr/LSW/admRulInfoP.do?admRulSeq=2100000251014) | 위험성 3단계 판단법 | 위험 지수 단계 |
 
-확인하지 못한 것: 국내 크레인 등록 대수 · 운전 시간(노출), 2013년 이후 국내 크레인 종류별 사망 통계, 항만 크레인 가용률 · MTBF,
-부산항 크레인별 생산성, KDS 지역별 기본 풍속, ISO 9224 지수 표, 크레인 시정 중지 기준, 해양 환경의 로프 수명 감소 정량값.
-조사 중 웹 검색 한도에 닿아 더 찾지 못했다.
+확인하지 못한 것: 국내 크레인 등록 대수 · 운전 시간(노출), 2013년 이후 국내 크레인 종류별 사망 통계, 부산항 크레인별 생산성,
+크레인 시정 중지 기준, 해양 환경의 로프 수명 감소 정량값. 조사 중 웹 검색 한도에 닿아 더 찾지 못했다.
+(KDS 지역별 기본 풍속, ISO 9224 지수, 항만 크레인 가용률 · 고장 빈도는 1.6단계 조사에서 찾았다 — 3-2 절.)
+
+## 3-2. 염해 · 화물 · 시계열 예측 · 날씨 API (2026-10-20 1.6단계 조사)
+
+전체 목록(값 · 인용 · 신뢰도 · 확인 못 한 것)은 [research/stage2](research/stage2/README.md) 의 R1–R5 메모에 있고, 쓰인 곳과 오차는
+[marine-and-prognostics.md](marine-and-prognostics.md) · [site-operation.md 7절](site-operation.md#7-실데이터-대조--보정-결과-srcfieldcalrs).
+아래는 모델 값에 직접 들어간 것만 추렸다.
+
+### 날씨 API · 기후
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| [Open-Meteo 보관 API](https://open-meteo.com/en/docs/historical-weather-api) · [대기질 API (CAMS)](https://open-meteo.com/en/docs/air-quality-api) · [해양 API](https://open-meteo.com/en/docs/marine-weather-api) (CC BY 4.0, 키 없음) | ERA5 / ERA5-Land 시간별 기온 · 이슬점 · 습도 · 바람 · 돌풍 · 강수 · 눈, SO₂, 파고 | `weather_api` · `data/climate/ports.json` |
+| 기상청 평년값 · 일수 · 순위값 (3-1 절) | 6개 지점 1991–2020 | ERA5 교차검증 (`era5cal`) |
+| Alduchov & Eskridge 1996 (J. Appl. Meteor. 35) | Magnus 계수 17.625 · 243.04 °C | 시간 습도 · 이슬점 |
+| Dai, Trenberth & Karl 1999 (J. Climate 12) | 구름 · 강수가 일교차를 25–50 % 줄임 | 비 오는 날 일교차 0.6 배 (가정 범위 안) |
+
+### 염해 · 부식
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| ISO 9223:2012 용량–반응식 ([Paterlini 2024 표 1](https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11679332/fullTextXML) · [Tidblad ISO WG4](https://www.rrcap.ait.ac.th/male/Meeting%20Document/14%20JT%20Classification.pdf)) | 탄소강 · 아연 식, 범주 C1–CX, S · P · τ 등급 | `marine::drf_*` |
+| [ISO 9224:2012 미리보기](https://cdn.standards.iteh.ai/samples/53500/48d0ad5886f74a05a0d0faf4a71da09e/ISO-9224-2012.pdf) | b 탄소강 0.523 · 아연 0.813, 20년 뒤 직선 | 장기 손실 |
+| [Alcántara et al. 2017](https://www.mdpi.com/1996-1944/10/4/406) | 해안 장기 지수 평균 0.73 (0.37–0.98), 바다 바람 3 m/s 문턱 | 고염분 b · 바다 바람 가중 |
+| 이종석 외 2004 ([KCI 학술대회](https://www.koreascience.or.kr/article/CFKO200411722756623.page)) · 2006 ([PDF](https://koreascience.kr/article/CFKO200625522717202.pdf)) | 국내 6개 지점 거리 감쇠 b, 27개 해안 100 m 비래염분 (mdd) | `KR_DECAY` · `KR_SALT_100M` |
+| [Li 2011 영종대교](https://koreascience.kr/article/JAKO201121161903206.pdf) | 상자 거더 안 · 밖 염화물 · SO₂ · 젖음 → 밀폐면 1/75 | 밀폐면 배수 |
+| [Yan et al. 2020 (NIMS)](https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7435615/fullTextXML) | 초시 · 미야코지마 노출 · 차폐 첫해 부식 | 차폐 배수 보정 · 벤치마크 |
+| [Chico et al. 2017 (ISOCORRAG · ICP · MICAT)](https://www.ebi.ac.uk/europepmc/webservices/rest/PMC5553418/fullTextXML) · [Chen et al. 2026 (동중국해)](https://www.ebi.ac.uk/europepmc/webservices/rest/PMC13027690/fullTextXML) · Vera 2023 (라파누이) · Paterlini 2024 (보나솔라) | 실측 첫해 부식 속도 · 환경 | 부식 벤치마크 12곳 |
+| [PennDOT 교량 세척 (FHWA-PA-2013-007)](https://www.pa.gov/content/dam/copapwp-pagov/en/penndot/documents/research-planning-innovation/research-projects/evaluation%20of%20bridge%20cleaning%20methods%20on%20steel%20structures%20-%20final%20report.pdf) | 담수 세척 염 제거 40–93 % | 세척 효율 0.75 |
+| ISO 12944 ([Hempel 안내](https://www.hempel.com/fi-fi/-/media/Files/Local/EU-condensed/Brochures/FI/ISO-Booklet-FI.pdf) · [Cloverdale 계통표](https://www.cloverdalepaint.com/docs/default-source/industrial/cloverdale-paint-iso12944-2017-systems-guide-forc4-c5-and-cx-extreme-2021.pdf)) | 내구성 L · M · H · VH, C4 · C5 · CX 계통 | 도장 수명 · 방지 프리셋 |
+| [GAA 첫 보수까지 수명표](https://gaa.com.au/wp-content/uploads/2026/08/Life-to-First-Maintenance-Chart-Australia-v2.pdf) · [AGA 이중 계통](https://www.galvanizeit.org/duplex-systems-gi-seminar/why-duplex/synergistic-effect/) | 85 µm C5 10–20년, 이중 계통 배수 1.5–2.3 | 통로 아연 · 이중 계통 · 벤치마크 |
+| ISA-71.04-2013 ([LBNL 요약](https://datacenters.lbl.gov/sites/default/files/Combination%20Corrosion%20Coupon%20Testing%20Needed%20for%20Today's%20Control%20Equipment.pdf)) · IEEE 43 ([요약](https://wiki.testguy.net/t/field-testing-of-motors/249)) | G1–GX 반응 두께, 습도 규칙 · 절연저항 최소 5 MΩ | 전장 · 모터 |
+| Cantley 1977 (ASLE Trans. 20) — R2 6a | 베어링 수명 (100/ppm)^0.6, 25–400 ppm | 감속기 수분 |
+
+### 화물
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| [Interpave Heavy Duty Pavements](https://paving.org.uk/download/heavy-duty-pavements) · Hapag-Lloyd 컨테이너 사양 (R3 1c) | 적재 무게 분포, 자체 무게 2.3 · 3.9 t | 컨테이너 무게 · 빈 컨테이너 |
+| [VICT Webb Dock VGM (FTA)](https://ftalliance.com.au/newsdetails/11919) | 수출 530개 중 ±1 t 넘게 다름 8.5 % | 신고 오차 · 재확인 벤치마크 |
+| [KOSHA A-G-18-2026](https://portal.kosha.or.kr/openapi/v1/file/down/CTC2026012909544827454054/1) | 시험 인양 20 cm, 특수 20–30 cm, 위험물 직반출, 20 m/s 중지 | 시험 인양 · 위험물 |
+| [Liebherr 강풍 지침](https://www.liebherr.com/en-at/mobile-and-crawler-cranes/customer-magazine/my-tip/safe-to-use-in-high-winds-5924163) (EN 13000 비례식) | 허용 풍속 ∝ √(1.2 / (A·c_D/m)) | 화물별 허용 풍속 |
+
+### 통계 · 설계
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| KDS 41 12 00:2019 ([국가건설기준센터](https://www.kcsc.re.kr)) — R4 | 지역 기본풍속 (부산 38 · 포항 36 · 울산 · 여수 · 서산 34 · 인천 28 m/s) | 폭풍 설계 확인 |
+| [Jo & Kim 2020 (JMSE 8, 6)](https://mdpi-res.com/d_attachment/jmse/jmse-08-00006/article_deploy/jmse-08-00006.pdf) | 부산 HKT 안벽 크레인 14기 가용률 95.0 %, 46 고장/년 · MTTR 0.40 h | 가용률 확인 |
+
+### 시계열 열화 · 점수
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| [van Noortwijk 2009](https://repub.eur.nl/pub/7974) | 감마 과정 열화 모형 | 참 상태 |
+| [Gneiting & Raftery 2007](https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf) | CRPS · 구간 점수 · 적정 점수 규칙 | `scoring` |
+| [Saxena et al. 2008 (NASA)](https://ntrs.nasa.gov/api/citations/20100039169/downloads/20100039169.pdf) | α–λ 정확도 · 예측 지평 | `scoring` |
+| Kuleshov, Fenner & Ermon 2018 (ICML, PMLR 80) | PIT 재보정 F' = G∘F | v4 |
+| Brier 1950 · Murphy 1973 (R5) | Brier 점수 · 분해 | 30일 고장 확률 |
+| ISO 4309 · ISO 10816/20816 · ISO 4628-3 (R2 · R5) | 로프 폐기 단선 수 · 진동 구역 · 녹 면적 Ri | 관측 지표 |
 
 ## 4. 우선 확보 순서
 

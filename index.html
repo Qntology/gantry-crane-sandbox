@@ -97,6 +97,13 @@ label.chk input { width: auto; }
 .dopt .d { color: var(--text-dim); font-size: 12px; }
 .dopt.off { opacity: .55; cursor: not-allowed; }
 .dopt.off .n { color: var(--danger); }
+.dopt .n { grid-row: span 3; }
+.dopt .o { color: var(--text-muted); font-size: 11px; }
+.stance { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 11px; font-weight: 600; margin-left: 6px; vertical-align: 1px; }
+.stance-safe { background: #1d3a28; color: var(--success); } .stance-proceed { background: #1d2b3a; color: var(--accent); }
+.stance-danger { background: #45241f; color: #ff9b7a; } .stance-stop { background: #2a2f37; color: var(--text-dim); border: 1px solid var(--line); }
+.inl { display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
+.inl input { width: 70px; } .inl input[type=checkbox] { width: auto; }
 #toasts { position: fixed; right: 14px; bottom: 14px; display: grid; gap: 6px; z-index: 60; width: min(420px, calc(100vw - 28px)); }
 .toast { background: var(--bg-panel); border: 1px solid var(--line); border-left: 4px solid var(--warning); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
 .toast.danger, .toast.stop { border-left-color: var(--danger); }
@@ -160,6 +167,17 @@ label.chk input { width: auto; }
       <label>분진 (ISO 281) <select id="e_dust"><option value="clean">깨끗</option><option value="normal">보통</option><option value="dusty">오염</option><option value="severe">심한 오염</option></select></label>
       <label>열원 가산 (K) <input id="e_heat" type="number" step="1"></label>
       <label>레일 상태 <select id="e_rail"><option value="good">양호</option><option value="fair">보통</option><option value="poor">나쁨</option></select></label>
+      <h3>해안 · 염해 · 화물</h3>
+      <label>크레인 평균 높이 (m) <input id="e_height" type="number" step="1"></label>
+      <label class="chk">해안 노출 계산 (염해) <input id="e_coast_on" type="checkbox"></label>
+      <label>바다까지 거리 (m) <input id="e_coast_dist" type="number" step="10"></label>
+      <label>바다 방위 (°, 북 0) <input id="e_coast_bearing" type="number" step="5"></label>
+      <label>해안 형태 <select id="e_coast_type"><option value="harbor">항만 (방파제 안)</option><option value="bay">만</option><option value="open">외해 (쇄파)</option><option value="tidal">갯벌 · 조간대</option><option value="strait">해협</option><option value="river">하구 · 강</option></select></label>
+      <label>비래염분 지역 (국내 실측) <select id="e_salt_area"></select></label>
+      <label>실측 염화물 (mg/m²·d) <input id="e_cl" type="number" step="5" placeholder="모르면 비움"></label>
+      <label>염해 방지 프리셋 <select id="e_prot"></select></label>
+      <label>화물 시나리오 <select id="e_cargo"></select></label>
+      <div class="note" id="e_cargo_note"></div>
       <h3>운영 · 사람 · 정비</h3>
       <label>운전원 숙련 <select id="e_oper"><option value="novice">초보</option><option value="standard">보통</option><option value="expert">숙련</option></select></label>
       <label class="chk">지상 작업자 (줄걸이 · 신호) <input id="e_ground" type="checkbox"></label>
@@ -192,7 +210,7 @@ label.chk input { width: auto; }
   </fieldset>
   <fieldset>
     <legend>결과 파일 열기</legend>
-    <div id="drop">crane_demo 가 저장한<br><b>pipeline.json</b> · compare.json<br><b>operation.json</b> · fieldcal.json<br>을 끌어다 놓거나 고르세요<br><input type="file" id="file" accept=".json" multiple style="margin-top:8px"></div>
+    <div id="drop">crane_demo 가 저장한<br><b>pipeline.json</b> · compare.json<br><b>operation.json</b> · fieldcal.json<br>prognostics.json<br>을 끌어다 놓거나 고르세요<br><input type="file" id="file" accept=".json" multiple style="margin-top:8px"></div>
   </fieldset>
   <fieldset>
     <legend>내보내기</legend>
@@ -226,6 +244,7 @@ label.chk input { width: auto; }
       <button data-t="compare">방식 비교</button>
       <button data-t="xcheck">교차검증</button>
       <button data-t="op">현장 운영 · 내구도</button>
+      <button data-t="marine">염해 · 예측 점수</button>
       <button data-t="cal">실데이터 보정</button>
     </div>
     <div class="tab on" id="t-sway">
@@ -255,25 +274,51 @@ label.chk input { width: auto; }
     <div class="tab" id="t-op">
       <div id="opHead" class="note">현장 운영을 실행하거나 operation.json 을 여세요.</div>
       <div class="kpis" id="opKpis"></div>
+      <div id="opMarine" class="note" style="margin-top:8px"></div>
       <div class="charts" style="margin-top:12px">
         <div><canvas id="cOpMoves"></canvas><div class="legend" id="lOpMoves"></div></div>
         <div><canvas id="cOpWx"></canvas><div class="legend" id="lOpWx"></div></div>
         <div><canvas id="cOpRisk"></canvas><div class="legend" id="lOpRisk"></div></div>
         <div><canvas id="cOpLife"></canvas><div class="legend" id="lOpLife"></div></div>
+        <div id="opSaltBox"><canvas id="cOpSalt"></canvas><div class="legend" id="lOpSalt"></div></div>
       </div>
       <h2 style="margin-top:12px">부품 내구도 · 안정성 <span class="muted" id="opLedger"></span></h2>
       <table id="opHealth"></table>
       <div class="split">
-        <div><h2>사고 예방 알림 <select id="alertFilter" style="width:auto;margin-left:6px"><option value="1">주의 이상</option><option value="2">경고 이상</option><option value="0">전체</option></select></h2><div id="opAlerts" class="feed"></div></div>
+        <div><h2>사고 예방 알림 <select id="alertFilter" style="width:auto;margin-left:6px"><option value="1">주의 이상</option><option value="2">경고 이상</option><option value="0">전체</option></select> <select id="alertProc" style="width:auto"><option value="">모든 절차</option></select></h2><div id="opAlerts" class="feed"></div></div>
         <div><h2>결정 기록</h2><div id="opDecisions" class="feed"></div></div>
       </div>
       <h2 style="margin-top:12px">사고 · 정지 사유</h2>
       <div id="opIncidents" class="note"></div>
     </div>
+    <div class="tab" id="t-marine">
+      <div class="btnrow"><button id="mrRun">염해 진행 계산 (선택한 현장 · 방지 프리셋 비교)</button><span class="inl">기간 <input id="mrYears" type="number" value="10" min="1" max="40"> 년</span><span class="inl"><input id="mrMaint" type="checkbox" checked> 도장 점검 · 보수 포함</span></div>
+      <div id="mrSum" class="note" style="margin-top:8px">현장 프리셋의 해안 노출(거리 · 방위 · 해안 형태 · 비래염분 지역)과 염해 방지 프리셋으로 ISO 9223 부식 속도 · 도장 열화 · 녹 면적을 해마다 진행합니다. 프리셋 편집 값(저장 전)도 그대로 씁니다.</div>
+      <table id="mrTable" style="margin-top:8px"></table>
+      <div class="charts" style="margin-top:12px">
+        <div><canvas id="cMrCoat"></canvas><div class="legend" id="lMrCoat"></div></div>
+        <div><canvas id="cMrLoss"></canvas><div class="legend" id="lMrLoss"></div></div>
+      </div>
+      <h2 style="margin-top:16px">부품 상태 예측 점수 — 시계열 열화 · 현장 하나 빼기 교차검증</h2>
+      <div class="btnrow"><button id="pgRun">다시 계산 (3개 현장 · 3년 · 복제 4 · 몇 분)</button></div>
+      <div id="pgSum" class="note" style="margin-top:8px">저장된 점수(crane_demo prognostics)를 불러오는 중…</div>
+      <table id="pgTable" style="margin-top:8px"></table>
+      <div class="charts" style="margin-top:12px">
+        <div><canvas id="cPgPit"></canvas><div class="legend" id="lPgPit"></div></div>
+        <div><canvas id="cPgRel"></canvas><div class="legend" id="lPgRel"></div></div>
+        <div><canvas id="cPgHealth"></canvas><div class="legend" id="lPgHealth"></div></div>
+      </div>
+      <div class="split">
+        <div><h2>현장 하나 빼기 (v3 · v4)</h2><table id="pgFolds"></table></div>
+        <div><h2>부품 종류별 (마지막 판)</h2><table id="pgKinds"></table></div>
+      </div>
+    </div>
     <div class="tab" id="t-cal">
       <div class="btnrow"><button id="calQuick">빠른 확인 (짧은 표본 · 오차 큼)</button><button id="calFull">전체 보정 다시 계산 (몇 분)</button></div>
       <div id="calSum" class="note" style="margin-top:8px">조사한 실데이터(기상청 · 제조사 · 현장 사례 · 법규)와 모델 출력의 오차입니다. crane_demo fieldcal 결과(fieldcal.json)도 열 수 있습니다.</div>
       <table id="calTable" style="margin-top:8px"></table>
+      <h2 style="margin-top:14px">ERA5 재분석 → 기상청 관측 보정 <span class="muted">(지점 6곳, 지점 하나 빼기 교차검증 — 항만 기후에 쓰는 계수)</span></h2>
+      <table id="calEra5"></table>
     </div>
   </section>
 </main>
@@ -528,8 +573,8 @@ function renderAll() {
   play.t = 0; play.on = false; $('playBtn').textContent = '재생'; drawScene();
   if (REPORT.models) $('mstatus').textContent = (REPORT.models.notes || []).join(' · ') || $('mstatus').textContent;
 }
-$('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 't-' + b.dataset.t)); if (REPORT) { renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP && b.dataset.t === 'op') renderOp(); };
-window.addEventListener('resize', () => { if (REPORT) { drawScene(); renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP) renderOp(); });
+$('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 't-' + b.dataset.t)); if (REPORT) { renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP && b.dataset.t === 'op') renderOp(); if (b.dataset.t === 'marine') { renderMarine(); renderProg(); } };
+window.addEventListener('resize', () => { if (REPORT) { drawScene(); renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP) renderOp(); renderMarine(); renderProg(); });
 
 // ---------- 실행 · 파일 ----------
 async function buildScenario() {
@@ -561,6 +606,8 @@ async function openFiles(files) {
       if (Array.isArray(j) && j.length && 'max_residual_sway_mm' in j[0]) { COMPARE = j; renderCompare(); }
       else if (j.kpi && j.ledger && j.daily) { OP = j; renderOp(); document.querySelector('#tabs button[data-t=op]').click(); setStatus(`불러옴: ${j.site_name}`); }
       else if (j.benchmarks && j.fitted) { CAL = j; renderCal(); document.querySelector('#tabs button[data-t=cal]').click(); setStatus('불러옴: 실데이터 보정'); }
+      else if (j.overall && j.folds && j.by_kind) { PG = j; document.querySelector('#tabs button[data-t=marine]').click(); setStatus('불러옴: 예측 점수'); }
+      else if (Array.isArray(j) && j.length && j[0].protection && j[0].rows) { MR = j; document.querySelector('#tabs button[data-t=marine]').click(); setStatus('불러옴: 염해 진행'); }
       else if (j.cycle && j.decision) { REPORT = j; renderAll(); }
       else if (j.samples && j.moves) { setStatus(`${f.name}: cycle.json 에는 크레인 제원이 없어 그릴 수 없습니다. crane_demo pipeline 이 저장한 pipeline.json 을 여세요`); }
       else setStatus(`${f.name}: 알 수 없는 형식`);
@@ -587,6 +634,10 @@ $('exJson').onclick = () => REPORT && download('pipeline.json', JSON.stringify(R
 
 // ---------- 현장 운영 · 내구도 ----------
 let SITES = [], SITE = null, OP = null, CAL = null, CRANES = [], CLIMATES = [], AUTO = false, SHOWN_ALERTS = 0;
+let PROTS = [], SALT_AREAS = [], CARGOS = [], MR = null, PG = null;
+const STANCE = { safe: '안전', proceed: '진행', danger: '위험', stop: '중단' };
+const REGION = { east: '동해', west: '서해', south: '남해' };
+const stanceBadge = s => s && STANCE[s] ? `<span class="stance stance-${s}">${STANCE[s]}</span>` : '';
 const LV = { info: ['안내', 0], caution: ['주의', 1], warning: ['경고', 2], danger: ['위험', 3], stop: ['작업 중지', 4] };
 const ST = { good: '양호', watch: '관찰', plan: '정비 계획', replace: '교체 필요', overdue: '기준 초과' };
 const lvRank = l => (LV[l] || ['', 0])[1];
@@ -624,6 +675,16 @@ function fillEditor() {
   $('e_dpw').value = t.days_per_week; $('e_handling').value = t.handling_overhead_s; $('e_geom').value = `${t.travel_m}, ${t.trolley_m}, ${t.lift_m}`;
   $('e_spec').value = spectrumText(l.spectrum); $('e_crit').value = l.critical_fraction; $('e_over').value = l.overweight_share;
   $('e_indoor').checked = e.indoor; $('e_corr').value = e.corrosivity; $('e_dust').value = e.dust; $('e_heat').value = e.heat_source_c; $('e_rail').value = e.rail_condition;
+  const ce = e.coastal;
+  $('e_height').value = e.crane_height_m; $('e_coast_on').checked = !!ce;
+  $('e_coast_dist').value = ce ? ce.distance_to_sea_m : 300; $('e_coast_bearing').value = ce ? ce.sea_bearing_deg : 180; $('e_coast_type').value = ce ? ce.coast_type : 'harbor';
+  fillSelect($('e_salt_area'), [['', ce && ce.salt_100m_mdd != null ? `프리셋 직접 값 (100 m ${ce.salt_100m_mdd} mdd)` : '해안 형태 기본값 (가정)'], ...SALT_AREAS.map(a => [a.id, `${a.id} · ${REGION[a.region] || a.region} · 100 m ${a.mdd_100m} mdd`])], (ce && ce.salt_area) || '');
+  $('e_cl').value = ce && ce.chloride_mg_m2_d != null ? ce.chloride_mg_m2_d : '';
+  const pr = e.protection, prId = pr == null ? 'none' : typeof pr === 'string' ? pr : pr.id;
+  fillSelect($('e_prot'), PROTS.map(x => [x.id, x.name]).concat(pr && typeof pr === 'object' && !PROTS.some(x => x.id === pr.id) ? [[pr.id, `${pr.name || pr.id} (직접 값)`]] : []), prId);
+  const cg = p.cargo, cgId = cg == null ? '' : typeof cg === 'string' ? cg : cg.id;
+  fillSelect($('e_cargo'), [['', '없음 (아래 하중 스펙트럼 그대로)'], ...CARGOS.map(x => [x.id, x.name])].concat(cg && typeof cg === 'object' && !CARGOS.some(x => x.id === cg.id) ? [[cg.id, `${cg.name || cg.id} (직접 값)`]] : []), cgId);
+  cargoNote();
   $('e_oper').value = o.operator_experience; $('e_ground').checked = o.ground_crew; $('e_cab').checked = o.cab_air_conditioned; $('e_signal').checked = o.signalman;
   $('e_excl').checked = o.exclusion_zone; $('e_maint').value = o.maintenance_quality; $('e_periodic').value = o.periodic_inspection_days; $('e_lux').value = o.lighting_lux;
   $('siteDel').disabled = SITES.find(s => s.id === p.id)?.builtin !== false;
@@ -638,11 +699,28 @@ function readEditor() {
   if (g.length !== 3 || g.some(v => !isFinite(v))) throw '주행 · 횡행 · 권상 거리는 "60, 15, 12" 꼴입니다';
   [p.throughput.travel_m, p.throughput.trolley_m, p.throughput.lift_m] = g;
   p.loads.spectrum = parseSpectrum($('e_spec').value); p.loads.critical_fraction = num('e_crit'); p.loads.overweight_share = num('e_over');
-  Object.assign(p.environment, { indoor: $('e_indoor').checked, corrosivity: $('e_corr').value, dust: $('e_dust').value, heat_source_c: num('e_heat'), rail_condition: $('e_rail').value });
+  Object.assign(p.environment, { indoor: $('e_indoor').checked, corrosivity: $('e_corr').value, dust: $('e_dust').value, heat_source_c: num('e_heat'), rail_condition: $('e_rail').value, crane_height_m: num('e_height') });
+  if ($('e_coast_on').checked) {
+    const cl = $('e_cl').value.trim();
+    if (cl !== '' && !(isFinite(Number(cl)) && Number(cl) >= 0)) throw '실측 염화물은 0 이상 숫자이거나 비워 두세요';
+    p.environment.coastal = Object.assign({}, SITE.environment.coastal || {}, { distance_to_sea_m: num('e_coast_dist'), sea_bearing_deg: num('e_coast_bearing'), coast_type: $('e_coast_type').value, salt_area: $('e_salt_area').value || null, chloride_mg_m2_d: cl === '' ? null : Number(cl) });
+  } else p.environment.coastal = null;
+  // 직접 값(객체)으로 들어 있던 방지 · 화물은 같은 id 를 고르면 그대로 둔다
+  const keep = (old, id) => (old && typeof old === 'object' && old.id === id) ? old : id;
+  p.environment.protection = keep(SITE.environment.protection, $('e_prot').value);
+  p.cargo = $('e_cargo').value ? keep(SITE.cargo, $('e_cargo').value) : null;
   Object.assign(p.operations, { operator_experience: $('e_oper').value, ground_crew: $('e_ground').checked, cab_air_conditioned: $('e_cab').checked, signalman: $('e_signal').checked, exclusion_zone: $('e_excl').checked, maintenance_quality: $('e_maint').value, periodic_inspection_days: num('e_periodic'), lighting_lux: num('e_lux') });
   return p;
 }
 
+function cargoNote() {
+  const s = CARGOS.find(x => x.id === $('e_cargo').value);
+  const tname = id => (window.CARGO_TYPES || []).find(t => t.id === id)?.name || id;
+  $('e_cargo_note').innerHTML = s ? `${esc(s.description || '')}<br>구성: ${s.mix.map(([id, f]) => `${esc(tname(id))} ${fmt(f * 100, 0)}%`).join(' · ')}<br><span class="muted">화물 시나리오가 있으면 하중 스펙트럼 · 정격 초과 비율은 화물 무게 분포에서 정하고, 바람 허용 · 시험 인양 · 위험물 직반출을 화물마다 적용합니다.</span>` : '';
+  const prot = PROTS.find(x => x.id === $('e_prot').value);
+  if (prot) $('e_cargo_note').innerHTML += `<div class="muted" style="margin-top:4px">방지: ${esc(prot.name)} — 도장 ${esc(prot.coating_category)}-${esc(prot.coating_durability)}${prot.duplex_hdg_um ? ` · 이중 아연 ${prot.duplex_hdg_um} µm` : ''} · 모터 ${esc(prot.motor_ip)}${prot.motor_heaters ? ' + 히터' : ''}${prot.eroom_conditioned ? ' · 전기실 공조' : ''}${prot.washing_days ? ` · 담수 세척 ${prot.washing_days} 일` : ''}</div>`;
+}
+$('e_cargo').onchange = cargoNote; $('e_prot').onchange = cargoNote;
 $('siteSel').onchange = e => loadSite(e.target.value).catch(err => setOpStatus('오류: ' + err));
 $('siteSave').onclick = async () => {
   if (!online()) { setOpStatus('프리셋 저장은 데스크톱 앱 · crane_demo serve 에서 됩니다'); return; }
@@ -713,15 +791,16 @@ async function decide(id, key) {
 function showDecision(d) {
   const p = d.prompt;
   $('decHeader').textContent = p.header;
-  $('decAt').textContent = d.at;
+  $('decAt').innerHTML = `${esc(d.at)}${p.procedure ? ` · 절차 <b>${esc(p.procedure)}</b>` : ''}${p.situation ? ` · 지금 상황 ${stanceBadge(p.situation)}` : ''}`;
   $('decRisk').textContent = `위험 지수 ${fmt(d.risk_index, 0)}`;
   $('decQ').textContent = p.question;
   $('decAttn').innerHTML = (p.attention || []).map(a => `· ${esc(a)}`).join('<br>');
   let n = 0;
   $('decOpts').innerHTML = p.options.map(o => {
-    if (!o.enabled) return `<div class="dopt off" aria-disabled="true"><span class="n">✕</span><span class="l">${esc(o.label)}</span><span class="d">막힘: ${esc(o.blocked_by.join(', '))}</span></div>`;
+    const oc = o.outcome ? `<span class="o">→ ${esc(o.outcome)}</span>` : '';
+    if (!o.enabled) return `<div class="dopt off" aria-disabled="true"><span class="n">✕</span><span class="l">${esc(o.label)}${stanceBadge(o.stance)}</span><span class="d">막힘: ${esc(o.blocked_by.join(', '))}</span>${oc}</div>`;
     n += 1;
-    return `<button class="dopt ${o.recommended ? 'rec' : ''}" data-k="${esc(o.key)}" data-n="${n}"><span class="n">${n}</span><span class="l">${esc(o.label)}${o.recommended ? ' (권장)' : ''}</span><span class="d">${esc(o.detail)}</span></button>`;
+    return `<button class="dopt ${o.recommended ? 'rec' : ''}" data-k="${esc(o.key)}" data-n="${n}"><span class="n">${n}</span><span class="l">${esc(o.label)}${o.recommended ? ' (권장)' : ''}${stanceBadge(o.stance)}</span><span class="d">${esc(o.detail)}</span>${oc}</button>`;
   }).join('');
   $('decOpts').querySelectorAll('button[data-k]').forEach(b => b.onclick = () => { hideDecision(); decide(d.id, b.dataset.k); });
   $('decOverlay').classList.remove('hidden');
@@ -767,7 +846,12 @@ function renderOp() {
     kp('위험 지수 평균 · 최대', `${fmt(k.risk_mean, 0)} · ${fmt(k.risk_max, 0)}`, k.risk_max >= 60 ? 'bad' : k.risk_max >= 40 ? 'warn' : ''),
     kp('결정 (작업자)', `${k.decisions} (${k.decisions_by_operator})`),
     kp('결정으로 줄인 기대 사고', fmt(k.risk_avoided, 3), 'good'),
+    kp('돌발 고장 (참 상태 기준 초과)', `${k.breakdowns || 0}`, (k.breakdowns || 0) > 0 ? 'bad' : ''),
+    kp('기준 넘긴 채 운전 (모르고)', `${fmt(k.hidden_overdue_h || 0, 0)} h`, (k.hidden_overdue_h || 0) > 0 ? 'warn' : ''),
+    kp('화물 보류 이동 · 무게 재확인', `${fmt(k.cargo_held_moves || 0, 0)} · ${fmt(k.weight_rechecks || 0, 0)}`),
   ].join('');
+  const mz = r.marine;
+  $('opMarine').innerHTML = mz ? `<b>염해</b> ${esc(mz.setup.category)} (${esc(mz.setup.chloride_class)}) · 연평균 염화물 ${fmt(mz.mean_sd, 0)} mg/m²·d · 젖음 ${fmt(mz.tow_h_per_year, 0)} h/년 · 탄소강 ${fmt(mz.steel_um_per_year, 1)} µm/년 <span class="muted">(이 기간 속도의 연환산)</span> · 도장 열화 노출 ${fmt(mz.coat[0], 2)} · 차폐 ${fmt(mz.coat[1], 2)} · 녹 ${fmt(mz.rust_area_pct, 2)}% (Ri ${mz.ri}) · 세척 ${mz.washes} · 재도장 ${mz.repaints} <span class="muted">· 방지 ${esc(mz.protection)}</span>${(k.moves_by_cargo || []).length ? `<br><b>화물별 이동</b> ${k.moves_by_cargo.map(([n, v]) => `${esc(n)} ${fmt(v, 0)}`).join(' · ')}` : ''}` : ((k.moves_by_cargo || []).length ? `<b>화물별 이동</b> ${k.moves_by_cargo.map(([n, v]) => `${esc(n)} ${fmt(v, 0)}`).join(' · ')}` : '');
   const D = r.daily, x = D.map(d => d.day + 1);
   chart($('cOpMoves'), { title: '하루 이동 · 수요 · 정지', xLabel: '일', series: [{ name: '이동', x, y: D.map(d => d.moves), color: UI.accent }, { name: '수요', x, y: D.map(d => d.demand), color: UI.muted, dash: [4, 3] }, { name: '정지 h ×10', x, y: D.map(d => d.downtime_h * 10), color: UI.amber }] }, $('lOpMoves'));
   chart($('cOpWx'), { title: '날씨 (크레인 높이 최대 순간풍속 · 기온)', xLabel: '일', series: [{ name: '최대 순간풍속 m/s', x, y: D.map(d => d.max_gust_mps), color: UI.violet }, { name: '최고 기온 °C', x, y: D.map(d => d.temp_max_c), color: UI.danger }, { name: '최저 기온 °C', x, y: D.map(d => d.temp_min_c), color: UI.teal }, { name: '체감 최고 °C', x, y: D.map(d => d.feels_like_max_c), color: UI.amber, dash: [3, 3], width: 1 }] }, $('lOpWx'));
@@ -776,18 +860,29 @@ function renderOp() {
   const order = L.components.map((c, i) => [i, c.life_used]).sort((a, b) => b[1] - a[1]).slice(0, 6).map(v => v[0]);
   const cols = [UI.danger, UI.amber, UI.violet, UI.accent, UI.teal, UI.success];
   chart($('cOpLife'), { title: '부품 수명 사용 (원장 누적, %)', xLabel: '누적 일', series: order.map((ci, j) => ({ name: L.components[ci].label, x: H.map(h => h.day), y: H.map(h => (h.life[ci] || 0) * 100), color: cols[j % cols.length] })), hlines: [{ y: 80, label: '정비 계획', color: UI.amber }, { y: 100, label: '교체', color: UI.danger }] }, $('lOpLife'));
+  $('opSaltBox').style.display = r.marine ? '' : 'none';
+  if (r.marine) chart($('cOpSalt'), { title: '염해 (하루 염화물 · 탄소강 속도 · 녹 면적)', xLabel: '일', series: [{ name: '염화물 mg/m²·d', x, y: D.map(d => d.salt_mg_m2_d), color: UI.teal }, { name: '탄소강 µm/년', x, y: D.map(d => d.steel_rate_um_y), color: UI.amber }, { name: '녹 면적 % ×100', x, y: D.map(d => d.rust_area_pct * 100), color: UI.danger }] }, $('lOpSalt'));
   $('opLedger').textContent = `원장 누적 ${fmt(L.day, 0)} 일 · 운전 ${fmt(L.operating_hours, 0)} h · 이동 ${fmt(L.moves, 0)} · 실행 ${L.runs} 회`;
   const rows = r.durability.rows.map(c => {
     const pct = Math.max(0, c.life_used * 100), col = c.status === 'good' ? UI.success : c.status === 'watch' ? UI.accent : c.status === 'plan' ? UI.amber : UI.danger;
     const m = c.margin == null ? '—' : `${fmt(c.margin, 2)} <span class="muted">(최소 ${fmt(c.margin_min, 2)})</span>`;
     const rul = c.rul_days == null ? '—' : c.rul_days > 99999 ? '> 10만' : fmt(c.rul_days, 0);
-    return `<tr><td>${esc(c.label)}</td><td><span class="st st-${c.status}">${esc(ST[c.status] || c.status_label)}</span></td><td><div class="bar"><i style="width:${Math.min(100, pct)}%;background:${col}"></i></div></td><td class="num">${fmt(pct, 1)}%</td><td class="num">${rul}</td><td class="num">${c.replacements}</td><td class="num">${m}</td><td class="muted">${esc(c.margin_label || '')}</td><td class="muted">${esc(c.basis)}</td></tr>`;
+    const pg = (L.components.find(x => x.id === c.id) || {}).prog;
+    const days = v => v > 99999 ? '> 10만' : fmt(v, 0);
+    const hp = pg ? `${fmt(pg.health[1], 0)} <span class="muted">(${fmt(pg.health[0], 0)}–${fmt(pg.health[2], 0)})</span>` : '—';
+    const rp = pg ? `${days(pg.rul[1])} <span class="muted">(${days(pg.rul[0])}–${days(pg.rul[2])})</span>` : '—';
+    const p30 = pg ? `<span class="sev ${pg.p_fail[1] >= 0.2 ? 'sev2' : pg.p_fail[2] >= 0.2 ? 'sev1' : 'sev0'}">${fmt(pg.p_fail[1] * 100, 0)}%</span>` : '—';
+    const obs = pg ? `${esc(pg.indicator)}${pg.last_z != null ? ` ${fmt(pg.last_z, 2)} ${esc(pg.unit)}` : ''} <span class="muted">· 관측 ${pg.n_obs} · ${esc(pg.method)}</span>` : '';
+    return `<tr><td>${esc(c.label)}</td><td><span class="st st-${c.status}">${esc(ST[c.status] || c.status_label)}</span></td><td><div class="bar"><i style="width:${Math.min(100, pct)}%;background:${col}"></i></div></td><td class="num">${fmt(pct, 1)}%</td><td class="num">${rul}</td><td class="num">${hp}</td><td class="num">${rp}</td><td class="num">${p30}</td><td class="num">${c.replacements}</td><td class="num">${m}</td><td class="muted">${obs}</td><td class="muted">${esc(c.margin_label || '')}</td><td class="muted">${esc(c.basis)}</td></tr>`;
   }).join('');
-  $('opHealth').innerHTML = `<tr><th>부품</th><th>상태</th><th>수명 사용</th><th></th><th>남은 일</th><th>교체</th><th>안정성 여유</th><th>여유 기준</th><th>근거</th></tr>${rows}`;
+  $('opHealth').innerHTML = `<tr><th>부품</th><th>상태</th><th>수명 사용</th><th></th><th>남은 일 (물리)</th><th>건강 P50 (P10–P90)</th><th>남은 일 예측 P50 (P10–P90)</th><th>30일 고장</th><th>교체</th><th>안정성 여유</th><th>마지막 관측</th><th>여유 기준</th><th>근거</th></tr>${rows}`;
+  const procs = [...new Set(r.alerts.map(a => a.procedure).filter(Boolean))];
+  const curProc = $('alertProc').value;
+  fillSelect($('alertProc'), [['', '모든 절차'], ...procs.map(x => [x, x])], procs.includes(curProc) ? curProc : '');
   renderAlerts();
   $('opDecisions').innerHTML = r.decisions.slice().reverse().map(d => {
     const ch = d.prompt.options.find(o => o.chosen);
-    return `<div class="it"><span class="at">${esc(d.at)}</span><span class="chip">${esc(d.prompt.header)}</span> → <b>${esc(ch ? ch.label : d.chosen || '')}</b> <span class="muted">(${esc(d.decided_by === 'operator' ? '작업자' : d.decided_by || '')})</span><div class="muted">${esc(d.outcome || '')}${d.risk_avoided > 0 ? ` · 줄인 기대 사고 ${fmt(d.risk_avoided, 4)}` : ''}</div></div>`;
+    return `<div class="it"><span class="at">${esc(d.at)}</span><span class="chip">${esc(d.prompt.header)}</span>${d.prompt.procedure ? ` <span class="muted">${esc(d.prompt.procedure)}</span>` : ''} → <b>${esc(ch ? ch.label : d.chosen || '')}</b>${stanceBadge(ch && ch.stance)} <span class="muted">(${esc(d.decided_by === 'operator' ? '작업자' : d.decided_by || '')})</span><div class="muted">${esc(d.outcome || '')}${d.risk_avoided > 0 ? ` · 줄인 기대 사고 ${fmt(d.risk_avoided, 4)}` : ''}</div></div>`;
   }).join('') || '<div class="it muted">결정이 아직 없습니다</div>';
   const inc = r.incidents.map(i => `<div>${esc(i.at)} <span class="sev sev${i.severity === '중대' ? 3 : i.severity === '아차사고' ? 1 : 2}">${esc(i.severity)}</span> ${esc(i.kind)} — ${esc(i.detail)} (정지 ${fmt(i.downtime_h, 0)} h)</div>`).join('');
   const down = (k.downtime_by_reason || []).map(([why, h]) => `${esc(why)} ${fmt(h, 0)} h`).join(' · ');
@@ -796,14 +891,62 @@ function renderOp() {
 
 function renderAlerts() {
   if (!OP) return;
-  const min = Number($('alertFilter').value);
-  const items = OP.alerts.filter(a => lvRank(a.level) >= min).slice(-300).reverse();
-  $('opAlerts').innerHTML = items.map(a => `<div class="it"><span class="at">${esc(a.at)}</span><span class="lv lv-${a.level}">${esc(a.level_label)}</span><b>${esc(a.title)}</b>${a.lead_h ? ` <span class="muted">(${a.lead_h} h 전 예보)</span>` : ''}<div>${esc(a.message)}</div><div class="muted">→ ${esc(a.action)} · 근거: ${esc(a.basis)}</div></div>`).join('') || '<div class="it muted">알림이 없습니다</div>';
+  const min = Number($('alertFilter').value), proc = $('alertProc').value;
+  const items = OP.alerts.filter(a => lvRank(a.level) >= min && (!proc || a.procedure === proc)).slice(-300).reverse();
+  $('opAlerts').innerHTML = items.map(a => `<div class="it"><span class="at">${esc(a.at)}</span><span class="lv lv-${a.level}">${esc(a.level_label)}</span><b>${esc(a.title)}</b>${a.procedure ? ` <span class="muted">· ${esc(a.procedure)}</span>` : ''}${a.lead_h ? ` <span class="muted">(${a.lead_h} h 전 예보)</span>` : ''}<div>${esc(a.message)}</div><div class="muted">→ ${esc(a.action)} · 근거: ${esc(a.basis)}</div></div>`).join('') || '<div class="it muted">알림이 없습니다</div>';
 }
-$('alertFilter').onchange = renderAlerts;
+$('alertFilter').onchange = renderAlerts; $('alertProc').onchange = renderAlerts;
+
+// ---------- 염해 진행 · 예측 점수 ----------
+const PCOL = [UI.accent, UI.amber, UI.teal, UI.violet, UI.danger, UI.success];
+function renderMarine() {
+  const P = MR; if (!P || !P.length) return;
+  const s = P[0].setup, last = p => p.rows[p.rows.length - 1] || {};
+  $('mrSum').innerHTML = `<b>${esc(P[0].site)}</b> · ISO 9223 ${esc(s.category)} (아연 ${esc(s.category_zinc)}) · 염화물 ${esc(s.chloride_class)} ${fmt(s.sd_annual, 0)} mg/m²·d (차폐면 ${fmt(s.sd_sheltered_annual, 0)}) · SO₂ ${fmt(s.so2_ug_m3, 1)} µg/m³ · 젖음 ${fmt(s.tow_annual_h, 0)} h/년 · ${fmt(s.t_annual, 1)} °C · RH ${fmt(s.rh_annual, 0)}%<br>탄소강 첫해 부식 노출 ${fmt(s.r_steel[0], 1)} · 차폐 ${fmt(s.r_steel[1], 1)} · 밀폐 ${fmt(s.r_steel[2], 1)} µm/년 · 아연 ${fmt(s.r_zinc, 2)} µm/년 · 높이 배수 ${fmt(s.height_factor, 2)} · 차폐 누적 배수 ${fmt(s.shelter_factor, 2)}<div class="muted">${(s.notes || []).map(esc).join(' · ')}</div>`;
+  const yrs = P[0].rows.length;
+  $('mrTable').innerHTML = `<tr><th>염해 방지 프리셋</th><th>도장</th><th>도장 수명 노출 · 차폐 (년)</th><th>${yrs}년 뒤 열화 노출 · 차폐</th><th>녹 면적 %</th><th>Ri</th><th>국부 손실 µm</th><th>통로 사용</th><th>감속기 수분 ppm</th><th>전기실 ISA</th><th>세척 · 터치업 · 재도장</th><th>연 비용 (가정)</th></tr>` + P.map((p, i) => {
+    const r = last(p), pr = p.protection;
+    return `<tr><td>${i === 0 ? '<b>' : ''}${esc(pr.name)}${i === 0 ? '</b> <span class="muted">(현장)</span>' : ''}</td><td>${esc(pr.coating_category)}-${esc(pr.coating_durability)}${pr.duplex_hdg_um ? ` + HDG ${pr.duplex_hdg_um}` : ''}</td><td class="num">${fmt(p.setup.coat_life_years[0], 1)} · ${fmt(p.setup.coat_life_years[1], 1)}</td><td class="num">${fmt(r.coat_exposed, 2)} · ${fmt(r.coat_sheltered, 2)}</td><td class="num">${fmt(r.rust_area_pct, 2)}</td><td class="num"><span class="sev ${r.ri >= 4 ? 'sev3' : r.ri >= 3 ? 'sev2' : r.ri >= 2 ? 'sev1' : 'sev0'}">Ri ${r.ri}</span></td><td class="num">${fmt(r.local_loss_um, 0)}</td><td class="num">${fmt(r.access_used * 100, 0)}%</td><td class="num">${fmt(r.gear_ppm, 0)}</td><td class="num">${['G1', 'G2', 'G3', 'GX'][Math.min(3, r.isa_level || 0)]}</td><td class="num">${r.washes} · ${r.touch_ups} · ${r.repaints}</td><td class="num">${pr.annual_cost_krw ? fmt(pr.annual_cost_krw / 1e6, 0) + ' 백만원' : '—'}</td></tr>`;
+  }).join('');
+  chart($('cMrCoat'), { title: '차폐면 도장 열화 (1 = 대보수 기준)', xLabel: '년', series: P.map((p, i) => ({ name: p.protection.name, x: p.rows.map(r => r.year), y: p.rows.map(r => r.coat_sheltered), color: PCOL[i % PCOL.length], width: i === 0 ? 2.2 : 1.3 })), hlines: [{ y: 1, label: '대보수', color: UI.danger }] }, $('lMrCoat'));
+  chart($('cMrLoss'), { title: '국부 강재 손실 (µm, 도장이 깨진 곳)', xLabel: '년', series: P.map((p, i) => ({ name: p.protection.name, x: p.rows.map(r => r.year), y: p.rows.map(r => r.local_loss_um), color: PCOL[i % PCOL.length], width: i === 0 ? 2.2 : 1.3 })) }, $('lMrLoss'));
+}
+$('mrRun').onclick = async () => {
+  if (!online()) { $('mrSum').textContent = '파일 모드: crane_demo marine show 결과를 보거나 데스크톱 앱 · crane_demo serve 에서 계산하세요'; return; }
+  try {
+    $('mrSum').textContent = '계산 중…';
+    MR = await api('marine_project', { preset: readEditor(), years: Math.max(1, Math.min(40, Math.round(Number($('mrYears').value) || 10))), maintain: $('mrMaint').checked, seed: Math.round(Number($('opSeed').value) || 1) });
+    renderMarine();
+  } catch (e) { $('mrSum').textContent = '오류: ' + e; }
+};
+function stepXY(h) { const n = h.length, x = [], y = []; h.forEach((v, i) => { x.push(i / n, (i + 1) / n); y.push(v * n, v * n); }); return { x, y }; }
+function renderProg() {
+  const r = PG; if (!r) return;
+  const v3 = r.overall[r.overall.length - 1], v0 = r.overall[0];
+  const gain = v0 && v0.crps > 0 ? (1 - v3.crps / v0.crps) * 100 : 0;
+  const adopt = r.recal && r.recal.length ? ` · v4 재보정 ${r.recal_adopted ? '<b>채택</b> (현장 운영이 씀)' : '채택 안 함'}` : '';
+  $('pgSum').innerHTML = `현장 ${r.sites.map(esc).join(' · ')} · ${r.days} 일 · 복제 ${r.replicas} · ${r.origin_every} 일마다 예측 · 기록 ${fmt(r.n_records, 0)} · v3 퍼짐 배수 (전체 맞춤) ${fmt(r.spread_all, 2)}${adopt}<br><b>${esc(v3.method)}</b> (현장 하나 빼기): CRPS ${fmt(v3.crps, 1)} 일 (v0 대비 ${fmt(gain, 0)}% 줄임) · 80% 구간 적중 ${fmt(v3.coverage80 * 100, 0)}% · PIT KS ${fmt(v3.pit_ks, 3)} · 30일 고장 BSS ${fmt(v3.brier.skill, 3)}<div class="muted">${(r.notes || []).map(esc).join(' · ')}</div>`;
+  const row = m => `<tr><td>${esc(m.label)}</td><td class="num">${fmt(m.n_rul, 0)}</td><td class="num">${fmt(m.crps, 1)}</td><td class="num">${fmt(m.mae_median, 1)}</td><td class="num"><span class="sev ${Math.abs(m.coverage80 - 0.8) <= 0.05 ? 'sev0' : Math.abs(m.coverage80 - 0.8) <= 0.15 ? 'sev1' : 'sev2'}">${fmt(m.coverage80 * 100, 0)}%</span></td><td class="num">${fmt(m.coverage50 * 100, 0)}%</td><td class="num"><span class="sev ${m.pit_ks <= 0.08 ? 'sev0' : m.pit_ks <= 0.15 ? 'sev1' : 'sev2'}">${fmt(m.pit_ks, 3)}</span></td><td class="num">${fmt(m.alpha_acc * 100, 0)}%</td><td class="num"><span class="sev ${m.brier.skill > 0.2 ? 'sev0' : m.brier.skill > 0 ? 'sev1' : 'sev2'}">${fmt(m.brier.skill, 3)}</span></td><td class="num">${fmt(m.nowcast_cov80 * 100, 0)}%</td><td class="num">${fmt(m.spread, 2)}</td></tr>`;
+  const head = `<tr><th>방식</th><th>건수</th><th>CRPS (일)</th><th>중앙 MAE (일)</th><th>80% 적중</th><th>50% 적중</th><th>PIT KS</th><th>α ±20%</th><th>30일 BSS</th><th>현재 80%</th><th>퍼짐</th></tr>`;
+  $('pgTable').innerHTML = head + r.overall.map(row).join('');
+  const fcell = m => m ? `<td class="num">${fmt(m.crps, 1)}</td><td class="num">${fmt(m.coverage80 * 100, 0)}%</td><td class="num">${fmt(m.pit_ks, 3)}</td><td class="num">${fmt(m.brier.skill, 3)}</td>` : '<td></td><td></td><td></td><td></td>';
+  const has4 = r.folds.some(f => f.recal);
+  $('pgFolds').innerHTML = `<tr><th>뺀 현장</th><th>퍼짐</th><th>v3 CRPS</th><th>80%</th><th>KS</th><th>BSS</th>${has4 ? '<th>v4 CRPS</th><th>80%</th><th>KS</th><th>BSS</th>' : ''}</tr>` + r.folds.map(f => `<tr><td>${esc(f.held_out)}</td><td class="num">${fmt(f.spread, 2)}</td>${fcell(f.score)}${has4 ? fcell(f.recal) : ''}</tr>`).join('');
+  $('pgKinds').innerHTML = `<tr><th>부품</th><th>가속</th><th>건수</th><th>CRPS</th><th>80% 적중</th><th>PIT KS</th></tr>` + r.by_kind.map(k => { const m = k.methods[k.methods.length - 1] || {}; return `<tr><td>${esc(k.kind)}</td><td class="num">×${fmt(k.accel, 1)}</td><td class="num">${fmt(m.n_rul || 0, 0)}</td><td class="num">${fmt(m.crps, 1)}</td><td class="num">${fmt((m.coverage80 || 0) * 100, 0)}%</td><td class="num">${fmt(m.pit_ks, 3)}</td></tr>`; }).join('');
+  const cols = [UI.muted, UI.violet, UI.amber, UI.accent];
+  chart($('cPgPit'), { title: 'PIT 히스토그램 (평평할수록 보정이 맞음, 밀도)', xLabel: 'PIT', yMin: 0, series: r.overall.map((m, i) => ({ name: m.label, ...stepXY(m.pit_hist || []), color: cols[i % cols.length], width: i === r.overall.length - 1 ? 2.2 : 1.2, dash: i === r.overall.length - 1 ? null : [4, 3] })), hlines: [{ y: 1, label: '균등', color: UI.success }] }, $('lPgPit'));
+  const bins = (v3.brier && v3.brier.bins) || [];
+  chart($('cPgRel'), { title: '30일 고장 확률 신뢰도 (v3)', xLabel: '예측 확률', xMin: 0, xMax: 1, yMin: 0, yMax: 1, series: [{ name: '완전 보정', x: [0, 1], y: [0, 1], color: UI.muted, dash: [4, 3] }, { name: '관측 빈도', x: bins.map(b => b.p_mean), y: bins.map(b => b.observed), color: UI.accent, width: 2 }] }, $('lPgRel'));
+  chart($('cPgHealth'), { title: '건강 점수 분포 (예측 중앙값, 0–100)', xLabel: '건강 점수', yMin: 0, series: r.overall.map((m, i) => { const h = m.health_hist || []; const s = stepXY(h); return { name: m.label, x: s.x.map(v => v * 100), y: s.y.map(v => v / h.length), color: cols[i % cols.length], width: i === r.overall.length - 1 ? 2.2 : 1.2 }; }) }, $('lPgHealth'));
+}
+$('pgRun').onclick = async () => {
+  if (!online()) { $('pgSum').textContent = '파일 모드: crane_demo prognostics 가 저장한 prognostics.json 을 여세요'; return; }
+  try { $('pgSum').textContent = '예측 점수 계산 중 (몇 분 걸립니다)…'; PG = await api('prognostics_run', {}); renderProg(); }
+  catch (e) { $('pgSum').textContent = '오류: ' + e; }
+};
 
 // ---------- 실데이터 보정 ----------
-const GROUP = { weather: '날씨 (기상청 관측 vs 생성 날씨)', motor: '모터 (제조사 표 vs 열 모델)', throughput: '처리량', durability: '내구도', rule: '법규 확인' };
+const GROUP = { weather: '날씨 (기상청 관측 vs 생성 날씨)', motor: '모터 (제조사 표 vs 열 모델)', throughput: '처리량', durability: '내구도', corrosion: '부식 (실측 첫해 부식 · 차폐 비 · 아연 — ISO 9223 식 확인, 차폐 배수 보정)', storm: '폭풍 설계 확인 (KDS 41 12 00 기본풍속 vs 모델 100년 순간풍속)', availability: '가용률 (항만 크레인 실적)', cargo: '화물 (VGM 계근 · 시험 인양)', rule: '법규 확인' };
 function renderCal() {
   const r = CAL; if (!r) return;
   $('calSum').innerHTML = `맞춘 항목 평균 절대 오차: 보정 전 <b>${fmt(r.mean_abs_error_before_pct, 1)}%</b> → 보정 뒤 <b>${fmt(r.mean_abs_error_after_pct, 1)}%</b> · 모든 항목 보정 뒤 ${fmt(r.mean_abs_error_all_after_pct, 1)}%<div class="muted">${(r.notes || []).map(esc).join(' · ')}</div>`;
@@ -814,6 +957,8 @@ function renderCal() {
     html += `<tr><td>${esc(b.label)}</td><td class="num">${fmt(b.reference, 3)} ${esc(b.unit)}</td><td class="num">${fmt(b.before, 3)}</td><td class="num">${fmt(b.after, 3)}</td><td class="num"><span class="sev ${cls(b.error_before_pct)}">${fmt(b.error_before_pct, 1)}%</span></td><td class="num"><span class="sev ${cls(b.error_after_pct)}">${fmt(b.error_after_pct, 1)}%</span></td><td class="muted">${esc(b.knob || '확인만')}</td><td class="muted">${esc(b.source)} (${esc(b.confidence)})</td></tr>`;
   }
   $('calTable').innerHTML = html;
+  const e5 = r.era5;
+  $('calEra5').innerHTML = e5 && e5.items && e5.items.length ? `<tr><th>항목</th><th>기상청 평균</th><th>보정 전 오차</th><th>지점 하나 빼기</th><th>전체 맞춤</th></tr>` + e5.items.map(i => `<tr><td>${esc(i.name)}</td><td class="num">${fmt(i.kma_mean, 2)} ${esc(i.unit)}</td><td class="num">${fmt(i.mae_before, 2)}</td><td class="num"><span class="sev ${i.mae_loso < i.mae_before * 0.9 ? 'sev0' : i.mae_loso <= i.mae_before * 1.05 ? 'sev1' : 'sev2'}">${fmt(i.mae_loso, 2)}</span></td><td class="num">${fmt(i.mae_all, 2)}</td></tr>`).join('') + `<tr><td colspan="5" class="muted">${(e5.notes || []).map(esc).join(' · ')}</td></tr>` : '<tr><td class="muted">이 보고서에는 ERA5 비교가 없습니다</td></tr>';
 }
 async function runCal(quick) {
   if (!online()) { $('calSum').textContent = '파일 모드: crane_demo fieldcal 이 저장한 fieldcal.json 을 여세요'; return; }
@@ -830,7 +975,9 @@ $('calFull').onclick = () => runCal(false);
   if (online()) {
     $('src').textContent = TAURI ? '데스크톱 (Tauri)' : '브라우저 (crane_demo serve)';
     try { const s = await invoke('models_status'); if (s && (s.ttm || s.advisor)) $('mstatus').textContent = s.notes.join(' · '); } catch (_) {}
+    try { const mr = await api('marine_refs'); PROTS = mr.protections; SALT_AREAS = mr.salt_areas; const cs = await api('cargo_scenarios'); CARGOS = cs.scenarios; window.CARGO_TYPES = cs.types; } catch (e) { setOpStatus('염해 · 화물 프리셋 불러오기 실패: ' + e); }
     try { CRANES = await api('cranes'); CLIMATES = await api('climates'); await loadSiteList(); } catch (e) { setOpStatus('프리셋 불러오기 실패: ' + e); }
+    try { PG = await api('prognostics_saved'); renderProg(); } catch (_) {}
     try { CAL = await api('fieldcal_saved'); renderCal(); } catch (_) {}
   } else {
     $('run').title = '데스크톱 앱 · crane_demo serve 에서 실행됩니다'; $('cmp').title = $('run').title; $('opRun').title = $('run').title;

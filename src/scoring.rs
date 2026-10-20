@@ -9,6 +9,7 @@
 //! | Brier · 분해 | BS = mean (p − o)², BS = 신뢰도 − 분해능 + 불확실성 | Brier 1950, Murphy 1973 |
 //! | α–λ 정확도 · 예측 지평 | 참 남은 수명의 ±α 안에 드는가 | Saxena et al. 2008 |
 //! | 적응 등각 추론 | α_{t+1} = α_t + γ(α − err_t) | Gibbs & Candès 2021 |
+//! | PIT 재보정 | F' = G∘F, G = 학습 PIT 의 경험 분포 | Kuleshov, Fenner & Ermon 2018 |
 
 use serde::{Deserialize, Serialize};
 
@@ -308,6 +309,99 @@ pub fn aci_update(alpha_t: f64, target_alpha: f64, missed: bool, gamma: f64) -> 
     (alpha_t + gamma * (target_alpha - err)).clamp(0.001, 0.999)
 }
 
+/// PIT 재보정 (Kuleshov, Fenner & Ermon 2018): 학습 예측들의 PIT u = F(y) 경험 분포 G 로 F' = G∘F.
+/// `knots[i]` = G⁻¹(i / (GRID − 1)). 표본이 적으면 항등(보정 없음) 쪽으로 줄인다 (가중 n / (n + shrink_n))
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PitRecal {
+    pub knots: Vec<f64>,
+    pub n: usize,
+}
+
+impl Default for PitRecal {
+    fn default() -> Self {
+        Self::identity()
+    }
+}
+
+impl PitRecal {
+    pub const GRID: usize = 21;
+
+    pub fn identity() -> Self {
+        Self { knots: (0..Self::GRID).map(|i| i as f64 / (Self::GRID - 1) as f64).collect(), n: 0 }
+    }
+
+    pub fn from_knots(knots: &[f64], n: usize) -> Self {
+        Self { knots: knots.to_vec(), n }
+    }
+
+    pub fn fit(pits: &[f64], shrink_n: f64) -> Self {
+        let mut v: Vec<f64> = pits.iter().filter(|x| x.is_finite()).map(|x| x.clamp(0.0, 1.0)).collect();
+        let n = v.len();
+        if n < 2 {
+            return Self::identity();
+        }
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let w = n as f64 / (n as f64 + shrink_n.max(0.0));
+        let mut knots = Vec::with_capacity(Self::GRID);
+        let mut prev = 0.0f64;
+        for i in 0..Self::GRID {
+            let t = i as f64 / (Self::GRID - 1) as f64;
+            let e = if i == 0 {
+                0.0
+            } else if i == Self::GRID - 1 {
+                1.0
+            } else {
+                let h = (n - 1) as f64 * t;
+                let (lo, f) = (h.floor() as usize, h - h.floor());
+                v[lo] + (v[(lo + 1).min(n - 1)] - v[lo]) * f
+            };
+            let k = (w * e + (1.0 - w) * t).clamp(prev, 1.0);
+            knots.push(k);
+            prev = k;
+        }
+        Self { knots, n }
+    }
+
+    /// G⁻¹(τ)
+    pub fn inv(&self, tau: f64) -> f64 {
+        let t = tau.clamp(0.0, 1.0);
+        let m = self.knots.len();
+        if m < 2 {
+            return t;
+        }
+        let x = t * (m - 1) as f64;
+        let i = (x.floor() as usize).min(m - 2);
+        let f = x - i as f64;
+        self.knots[i] + (self.knots[i + 1] - self.knots[i]) * f
+    }
+
+    /// G(p) — `inv` 의 역함수
+    pub fn cdf(&self, p: f64) -> f64 {
+        let p = p.clamp(0.0, 1.0);
+        let m = self.knots.len();
+        if m < 2 {
+            return p;
+        }
+        for i in 1..m {
+            if p <= self.knots[i] {
+                let (a, b) = (self.knots[i - 1], self.knots[i]);
+                let (ta, tb) = ((i - 1) as f64 / (m - 1) as f64, i as f64 / (m - 1) as f64);
+                if b - a < 1e-12 {
+                    return tb;
+                }
+                return ta + (tb - ta) * (p - a) / (b - a);
+            }
+        }
+        1.0
+    }
+
+    /// 분위수 예측에 적용: q'(τ) = q(G⁻¹(τ)), 값은 `floor` 아래로 가지 않게
+    pub fn apply(&self, q: &QuantileForecast, floor: f64) -> QuantileForecast {
+        let qs = q.taus.iter().map(|t| q.quantile(self.inv(*t)).max(floor)).collect();
+        QuantileForecast::new(&q.taus, qs)
+    }
+}
+
 /// 시간 순 교차검증의 예측 시점 (학습 최소 길이 · 간격)
 pub fn rolling_origins(n: usize, min_train: usize, step: usize) -> Vec<usize> {
     let s = step.max(1);
@@ -318,6 +412,53 @@ pub fn rolling_origins(n: usize, min_train: usize, step: usize) -> Vec<usize> {
 mod tests {
     use super::*;
     use crate::rng::Rng;
+
+    #[test]
+    fn pit_recalibration_fixes_biased_forecasts() {
+        // 예측은 N(0, 1) 인데 참값은 N(0.8, 1): PIT 가 1 쪽으로 몰린다
+        let mut rng = Rng::new(9);
+        let taus = uniform_taus(20);
+        let z = |t: f64| {
+            // 표준 정규 분위수 (Acklam 근사 대신 이분법)
+            let (mut lo, mut hi) = (-8.0f64, 8.0f64);
+            for _ in 0..60 {
+                let m = 0.5 * (lo + hi);
+                if 0.5 * (1.0 + erf_approx(m / std::f64::consts::SQRT_2)) < t {
+                    lo = m;
+                } else {
+                    hi = m;
+                }
+            }
+            0.5 * (lo + hi)
+        };
+        let fc = QuantileForecast::new(&taus, taus.iter().map(|t| z(*t)).collect());
+        let ys: Vec<f64> = (0..2000).map(|_| 0.8 + rng.normal()).collect();
+        let pits: Vec<f64> = ys.iter().map(|y| fc.cdf(*y)).collect();
+        let before = ks_uniform(&pits);
+        let rc = PitRecal::fit(&pits[..1000], 50.0);
+        let fixed = rc.apply(&fc, f64::NEG_INFINITY);
+        let after = ks_uniform(&ys[1000..].iter().map(|y| fixed.cdf(*y)).collect::<Vec<_>>());
+        // 분위수 20개의 끝 바깥은 직선으로 늘리므로 꼬리가 조금 남는다 — 치우침의 대부분이 없어지면 된다
+        assert!(before > 0.2 && after < 0.35 * before, "{before} → {after}");
+        assert!((fixed.median() - 0.8).abs() < 0.15, "median {}", fixed.median());
+        // 항등 · 역함수
+        let id = PitRecal::identity();
+        assert!((id.inv(0.37) - 0.37).abs() < 1e-12 && (id.cdf(0.37) - 0.37).abs() < 1e-12);
+        for p in [0.05, 0.3, 0.5, 0.9] {
+            assert!((rc.cdf(rc.inv(p)) - p).abs() < 1e-9, "{p}");
+        }
+    }
+
+    fn erf_approx(x: f64) -> f64 {
+        // Abramowitz & Stegun 7.1.26
+        let t = 1.0 / (1.0 + 0.327_591_1 * x.abs());
+        let y = 1.0 - (((((1.061_405_429 * t - 1.453_152_027) * t) + 1.421_413_741) * t - 0.284_496_736) * t + 0.254_829_592) * t * (-x * x).exp();
+        if x >= 0.0 {
+            y
+        } else {
+            -y
+        }
+    }
 
     #[test]
     fn pinball_and_interval_score() {
