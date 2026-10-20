@@ -1,94 +1,75 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! 데스크톱 셸 (Tauri v1). 계산은 모두 `crane_model::api` 가 하고, 여기서는 상태(모델 · 마지막 결과)만 들고 있다.
+//! 데스크톱 셸 (Tauri v1). 계산과 상태는 모두 `crane_model::backend::Backend` 가 갖고, 여기서는 명령을 넘겨 준다.
+//! 브라우저용 `crane_demo serve` 와 같은 명령 이름 · 인자를 쓴다 (`api_call`).
 
-use crane_model::antisway::AntiSwayMode;
-use crane_model::api::{self, CompareRow, ModelStatus, Models, PipelineConfig, PipelineReport};
-use crane_model::calib::{self, CrossCheck};
-use crane_model::crane_profile;
-use crane_model::cyclesim::{self, Scenario};
-use crane_model::decision::{self, Action, DecisionReport};
-use crane_model::sds::{Scope, SdsStore};
-use std::path::PathBuf;
+use crane_model::api::{CompareRow, ModelStatus, PipelineConfig, PipelineReport};
+use crane_model::backend::Backend;
+use crane_model::calib::CrossCheck;
+use crane_model::cyclesim::Scenario;
+use crane_model::decision::DecisionReport;
+use serde_json::{json, Value};
 use std::sync::Mutex;
 use tauri::{Manager, State};
 
 struct AppState {
-    models: Mutex<Models>,
-    last: Mutex<Option<PipelineReport>>,
-    data_dir: PathBuf,
+    backend: Mutex<Backend>,
 }
 
-fn mode_of(s: &str) -> Result<AntiSwayMode, String> {
-    AntiSwayMode::all().into_iter().find(|m| m.key() == s).ok_or_else(|| format!("모르는 흔들림 억제 방식: {s}"))
+fn call(state: &State<'_, AppState>, cmd: &str, args: Value) -> Result<Value, String> {
+    let mut b = state.backend.lock().map_err(|e| e.to_string())?;
+    b.call(cmd, &args)
+}
+
+fn typed<T: for<'de> serde::Deserialize<'de>>(v: Value) -> Result<T, String> {
+    serde_json::from_value(v).map_err(|e| e.to_string())
+}
+
+/// 모든 명령의 공통 입구 — 현장 프리셋 · 현장 운영 · 내구도 원장 · 실데이터 보정
+#[tauri::command]
+async fn api_call(cmd: String, args: Value, state: State<'_, AppState>) -> Result<Value, String> {
+    call(&state, &cmd, args)
 }
 
 #[tauri::command]
-fn presets() -> serde_json::Value {
-    api::presets_json()
+fn presets(state: State<'_, AppState>) -> Result<Value, String> {
+    call(&state, "presets", json!({}))
 }
 
 #[tauri::command]
-fn demo_scenario(crane: String, load: f64, mode: String) -> Result<Scenario, String> {
-    Ok(cyclesim::demo_scenario(&crane, load, mode_of(&mode)?))
+fn demo_scenario(crane: String, load: f64, mode: String, state: State<'_, AppState>) -> Result<Scenario, String> {
+    typed(call(&state, "demo_scenario", json!({"crane": crane, "load": load, "mode": mode}))?)
 }
 
 #[tauri::command]
 async fn run_pipeline(scenario: Scenario, config: PipelineConfig, state: State<'_, AppState>) -> Result<PipelineReport, String> {
-    let mut cfg = config;
-    if cfg.sds_dir.is_none() {
-        cfg.sds_dir = Some(state.data_dir.join("sds").to_string_lossy().into_owned());
-    }
-    let rep = {
-        let models = state.models.lock().map_err(|e| e.to_string())?;
-        api::run_pipeline(&scenario, &cfg, &models)?
-    };
-    *state.last.lock().map_err(|e| e.to_string())? = Some(rep.clone());
-    Ok(rep)
+    typed(call(&state, "run_pipeline", json!({"scenario": scenario, "config": config}))?)
 }
 
 #[tauri::command]
-async fn compare(scenario: Scenario) -> Result<Vec<CompareRow>, String> {
-    api::compare(&scenario, &AntiSwayMode::all())
+async fn compare(scenario: Scenario, state: State<'_, AppState>) -> Result<Vec<CompareRow>, String> {
+    typed(call(&state, "compare", json!({"scenario": scenario}))?)
 }
 
 #[tauri::command]
-async fn crosscheck(crane: String, rope: f64, load: f64, sling: f64) -> Result<CrossCheck, String> {
-    let spec = crane_profile::preset(&crane).ok_or_else(|| format!("크레인 프리셋 {crane} 이 없습니다"))?;
-    Ok(calib::crosscheck(&spec, rope, load, sling))
+async fn crosscheck(crane: String, rope: f64, load: f64, sling: f64, state: State<'_, AppState>) -> Result<CrossCheck, String> {
+    typed(call(&state, "crosscheck", json!({"crane": crane, "rope": rope, "load": load, "sling": sling}))?)
 }
 
 #[tauri::command]
 async fn models_load(root: String, state: State<'_, AppState>) -> Result<ModelStatus, String> {
-    let m = Models::load(std::path::Path::new(&root));
-    let st = m.status();
-    *state.models.lock().map_err(|e| e.to_string())? = m;
-    Ok(st)
+    typed(call(&state, "models_load", json!({"root": root}))?)
 }
 
 #[tauri::command]
 fn models_status(state: State<'_, AppState>) -> Result<ModelStatus, String> {
-    Ok(state.models.lock().map_err(|e| e.to_string())?.status())
+    typed(call(&state, "models_status", json!({}))?)
 }
 
 /// 작업자 선택을 마지막 판정에 반영하고, 작업자–규칙 · 작업자–LAYA 일치를 SDS 원장에 남긴다
 #[tauri::command]
 fn choose_action(action: String, state: State<'_, AppState>) -> Result<DecisionReport, String> {
-    let a = Action::from_key(&action).ok_or_else(|| format!("모르는 조치: {action}"))?;
-    let mut last = state.last.lock().map_err(|e| e.to_string())?;
-    let rep = last.as_mut().ok_or("먼저 실행하세요")?;
-    decision::apply_operator_choice(&mut rep.decision, a)?;
-    let mut sds = SdsStore::open(&state.data_dir.join("sds"))?;
-    let scope = Scope::new(&rep.crane.name, "all");
-    sds.record_agreement(&scope, "operator_rule", rep.decision.rule_action == a);
-    if let Some(adv) = rep.decision.advisor_action {
-        sds.record_agreement(&scope, "operator_laya", adv == a);
-    }
-    sds.flush()?;
-    let op = sds.agreement_rate(&scope, "operator_laya");
-    let rl = sds.agreement_rate(&scope, "rule_laya");
-    rep.decision.choice = Some(decision::choice_prompt(&rep.decision, op, rl));
-    Ok(rep.decision.clone())
+    typed(call(&state, "choose_action", json!({"action": action}))?)
 }
 
 #[tauri::command]
@@ -101,10 +82,11 @@ fn main() {
         .setup(|app| {
             let dir = app.path_resolver().app_data_dir().unwrap_or_else(|| std::env::temp_dir().join("gantry-crane-sandbox"));
             let _ = std::fs::create_dir_all(&dir);
-            app.manage(AppState { models: Mutex::new(Models::none()), last: Mutex::new(None), data_dir: dir });
+            app.manage(AppState { backend: Mutex::new(Backend::new(&dir)) });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            api_call,
             presets,
             demo_scenario,
             run_pipeline,

@@ -15,11 +15,14 @@ pub struct Environment {
     pub gust_amp_mps: f64,
     /// 돌풍 주기 (s)
     pub gust_period_s: f64,
+    /// 바퀴–레일 점착 계수 (젖음 · 결빙 등). 있으면 주행 · 횡행 구동력과 제동력을 μ × 제동 바퀴 하중으로 자른다
+    #[serde(default)]
+    pub adhesion_mu: Option<f64>,
 }
 
 impl Default for Environment {
     fn default() -> Self {
-        Self { ambient_c: 25.0, air_density_kg_m3: 1.2, wind_mean_mps: [0.0, 0.0], gust_amp_mps: 0.0, gust_period_s: 8.0 }
+        Self { ambient_c: 25.0, air_density_kg_m3: 1.2, wind_mean_mps: [0.0, 0.0], gust_amp_mps: 0.0, gust_period_s: 8.0, adhesion_mu: None }
     }
 }
 
