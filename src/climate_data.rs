@@ -82,6 +82,7 @@ fn climate(
             duration_h: 18.0,
             source: format!("기상청 지점 {station} 최대 순간풍속 순위값 상위 10개의 굼벨 꼬리 회귀"),
         }),
+        wind_rose: Vec::new(),
     }
 }
 
@@ -204,17 +205,28 @@ pub fn raw_presets() -> Vec<Climate> {
     vec![busan(), incheon(), ulsan(), pohang(), yeosu(), seosan()]
 }
 
-/// 보정한 기후 (fieldcal 이 맞춘 생성기 계수)
+/// 보정한 기후 (fieldcal 이 맞춘 생성기 계수). 기상청 지점 좌표의 ERA5 통계가 있으면 월별 바람장미를 붙인다
 pub fn presets() -> Vec<Climate> {
     let mut v = raw_presets();
     for c in v.iter_mut() {
         crate::field_constants::apply_climate_calibration(c);
+        if let Some(s) = crate::ports::stats(&format!("kma_{}", c.id)) {
+            c.wind_rose = s.months.iter().map(|m| m.dir_freq.clone()).collect();
+        }
     }
     v
 }
 
+/// 기상청 평년값 기후 또는 항만 기후 (ERA5, `ports`)
 pub fn preset(id: &str) -> Option<Climate> {
-    presets().into_iter().find(|c| c.id == id)
+    presets().into_iter().find(|c| c.id == id).or_else(|| crate::ports::climate(id))
+}
+
+/// 고를 수 있는 모든 기후 (기상청 6 + 항만)
+pub fn all() -> Vec<Climate> {
+    let mut v = presets();
+    v.extend(crate::ports::climates());
+    v
 }
 
 /// 보정 목표 (기상청 연 일수 평균 · 순위값)

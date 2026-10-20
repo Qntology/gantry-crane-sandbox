@@ -430,6 +430,12 @@ struct Modifiers {
     periodic_postponed_to: Option<f64>,
     /// 폭풍 일주 사고가 난 폭풍 (중복 방지 끝 시간)
     runaway_until: Option<usize>,
+    /// 감시하며 진행: (끝 시간, 이 순간풍속 이상이면 바로 정지)
+    #[serde(default)]
+    watch: Option<(usize, f64)>,
+    /// 중량물 들기를 보류한 날
+    #[serde(default)]
+    heavy_hold_day: Option<u32>,
 }
 
 pub struct OpSim {
@@ -663,25 +669,98 @@ impl OpSim {
             enabled,
             blocked_by: blocked_by.iter().map(|s| s.to_string()).collect(),
             chosen: false,
+            stance: String::new(),
+            outcome: String::new(),
         }
     }
 
     fn rank(key: &str) -> u8 {
         match key {
             "continue" | "defer" | "standard" | "overtime" | "postpone" | "lift_anyway" => 0,
-            "reduce_speed" | "relief" | "replace_offshift" | "schedule" => 1,
-            "signalman_slow" | "rest" | "inspect_now" | "inspect" | "lift_plan" | "carry" | "park_at_stop" => 2,
-            "rest_and_midday_stop" | "park" | "stop" | "replace_now" | "legal_inspection" | "refuse" => 3,
+            "reduce_speed" | "relief" | "replace_offshift" | "schedule" | "proceed_watch" => 1,
+            "signalman_slow" | "rest" | "inspect_now" | "inspect" | "lift_plan" | "carry" | "park_at_stop" | "schedule_offshift" => 2,
+            "rest_and_midday_stop" | "park" | "stop" | "replace_now" | "legal_inspection" | "refuse" | "hold_heavy" | "stop_work" => 3,
             "storm_secure" => 4,
+            "stop_now" => 5,
             _ => 2,
         }
     }
 
+    /// 선택지 성격의 기본값 (상황이 나쁘면 '진행' 은 '위험' 으로 올린다 — `open_decision`)
+    fn stance_for(topic: &str, key: &str) -> &'static str {
+        match (topic, key) {
+            (_, "continue") | (_, "standard") | (_, "postpone") | (_, "park_at_stop") | (_, "proceed_watch") => "proceed",
+            ("component", "defer") => "proceed",
+            ("overtime", "overtime") => "proceed",
+            (_, "lift_anyway") => "danger",
+            (_, "reduce_speed") | (_, "signalman_slow") | (_, "rest") | (_, "lift_plan") | (_, "relief") | (_, "inspect") | (_, "schedule") | (_, "replace_offshift") | (_, "storm_secure") | (_, "schedule_offshift") => "safe",
+            (_, "park") | (_, "stop") | (_, "stop_now") | (_, "stop_work") | (_, "hold_heavy") | (_, "rest_and_midday_stop") | (_, "replace_now") | (_, "inspect_now") | (_, "legal_inspection") | (_, "carry") | (_, "refuse") => "stop",
+            _ => "proceed",
+        }
+    }
+
+    /// 결정이 걸린 작업 절차
+    fn procedure_for(&self, topic: &str) -> &'static str {
+        let (sched, _, _) = self.schedule(self.idx);
+        match topic {
+            "storm" => "작업 후 · 계류",
+            "overtime" => "작업 후 · 교대",
+            "component" | "inspection" | "legal" | "corrosion" | "prognostic" => "정비 · 점검",
+            "critical_lift" | "rigging" => "줄걸이 · 시험 인양",
+            "test_lift" | "overweight" => "시험 인양",
+            "landing" => "착지 · 해체",
+            "heat" => "작업 전 점검",
+            "incident" => "사고 대응",
+            _ if !sched => "작업 전 점검",
+            _ => "인양 · 이동",
+        }
+    }
+
+    /// 지금 상황 판정 (안전 · 진행 · 위험 · 중단)
+    fn situation_for(&self, topic: &str, component: Option<&str>) -> &'static str {
+        if let Some(c) = component.and_then(|id| self.ledger.component(id)) {
+            return match c.status {
+                Health::Good => "safe",
+                Health::Watch | Health::Plan => "proceed",
+                Health::Replace => "danger",
+                Health::Overdue => "stop",
+            };
+        }
+        match self.book.level(topic) {
+            Some(AlertLevel::Stop) => "stop",
+            Some(AlertLevel::Danger) | Some(AlertLevel::Warning) => "danger",
+            Some(AlertLevel::Caution) | Some(AlertLevel::Info) => "proceed",
+            None => "proceed",
+        }
+    }
     #[allow(clippy::too_many_arguments)]
     fn open_decision(&mut self, topic: &str, component: Option<&str>, header: &str, question: String, mut options: Vec<ChoiceOption>, attention: Vec<String>, expected: Vec<(String, f64)>) -> Option<StepOutcome> {
         let id = self.new_id();
+        let situation = self.situation_for(topic, component);
+        let best_safe = options
+            .iter()
+            .filter(|o| o.enabled && matches!(Self::stance_for(topic, &o.key), "safe" | "stop"))
+            .filter_map(|o| expected.iter().find(|(k, _)| *k == o.key).map(|(_, e)| *e))
+            .fold(f64::INFINITY, f64::min);
+        for o in options.iter_mut() {
+            let mut st = Self::stance_for(topic, &o.key);
+            let e = expected.iter().find(|(k, _)| *k == o.key).map(|(_, e)| *e);
+            // 막혔거나, 이미 중단 상황이거나, 안전한 선택보다 기대 사고가 `DANGER_RISK_RATIO` 배 이상이면 '진행' 은 '위험'
+            let ratio_high = matches!(e, Some(x) if best_safe.is_finite() && x > field_constants::DANGER_RISK_RATIO * best_safe.max(1e-9) && x > 1e-6);
+            if st == "proceed" && (!o.enabled || situation == "stop" || ratio_high) {
+                st = "danger";
+            }
+            o.stance = st.into();
+            o.outcome = match e {
+                Some(x) if x > 0.0 => format!("{} · 기대 사고 {:.4}", crate::choice::stance_label(st), x),
+                Some(_) => format!("{} · 기대 사고 0", crate::choice::stance_label(st)),
+                None => crate::choice::stance_label(st).to_string(),
+            };
+        }
         let rec = options.iter().find(|o| o.recommended).map(|o| o.key.clone()).unwrap_or_default();
         let mut prompt = ChoicePrompt {
+            procedure: self.procedure_for(topic).into(),
+            situation: situation.into(),
             kind: if matches!(topic, "component" | "inspection" | "legal") { "maintenance".into() } else { "operation".into() },
             header: header.into(),
             question,
@@ -843,6 +922,32 @@ impl OpSim {
                 format!("{} 부터 작업 종료 · 레일 클램프 · 계류(타이다운), {} 까지 ({} h)", self.at(from), self.at(until), until - from)
             }
             ("storm", "park_at_stop") => "정지 기준에 닿으면 클램프만 체결".into(),
+            ("storm", "stop_now") => {
+                let ol = self.forecaster.outlook(&self.weather, i, self.policy.storm_lookahead_h);
+                let peak = i + ol.hour_of_max.max(1) as usize;
+                let until = peak + self.hours_until_below(peak, self.policy.wind_warn_mps) + 2;
+                self.mods.parks.push((i, until, "태풍 · 폭풍".into()));
+                self.mods.ties.push((i, until));
+                self.usage.clamp_ops += 1.0;
+                format!("지금부터 {} 까지 운전 중지 · 클램프 · 타이다운 ({} h)", self.at(until), until - i)
+            }
+            ("wind", "proceed_watch") => {
+                let hours = self.hours_until_below(i, self.policy.wind_caution_mps).clamp(1, 12);
+                self.mods.watch = Some((i + hours, self.policy.wind_warn_mps));
+                format!("{hours} h 정상 속도, 순간풍속 {:.0} m/s 넘으면 바로 정지", self.policy.wind_warn_mps)
+            }
+            ("legal", "schedule_offshift") => {
+                self.push_task("legal_inspection", None, field_constants::LEGAL_INSPECTION_H, true, "법정 안전검사 (비번 시간)");
+                format!("비번 시간 안전검사 예약 ({:.0} h)", field_constants::LEGAL_INSPECTION_H)
+            }
+            ("inspection", "stop_work") => {
+                self.push_task("periodic_inspection", None, field_constants::PERIODIC_INSPECTION_H, false, "정기 점검 (근무 중)");
+                format!("지금 {:.0} h 운전 중지 · 정기 점검", field_constants::PERIODIC_INSPECTION_H)
+            }
+            ("critical_lift", "hold_heavy") => {
+                self.mods.heavy_hold_day = Some(self.day_num(i));
+                "오늘 중량물 들기 보류 (물량 이월)".into()
+            }
             ("heat", "rest") => {
                 self.mods.heat_rest_until = Some((i / 24 + 1) * 24);
                 self.mods.heat_midday_stop = false;
@@ -986,6 +1091,7 @@ impl OpSim {
                     Self::option("storm_secure", "태풍 대비 고정", format!("조기 종료 · 클램프 · 타이다운 — 예상 일주 여유 {:.2}", self.runaway_margin(ol.max_gust_mps, true, true)), true, true, &[]),
                     Self::option("park_at_stop", "정지 기준까지 운전", format!("클램프만 — 예상 일주 여유 {margin_clamp:.2}"), false, margin_clamp >= 1.0, if margin_clamp >= 1.0 { &[] } else { &["클램프만으로는 폭풍 일주 여유 1 미만"] }),
                     Self::option("continue", "그대로 운전", "폭풍 예보 중 계속 운전".into(), false, false, &["폭풍 예보 (운전 허용 풍속 초과 예상)"]),
+                    Self::option("stop_now", "지금 작업 중단 · 고정", "지금부터 폭풍이 지날 때까지 운전 중지 · 클램프 · 타이다운".into(), false, true, &[]),
                 ];
                 if let Some(o) = self.open_decision(
                     "storm",
@@ -994,7 +1100,7 @@ impl OpSim {
                     format!("{} — 태풍 · 폭풍이 다가옵니다. 크레인을 어떻게 대비할까요?", self.at(i)),
                     opts,
                     vec![format!("최대 순간풍속 {:.0} m/s 예보", ol.max_gust_mps)],
-                    vec![("storm_secure".into(), exp_secure), ("park_at_stop".into(), exp_clamp), ("continue".into(), 1.0)],
+                    vec![("storm_secure".into(), exp_secure), ("park_at_stop".into(), exp_clamp), ("continue".into(), 1.0), ("stop_now".into(), 0.0)],
                 ) {
                     return Some(o);
                 }
@@ -1040,11 +1146,13 @@ impl OpSim {
                         let cap = self.capacity_per_hour(1.0, g);
                         let e_cont = self.expected_incidents_for(i, 1.0, hours);
                         let e_slow = self.expected_incidents_for(i, self.table.reduced_speed, hours);
+                        let e_watch = self.expected_incidents_below(i, 1.0, hours, p.wind_warn_mps);
                         let rec_park = l == AlertLevel::Danger;
                         let opts = vec![
                             Self::option("reduce_speed", "속도 낮춰 계속", format!("속도 ×{:.1} · 흔들림 억제 유지, 정지 기준이면 자동 정지 — 예상 사고 {:.4}", self.table.reduced_speed, e_slow), !rec_park, true, &[]),
                             Self::option("park", "운전 중지 · 계류", format!("예상 손실 약 {hours:.0} h ≈ {:.0} 이동", hours * cap), rec_park, true, &[]),
                             Self::option("continue", "그대로 계속", format!("예상 사고 {e_cont:.4} (감속 대비 ×{:.1})", e_cont / e_slow.max(1e-12)), false, l < AlertLevel::Danger, if l < AlertLevel::Danger { &[] } else { &["정지 기준 풍속 예보"] }),
+                            Self::option("proceed_watch", "감시하며 진행", format!("정상 속도, 순간풍속 {:.0} m/s 넘으면 바로 정지 ({hours:.0} h) — 예상 사고 {e_watch:.4}", p.wind_warn_mps), false, true, &[]),
                         ];
                         if let Some(o) = self.open_decision(
                             "wind",
@@ -1053,7 +1161,7 @@ impl OpSim {
                             format!("{} — 순간풍속 {:.1} m/s ({} h 안 {:.1} m/s 예보). 어떻게 운전할까요?", self.at(i), g_now, p.wind_lookahead_h, ol.max_gust_mps),
                             opts,
                             vec![format!("운전 정지 기준 {:.0} m/s", p.wind_stop_mps)],
-                            vec![("reduce_speed".into(), e_slow), ("park".into(), 0.0), ("continue".into(), e_cont)],
+                            vec![("reduce_speed".into(), e_slow), ("park".into(), 0.0), ("continue".into(), e_cont), ("proceed_watch".into(), e_watch)],
                         ) {
                             return Some(o);
                         }
@@ -1273,10 +1381,12 @@ impl OpSim {
                 None,
             );
             let opts = vec![
-                Self::option("legal_inspection", "안전검사 수검", format!("{:.0} h 운전 중지", field_constants::LEGAL_INSPECTION_H), true, true, &[]),
+                Self::option("legal_inspection", "지금 수검", format!("{:.0} h 운전 중지", field_constants::LEGAL_INSPECTION_H), overdue, true, &[]),
+                Self::option("schedule_offshift", "비번 시간 수검 예약", format!("다음 비번 시간 {:.0} h (24시간 현장은 근무 중)", field_constants::LEGAL_INSPECTION_H), !overdue, true, &[]),
                 Self::option("postpone", "나중에", "검사 기한까지 운전".into(), false, !overdue, if overdue { &["안전검사 기한 지남 — 운전 불가"] } else { &[] }),
             ];
-            if let Some(o) = self.open_decision("legal", None, "안전검사", format!("{} — 법정 안전검사 기한이 {}. 언제 받을까요?", self.at(i), if overdue { "지났습니다" } else { "다가옵니다" }), opts, vec![], vec![]) {
+            let e_late = self.risk.base_per_hour * (self.risk.legal_overdue - 1.0) * self.work_hours() * 7.0;
+            if let Some(o) = self.open_decision("legal", None, "안전검사", format!("{} — 법정 안전검사 기한이 {}. 언제 받을까요?", self.at(i), if overdue { "지났습니다" } else { "다가옵니다" }), opts, vec![], vec![("legal_inspection".into(), 0.0), ("schedule_offshift".into(), 0.0), ("postpone".into(), if overdue { e_late } else { 0.0 })]) {
                 return Some(o);
             }
         }
@@ -1299,8 +1409,9 @@ impl OpSim {
             let opts = vec![
                 Self::option("inspect", "비번 시간 정기 점검", format!("{:.0} h, 생산 손실 없음 (비번 시간)", field_constants::PERIODIC_INSPECTION_H), true, true, &[]),
                 Self::option("postpone", "1주 연기", "점검 지연 — 위험 배수 증가".into(), false, since < 2.0 * ops.periodic_inspection_days as f64, if since < 2.0 * ops.periodic_inspection_days as f64 { &[] } else { &["점검 주기 두 배 초과"] }),
+                Self::option("stop_work", "지금 멈추고 점검", format!("근무 중 {:.0} h 운전 중지 · 바로 점검", field_constants::PERIODIC_INSPECTION_H), false, true, &[]),
             ];
-            if let Some(o) = self.open_decision("inspection", None, "정기 점검", format!("{} — 정기 점검 기한입니다. 진행할까요?", self.at(i)), opts, vec![], vec![("inspect".into(), 0.0), ("postpone".into(), self.risk.base_per_hour * (self.risk.inspection_overdue - 1.0) * 7.0 * self.work_hours())]) {
+            if let Some(o) = self.open_decision("inspection", None, "정기 점검", format!("{} — 정기 점검 기한입니다. 진행할까요?", self.at(i)), opts, vec![], vec![("inspect".into(), 0.0), ("stop_work".into(), 0.0), ("postpone".into(), self.risk.base_per_hour * (self.risk.inspection_overdue - 1.0) * 7.0 * self.work_hours())]) {
                 return Some(o);
             }
         }
@@ -1327,8 +1438,9 @@ impl OpSim {
             let opts = vec![
                 Self::option("lift_plan", "작업계획서 · 신호수", format!("중량물마다 +{:.0} s — 예상 사고 {e_plan:.4}", field_constants::LIFT_PLAN_EXTRA_S), true, true, &[]),
                 Self::option("standard", "일반 절차", format!("예상 사고 {e_std:.4}"), false, true, &[]),
+                Self::option("hold_heavy", "중량물 오늘 보류", format!("중량물 약 {n:.0} 회를 다음 날로 — 그만큼 물량 이월"), false, true, &[]),
             ];
-            if let Some(o) = self.open_decision("critical_lift", None, "중량물", format!("{} — 오늘 중량물 들기가 약 {n:.0} 회 있습니다. 어떻게 할까요?", self.at(i)), opts, vec![], vec![("lift_plan".into(), e_plan), ("standard".into(), e_std)]) {
+            if let Some(o) = self.open_decision("critical_lift", None, "중량물", format!("{} — 오늘 중량물 들기가 약 {n:.0} 회 있습니다. 어떻게 할까요?", self.at(i)), opts, vec![], vec![("lift_plan".into(), e_plan), ("standard".into(), e_std), ("hold_heavy".into(), 0.0)]) {
                 return Some(o);
             }
         }
@@ -1521,7 +1633,7 @@ impl OpSim {
             signalman: ops.signalman,
             exclusion_zone: ops.exclusion_zone,
             maintenance: ops.maintenance_quality.clone(),
-            critical_share: crit,
+            critical_share: if self.mods.heavy_hold_day == Some(self.day_num(i)) { 0.0 } else { crit },
             critical_planned: self.lift_plan_valid(self.day_num(i)),
             rope_overdue: overdue(&|id| id.starts_with("rope")),
             brake_overdue: overdue(&|id| id.starts_with("brake")),
@@ -1540,6 +1652,22 @@ impl OpSim {
     fn expected_incidents_for(&self, from: usize, speed: f64, hours: f64) -> f64 {
         let n = hours.ceil() as usize;
         (0..n).map(|k| self.risk.evaluate(&self.risk_inputs((from + k).min(self.weather.len() - 1), speed)).per_hour).sum::<f64>() * (hours / n.max(1) as f64)
+    }
+
+    /// `expected_incidents_for` 와 같되, 순간풍속이 `gust_limit` 이상인 시간은 멈춘다고 본다 (감시하며 진행)
+    fn expected_incidents_below(&self, from: usize, speed: f64, hours: f64, gust_limit: f64) -> f64 {
+        let n = hours.ceil() as usize;
+        (0..n)
+            .map(|k| {
+                let j = (from + k).min(self.weather.len() - 1);
+                if self.weather[j].gust_mps >= gust_limit {
+                    0.0
+                } else {
+                    self.risk.evaluate(&self.risk_inputs(j, speed)).per_hour
+                }
+            })
+            .sum::<f64>()
+            * (hours / n.max(1) as f64)
     }
 
     // ---------- 하루 시작 · 끝 ----------
@@ -1723,11 +1851,14 @@ impl OpSim {
         self.kpi.demand_moves += demand;
         let parked = self.is_parked(i);
         let gust_stop = self.outdoor() && w.gust_mps >= self.policy.wind_stop_mps;
+        let watch_stop = self.outdoor() && matches!(self.mods.watch, Some((u, g)) if i < u && w.gust_mps >= g);
         let legal_overdue = self.site.operations.legal_inspection_days > 0 && self.abs_day(i) - self.ledger.last_legal_inspection_day > self.legal_interval() + 30.0;
         let reason: Option<String> = if let Some(b) = blocking {
             Some(b)
         } else if gust_stop {
             Some("바람".into())
+        } else if watch_stop {
+            Some("바람 (감시 정지)".into())
         } else if parked {
             self.park_reason(i)
         } else if legal_overdue {
@@ -1759,6 +1890,11 @@ impl OpSim {
         let cap = minutes * 60.0 / self.move_time_s(speed, if self.outdoor() { w.gust_mps } else { 0.0 }, i).max(1.0);
         let want = demand + self.backlog.min(self.site.throughput.moves_per_hour * self.work_hours());
         let mut moves = want.min(cap).max(0.0);
+        // 중량물 보류: 그날 정격 근처 들기는 이월
+        if self.mods.heavy_hold_day == Some(self.day_num(i)) {
+            let crit: f64 = self.table.normal.iter().filter(|r| r.fraction >= self.site.loads.critical_fraction).map(|r| r.share).sum();
+            moves *= (1.0 - crit).clamp(0.0, 1.0);
+        }
         // 정격 초과 (신고 무게 오류) — 제한 장치가 막는다
         let over = moves * self.site.loads.overweight_share.max(0.0);
         if over > 0.0 {

@@ -1,0 +1,26 @@
+{
+  "note": "해안 위치 목록. 좌표는 지도에서 읽은 근삿값(소수 둘째 자리 정도). sea_bearing_deg = 현장에서 바다(바람이 바다에서 불어오는 쪽)를 보는 방위, coast_type = harbor(방파제 안 항내) · bay(만) · open(외해에 면함) · tidal(갯벌 · 조차 큰 해안) · strait(해협) · river(하구에서 먼 강 항구). marine_* = 파고를 조회할 바다 격자 근처 점. kma_station 이 있으면 기상청 평년값과 교차검증하는 지점.",
+  "sites": [
+    {"id": "kma_busan", "name": "부산 (기상청 159)", "name_en": "Busan KMA 159", "country": "KR", "lat": 35.1047, "lon": 129.0320, "kind": "kma_station", "kma_station": 159, "climate_id": "busan", "sea_bearing_deg": 180, "coast_type": "harbor"},
+    {"id": "kma_incheon", "name": "인천 (기상청 112)", "name_en": "Incheon KMA 112", "country": "KR", "lat": 37.4777, "lon": 126.6249, "kind": "kma_station", "kma_station": 112, "climate_id": "incheon", "sea_bearing_deg": 250, "coast_type": "tidal"},
+    {"id": "kma_ulsan", "name": "울산 (기상청 152)", "name_en": "Ulsan KMA 152", "country": "KR", "lat": 35.5823, "lon": 129.3347, "kind": "kma_station", "kma_station": 152, "climate_id": "ulsan", "sea_bearing_deg": 100, "coast_type": "bay"},
+    {"id": "kma_pohang", "name": "포항 (기상청 138)", "name_en": "Pohang KMA 138", "country": "KR", "lat": 36.0320, "lon": 129.3800, "kind": "kma_station", "kma_station": 138, "climate_id": "pohang", "sea_bearing_deg": 70, "coast_type": "bay"},
+    {"id": "kma_yeosu", "name": "여수 (기상청 168)", "name_en": "Yeosu KMA 168", "country": "KR", "lat": 34.7393, "lon": 127.7406, "kind": "kma_station", "kma_station": 168, "climate_id": "yeosu", "sea_bearing_deg": 170, "coast_type": "open"},
+    {"id": "kma_seosan", "name": "서산 (기상청 129)", "name_en": "Seosan KMA 129", "country": "KR", "lat": 36.7766, "lon": 126.4939, "kind": "kma_station", "kma_station": 129, "climate_id": "seosan", "sea_bearing_deg": 270, "coast_type": "bay"},
+
+    {"id": "busan_newport", "name": "부산 신항", "name_en": "Busan New Port", "country": "KR", "lat": 35.075, "lon": 128.815, "kind": "port", "kma_station": 159, "climate_id": "busan", "sea_bearing_deg": 180, "coast_type": "bay", "marine_lat": 34.98, "marine_lon": 128.83},
+    {"id": "gwangyang", "name": "광양항", "name_en": "Gwangyang", "country": "KR", "lat": 34.905, "lon": 127.695, "kind": "port", "kma_station": 168, "climate_id": "yeosu", "sea_bearing_deg": 180, "coast_type": "bay", "marine_lat": 34.80, "marine_lon": 127.78},
+    {"id": "incheon_newport", "name": "인천 신항", "name_en": "Incheon New Port", "country": "KR", "lat": 37.345, "lon": 126.615, "kind": "port", "kma_station": 112, "climate_id": "incheon", "sea_bearing_deg": 240, "coast_type": "tidal", "marine_lat": 37.25, "marine_lon": 126.45},
+    {"id": "ulsan_mipo", "name": "울산 미포만 (조선소)", "name_en": "Ulsan Mipo Bay", "country": "KR", "lat": 35.505, "lon": 129.430, "kind": "port", "kma_station": 152, "climate_id": "ulsan", "sea_bearing_deg": 110, "coast_type": "open", "marine_lat": 35.47, "marine_lon": 129.52},
+    {"id": "pyeongtaek_dangjin", "name": "평택 · 당진항", "name_en": "Pyeongtaek-Dangjin", "country": "KR", "lat": 36.965, "lon": 126.835, "kind": "port", "kma_station": 129, "climate_id": "seosan", "sea_bearing_deg": 280, "coast_type": "bay", "marine_lat": 37.00, "marine_lon": 126.60},
+    {"id": "changwon_masan", "name": "창원 마산만", "name_en": "Changwon Masan Bay", "country": "KR", "lat": 35.200, "lon": 128.580, "kind": "port", "kma_station": 159, "climate_id": "busan", "sea_bearing_deg": 170, "coast_type": "bay", "marine_lat": 35.05, "marine_lon": 128.60},
+    {"id": "yokohama", "name": "요코하마 (일본)", "name_en": "Yokohama", "country": "JP", "lat": 35.440, "lon": 139.670, "kind": "port", "sea_bearing_deg": 120, "coast_type": "bay", "marine_lat": 35.35, "marine_lon": 139.75},
+    {"id": "shanghai_yangshan", "name": "상하이 양산 (중국)", "name_en": "Shanghai Yangshan", "country": "CN", "lat": 30.630, "lon": 122.060, "kind": "port", "sea_bearing_deg": 90, "coast_type": "open", "marine_lat": 30.60, "marine_lon": 122.25},
+    {"id": "kaohsiung", "name": "가오슝 (대만)", "name_en": "Kaohsiung", "country": "TW", "lat": 22.565, "lon": 120.310, "kind": "port", "sea_bearing_deg": 250, "coast_type": "open", "marine_lat": 22.50, "marine_lon": 120.20},
+    {"id": "singapore_tuas", "name": "싱가포르 투아스", "name_en": "Singapore Tuas", "country": "SG", "lat": 1.260, "lon": 103.630, "kind": "port", "sea_bearing_deg": 200, "coast_type": "strait", "marine_lat": 1.18, "marine_lon": 103.65},
+    {"id": "jebel_ali", "name": "제벨알리 (UAE)", "name_en": "Jebel Ali", "country": "AE", "lat": 25.010, "lon": 55.060, "kind": "port", "sea_bearing_deg": 315, "coast_type": "open", "marine_lat": 25.10, "marine_lon": 54.95},
+    {"id": "rotterdam_maasvlakte", "name": "로테르담 마스플락테 (네덜란드)", "name_en": "Rotterdam Maasvlakte", "country": "NL", "lat": 51.960, "lon": 4.020, "kind": "port", "sea_bearing_deg": 280, "coast_type": "open", "marine_lat": 51.98, "marine_lon": 3.85},
+    {"id": "hamburg", "name": "함부르크 (독일, 하구에서 약 100 km)", "name_en": "Hamburg", "country": "DE", "lat": 53.535, "lon": 9.935, "kind": "port", "sea_bearing_deg": 315, "coast_type": "river"},
+    {"id": "los_angeles", "name": "로스앤젤레스 · 롱비치 (미국)", "name_en": "Los Angeles / Long Beach", "country": "US", "lat": 33.745, "lon": -118.235, "kind": "port", "sea_bearing_deg": 190, "coast_type": "harbor", "marine_lat": 33.68, "marine_lon": -118.22}
+  ]
+}

@@ -864,6 +864,16 @@ pub fn choice_prompt(rep: &DecisionReport, operator_rate: Option<(f64, u64)>, ad
         .into_iter()
         .map(|a| {
             let enabled = operator_can_choose(rep, a);
+            // 성격: 규칙 판단보다 덜 보수적이면 위험, 멈추는 조치는 중단, 위험을 줄이며 계속하면 안전
+            let stance = if a.conservativeness() < rep.rule_action.conservativeness() {
+                "danger"
+            } else {
+                match a {
+                    Action::Continue => "proceed",
+                    Action::Inspect | Action::Park | Action::Stop => "stop",
+                    _ => "safe",
+                }
+            };
             ChoiceOption {
                 key: a.key().into(),
                 label: a.label().into(),
@@ -875,6 +885,8 @@ pub fn choice_prompt(rep: &DecisionReport, operator_rate: Option<(f64, u64)>, ad
                 enabled,
                 blocked_by: if enabled { Vec::new() } else { floor_gates.clone() },
                 chosen: rep.operator_choice == Some(a),
+                stance: stance.into(),
+                outcome: crate::choice::stance_label(stance).into(),
             }
         })
         .collect();
@@ -920,6 +932,14 @@ pub fn choice_prompt(rep: &DecisionReport, operator_rate: Option<(f64, u64)>, ad
             (None, None) => "LAYA 조언 미사용".into(),
         },
         agreement,
+        procedure: "인양 · 이동".into(),
+        situation: match system.conservativeness() {
+            0 => "safe",
+            1 => "proceed",
+            2 => "danger",
+            _ => "stop",
+        }
+        .into(),
     };
     c.sort_options(|k| Action::from_key(k).map(|a| a.conservativeness()).unwrap_or(9));
     c.settle_attention();

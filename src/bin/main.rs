@@ -17,7 +17,9 @@ use crane_model::ingest;
 use crane_model::motor;
 use crane_model::operation::{self, DecisionPolicy, OpSim, OperationConfig, OperationReport, StepOutcome};
 use crane_model::site::{self, SiteStore};
+use crane_model::ports;
 use crane_model::weather;
+use crane_model::weather_api;
 use std::collections::HashMap;
 use std::io::{BufRead, Read, Write as IoWrite};
 use std::path::{Path, PathBuf};
@@ -48,6 +50,11 @@ crane_demo — 갠트리 크레인 샌드박스
                                                       값을 바꿔 사용자 프리셋으로 저장 (예: --set throughput.moves_per_hour=25)
   crane_demo site delete <id>
   crane_demo climate list | show <id> | check <id> [--years N]   기후 프리셋 · 생성 날씨 vs 평년값
+  crane_demo weather ports                            세계 항만 · 해안 위치와 ERA5 통계 요약
+  crane_demo weather fetch --lat Y --lon X [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--cache DIR] [--offline]
+                                                      Open-Meteo ERA5 시간별 실제 날씨 조회 · 저장 (curl, 키 없음)
+  crane_demo weather build [--only id,id] [--file data/climate/ports.json] [--cache DIR] [--offline]
+                                                      위치 목록의 ERA5 일별 · 시간별 · SO₂ · 파고 → 통계 파일
   crane_demo operate --site <id> [--asset 이름] [--days N] [--start MM-DD] [--seed N]
                      [--policy ask|recommended|conservative|risky] [--ledger DIR] [--fresh] [--no-incidents] [--out DIR]
                                                       현장 운영 시뮬레이션 (ask: 결정 카드마다 묻는다)
@@ -367,6 +374,7 @@ fn run() -> Result<(), String> {
         "calibrate" => cmd_calibrate(&a),
         "site" => cmd_site(&a),
         "climate" => cmd_climate(&a),
+        "weather" => cmd_weather(&a),
         "operate" => cmd_operate(&a, &out),
         "health" => cmd_health(&a),
         "fieldcal" => cmd_fieldcal(&a, &out),
@@ -483,6 +491,120 @@ fn cmd_climate(a: &Args) -> Result<(), String> {
             Ok(())
         }
         other => Err(format!("climate 다음에 list | show | check 중 하나를 주세요 ({other})")),
+    }
+}
+
+/// 1970-01-01 부터 날 수 → (년, 월, 일) (Hinnant 의 civil_from_days)
+fn civil_from_days(z: i64) -> (i64, u32, u32) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    (yoe + era * 400 + if m <= 2 { 1 } else { 0 }, m, d)
+}
+
+fn today() -> String {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    let (y, m, d) = civil_from_days(secs.div_euclid(86_400));
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+fn cmd_weather(a: &Args) -> Result<(), String> {
+    let cache = PathBuf::from(a.s("cache").unwrap_or("out/weather_cache"));
+    let mut f = weather_api::Fetcher::new(&cache);
+    f.offline = a.s("offline").is_some();
+    match a.pos.get(1).map(|s| s.as_str()).unwrap_or("ports") {
+        "ports" | "list" => {
+            println!("{:<22} {:<3} {:<7} {:>6} {:>5} {:>6} {:>5} {:>6} {:>6} {:>6}  이름", "id", "국가", "해안", "기온°C", "RH%", "젖음h", "풍속", "폭풍/년", "SO₂", "파고m");
+            for s in ports::sites() {
+                let st = ports::stats(&s.id);
+                match st {
+                    Some(st) => {
+                        let so2: Vec<f64> = st.months.iter().filter_map(|m| m.so2_ug_m3).collect();
+                        let wv: Vec<f64> = st.months.iter().filter_map(|m| m.wave_mean_m).collect();
+                        let mean = |v: &[f64]| if v.is_empty() { f64::NAN } else { v.iter().sum::<f64>() / v.len() as f64 };
+                        let wind = st.months.iter().map(|m| m.wind_mean_mps).sum::<f64>() / 12.0;
+                        println!(
+                            "{:<22} {:<3} {:<7} {:>6.1} {:>5.0} {:>6.0} {:>5.1} {:>6.2} {:>6.1} {:>6.2}  {}",
+                            s.id,
+                            s.country,
+                            s.coast_type,
+                            st.annual_mean_temp(),
+                            st.annual_mean_rh(),
+                            st.tow_h(),
+                            wind,
+                            st.storm_peaks.iter().filter(|p| p.1 >= 25.0).count() as f64 / st.years.max(1.0),
+                            mean(&so2),
+                            mean(&wv),
+                            s.name
+                        );
+                    }
+                    None => println!("{:<22} {:<3} {:<7} (통계 없음 — crane_demo weather build)  {}", s.id, s.country, s.coast_type, s.name),
+                }
+            }
+            println!("\n{}", weather_api::ATTRIBUTION);
+            Ok(())
+        }
+        "fetch" => {
+            let lat = a.f("lat").ok_or("--lat 이 필요합니다")?;
+            let lon = a.f("lon").ok_or("--lon 이 필요합니다")?;
+            let from = a.s("from").unwrap_or("2023-01-01");
+            let to = a.s("to").unwrap_or("2023-12-31");
+            let h = f.hourly(lat, lon, from, to)?;
+            let n = h.len().max(1) as f64;
+            let tow = (0..h.len()).filter(|&i| h.rh_pct[i] > weather_api::TOW_RH && h.temp_c[i] > 0.0).count() as f64;
+            println!("격자 {:.3}, {:.3} (해발 {:.0} m, {}) · {} 시간 · 빈 값 {}", h.lat, h.lon, h.elevation_m, h.timezone, h.len(), h.gaps);
+            println!(
+                "평균 기온 {:.1} °C · 습도 {:.0}% · 풍속 {:.1} m/s · 최대 순간 {:.1} m/s · 강수 {:.0} mm · 젖음 시간 {:.0} h ({:.0}%)",
+                h.temp_c.iter().sum::<f64>() / n,
+                h.rh_pct.iter().sum::<f64>() / n,
+                h.wind_mps.iter().sum::<f64>() / n,
+                h.gust_mps.iter().cloned().fold(0.0, f64::max),
+                h.precip_mm.iter().sum::<f64>(),
+                tow,
+                100.0 * tow / n
+            );
+            println!("캐시: {}", f.cache_path("hourly-era5", lat, lon, from, to).display());
+            println!("{}", weather_api::ATTRIBUTION);
+            Ok(())
+        }
+        "build" => {
+            let only: Option<Vec<String>> = a.s("only").map(|o| o.split(',').map(|x| x.trim().to_string()).collect());
+            let sel: Vec<ports::PortSite> = ports::sites().into_iter().filter(|s| only.as_ref().map(|o| o.contains(&s.id)).unwrap_or(true)).collect();
+            let mut file = ports::build(&f, &sel, &mut |m| println!("{m}"));
+            let path = PathBuf::from(a.s("file").unwrap_or("data/climate/ports.json"));
+            // 일부만 다시 만들면 나머지는 기존 파일에서 그대로 둔다
+            if only.is_some() {
+                if let Ok(t) = std::fs::read_to_string(&path) {
+                    if let Ok(old) = serde_json::from_str::<ports::PortsFile>(&t) {
+                        for s in old.sites {
+                            if !file.sites.iter().any(|x| x.id == s.id) {
+                                file.sites.push(s);
+                            }
+                        }
+                    }
+                }
+            }
+            let order: Vec<String> = ports::sites().into_iter().map(|s| s.id).collect();
+            file.sites.sort_by_key(|s| order.iter().position(|x| *x == s.id).unwrap_or(usize::MAX));
+            file.built = today();
+            // 위치마다 한 줄 (diff 가 읽히게)
+            let mut txt = format!("{{\n  \"note\": {},\n  \"built\": {},\n  \"sites\": [\n", serde_json::to_string(&file.note).unwrap(), serde_json::to_string(&file.built).unwrap());
+            for (k, s) in file.sites.iter().enumerate() {
+                txt.push_str("    ");
+                txt.push_str(&serde_json::to_string(s).unwrap());
+                txt.push_str(if k + 1 < file.sites.len() { ",\n" } else { "\n" });
+            }
+            txt.push_str("  ]\n}\n");
+            std::fs::write(&path, txt).map_err(|e| format!("{}: {e}", path.display()))?;
+            println!("저장: {} ({} 위치) — 다시 빌드해야 기본 기후에 들어갑니다", path.display(), file.sites.len());
+            Ok(())
+        }
+        other => Err(format!("weather 다음에 ports | fetch | build 중 하나를 주세요 ({other})")),
     }
 }
 

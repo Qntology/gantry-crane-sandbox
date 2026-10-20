@@ -169,7 +169,7 @@ impl ClimateRef {
     pub fn resolve(&self) -> Result<Climate, String> {
         match self {
             ClimateRef::Preset(n) => climate_data::preset(n).ok_or_else(|| {
-                let names: Vec<String> = climate_data::presets().into_iter().map(|c| c.id).collect();
+                let names: Vec<String> = climate_data::all().into_iter().map(|c| c.id).collect();
                 format!("기후 프리셋 '{}' 이 없습니다 (사용 가능: {})", n, names.join(", "))
             }),
             ClimateRef::Data(c) => {

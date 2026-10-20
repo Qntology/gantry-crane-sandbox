@@ -24,9 +24,11 @@ pub mod ingest;
 pub mod motion;
 pub mod motor;
 pub mod operation;
+pub mod ports;
 pub mod rng;
 pub mod rope;
 pub mod rope_data;
+pub mod scoring;
 pub mod sds;
 pub mod site;
 pub mod site_presets;
@@ -34,6 +36,7 @@ pub mod site_presets;
 pub mod store;
 pub mod timeseries;
 pub mod weather;
+pub mod weather_api;
 
 #[cfg(feature = "ml")]
 pub mod ml;

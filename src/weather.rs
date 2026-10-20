@@ -153,6 +153,9 @@ pub struct Climate {
     pub snow_flurry_prob: f64,
     #[serde(default)]
     pub typhoon: Option<TyphoonClimate>,
+    /// 월별 바람장미: 12달 × 8방위(북 · 북동 · … · 북서, 바람이 불어오는 쪽) 빈도. 비어 있으면 풍향을 고르게 뽑는다
+    #[serde(default)]
+    pub wind_rose: Vec<Vec<f64>>,
 }
 
 fn default_gust_factor() -> f64 {
@@ -241,6 +244,9 @@ pub struct HourWeather {
     pub gust_mps: f64,
     /// 풍향: 0° = 주행 방향(+x), 90° = 횡행 방향(+y)
     pub wind_dir_deg: f64,
+    /// 바람이 불어오는 방위 (기상 풍향, 0° = 북, 시계 방향) — 해안 염분 계산용. 없으면 `wind_dir_deg` 에서 추정
+    #[serde(default)]
+    pub wind_from_deg: Option<f64>,
     /// 시간 강수량 (mm)
     pub rain_mm: f64,
     pub snow: bool,
@@ -327,6 +333,27 @@ pub struct WeatherOptions {
     pub seed: u64,
 }
 
+/// 바람장미가 있으면 그 달의 8방위 빈도에서, 없으면 고르게 — 균등 난수 하나로 방위(바람이 불어오는 쪽)를 정한다
+pub fn rose_direction(c: &Climate, month: usize, u: f64) -> f64 {
+    let Some(row) = c.wind_rose.get(month).filter(|r| r.len() == 8) else {
+        return u * 360.0;
+    };
+    let tot: f64 = row.iter().map(|x| x.max(0.0)).sum();
+    if tot <= 0.0 {
+        return u * 360.0;
+    }
+    let mut acc = 0.0;
+    for (k, f) in row.iter().enumerate() {
+        let p = f.max(0.0) / tot;
+        if u < acc + p || k == 7 {
+            let frac = if p > 0.0 { ((u - acc) / p).clamp(0.0, 1.0) } else { 0.5 };
+            return (k as f64 * 45.0 - 22.5 + 45.0 * frac).rem_euclid(360.0);
+        }
+        acc += p;
+    }
+    u * 360.0
+}
+
 /// 시간별 날씨를 만든다 (길이 = days × 24)
 pub fn generate(c: &Climate, o: &WeatherOptions) -> Vec<HourWeather> {
     let mut rng = Rng::new(o.seed ^ 0x5745_4154_4845_5221);
@@ -375,7 +402,7 @@ pub fn generate(c: &Climate, o: &WeatherOptions) -> Vec<HourWeather> {
         let u = norm_cdf(z_wind).clamp(1e-9, 1.0 - 1e-9);
         let w_mean = c.interp(doy as f64, |x| x.wind_mean_mps).max(0.1);
         let w_day = w_mean / g1k * (-(1.0 - u).ln()).powf(1.0 / k);
-        let dir_day = rng.uniform() * 360.0;
+        let dir_day = rose_direction(c, m, rng.uniform());
         // 강수 (2상태 마르코프, 지연 상관 0.3)
         let p_wet = (mc.rain_days / dim).clamp(0.0, 0.98);
         let rho = 0.3;
@@ -447,6 +474,8 @@ pub fn generate(c: &Climate, o: &WeatherOptions) -> Vec<HourWeather> {
             let recent_wet = last_wet_h.map(|w| idx - w <= 12).unwrap_or(false);
             let icy = temp <= 0.5 && (recent_wet || fog_now);
             let thunder_km = if thunder && h >= th_start && h < th_start + th_len { Some(15.0 * rng.uniform()) } else { None };
+            // 난수 순서를 예전과 같게 둔다 (보정한 기후 계수가 같은 날씨를 다시 만든다)
+            let dir_h = (dir_day + 25.0 * rng.normal()).rem_euclid(360.0);
             out.push(HourWeather {
                 day: d,
                 hour: h as u8,
@@ -455,7 +484,8 @@ pub fn generate(c: &Climate, o: &WeatherOptions) -> Vec<HourWeather> {
                 humidity_pct: rh,
                 wind_mean_mps: wind,
                 gust_mps: gust,
-                wind_dir_deg: (dir_day + 25.0 * rng.normal()).rem_euclid(360.0),
+                wind_dir_deg: (dir_h + 180.0).rem_euclid(360.0),
+                wind_from_deg: Some(dir_h),
                 rain_mm: rain,
                 snow,
                 icy,
@@ -635,6 +665,7 @@ mod tests {
             snow_temp_c: 1.0,
             snow_flurry_prob: 0.0,
             typhoon: None,
+            wind_rose: Vec::new(),
         }
     }
 

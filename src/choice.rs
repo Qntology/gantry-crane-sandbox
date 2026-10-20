@@ -25,6 +25,26 @@ pub struct ChoiceOption {
     pub blocked_by: Vec<String>,
     /// 작업자가 고른 선택지
     pub chosen: bool,
+    /// 선택지 성격: "safe" 안전(위험을 줄이고 계속) · "proceed" 진행(기준 안에서 그대로) ·
+    /// "danger" 위험(기준을 넘기거나 위험이 크게 늘어남) · "stop" 중단(멈춤)
+    #[serde(default)]
+    pub stance: String,
+    /// 고르면 예상되는 결과 한 줄 (기대 사고 · 손실)
+    #[serde(default)]
+    pub outcome: String,
+}
+
+/// 선택지 성격 네 가지 (안전 · 진행 · 위험 · 중단)
+pub const STANCES: [&str; 4] = ["safe", "proceed", "danger", "stop"];
+
+pub fn stance_label(s: &str) -> &'static str {
+    match s {
+        "safe" => "안전",
+        "proceed" => "진행",
+        "danger" => "위험",
+        "stop" => "중단",
+        _ => "",
+    }
 }
 
 /// 선택 카드 하나 — 질문 · 선택지 · 사람이 봐야 하는 이유
@@ -45,6 +65,12 @@ pub struct ChoicePrompt {
     pub operator_choice: Option<String>,
     /// laya 상태 (사용 · 미사용 이유)
     pub advisor_note: String,
+    /// 이 결정이 걸린 작업 절차 (작업 전 점검 · 줄걸이 · 시험 인양 · 인양 · 이동 · 착지 · 작업 후 · 정비 · 점검)
+    #[serde(default)]
+    pub procedure: String,
+    /// 지금 상황 판정 (안전 · 진행 · 위험 · 중단 — `STANCES` 와 같은 말)
+    #[serde(default)]
+    pub situation: String,
     /// (이름, 일치율, 건수) — 규칙–laya, 작업자–laya, 작업자–규칙
     pub agreement: Vec<(String, f64, u64)>,
 }

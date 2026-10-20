@@ -184,6 +184,14 @@ pub fn durability() -> DurabilityModel {
     }
 }
 
+/// ERA5(Open-Meteo era5_seamless) → 기상청 지상 관측 기준 보정 계수 — `fieldcal` 이 기상청 6개 지점과 비교해 맞춘다
+pub fn era5_adjust() -> crate::weather_api::Era5Adjust {
+    crate::weather_api::Era5Adjust::default()
+}
+
+/// 결정 카드: '진행' 선택의 기대 사고가 가장 안전한 선택의 이 배수 이상이면 '위험' 으로 표시한다 (정책 값, 가정)
+pub const DANGER_RISK_RATIO: f64 = 2.0;
+
 /// 보정 결과 (fieldcal, 2026-10-20) — 로프: 보정 전 1.0 (수명 202일) → 1.337 (270일 = 9개월).
 /// 브레이크: 보정 전 2.0×10⁻⁵ mm (권상 패드 75일) → 2.05×10⁻⁶ mm (730일 = 2년)
 pub const ROPE_FIELD_FACTOR: f64 = 1.337;
