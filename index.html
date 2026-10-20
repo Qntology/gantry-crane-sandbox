@@ -65,7 +65,44 @@ td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; 
 .legend i { display: inline-block; width: 10px; height: 3px; margin-right: 4px; vertical-align: middle; }
 #drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; text-align: center; color: var(--text-muted); }
 .empty { color: var(--text-muted); padding: 30px; text-align: center; }
-@media (max-width: 1100px) { .view { grid-template-columns: 1fr; } .layout { grid-template-columns: 1fr; } aside { border-right: none; } }
+details.ed { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; margin: 8px 0; }
+details.ed summary { cursor: pointer; color: var(--text-dim); font-size: 12px; padding: 4px 0; }
+details.ed h3 { font-size: 11px; color: var(--text-muted); margin: 10px 0 2px; font-weight: 600; letter-spacing: .3px; }
+label.chk { grid-template-columns: 1fr auto; }
+label.chk input { width: auto; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+.feed { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.feed .it { padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.feed .it:last-child { border-bottom: none; }
+.feed .at { font-family: var(--font-mono); color: var(--text-muted); margin-right: 6px; }
+.lv { display: inline-block; min-width: 42px; text-align: center; border-radius: 4px; padding: 0 5px; font-size: 11px; margin-right: 6px; }
+.lv-info { background: #1d2b3a; color: var(--accent); } .lv-caution { background: #3b3020; color: var(--warning); }
+.lv-warning { background: #45301f; color: #ffb074; } .lv-danger { background: #45241f; color: #ff9b7a; } .lv-stop { background: #551d24; color: var(--danger); }
+.st { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+.st-good { background: #1d3a28; color: var(--success); } .st-watch { background: #23303f; color: var(--accent); } .st-plan { background: #3b3020; color: var(--warning); }
+.st-replace { background: #45241f; color: #ff9b7a; } .st-overdue { background: #551d24; color: var(--danger); }
+.bar { position: relative; height: 8px; background: var(--bg-raise); border-radius: 4px; min-width: 90px; overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.overlay { position: fixed; inset: 0; background: rgba(5, 8, 12, .62); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.overlay.hidden { display: none; }
+.dcard { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+.dhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip { background: var(--bg-raise); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--accent); }
+.dq { font-size: 14px; margin: 4px 0 8px; line-height: 1.5; }
+.dopt { display: grid; grid-template-columns: 26px 1fr; gap: 2px 8px; width: 100%; text-align: left; margin: 6px 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-raise); color: var(--text); }
+.dopt.rec { border-color: var(--accent); }
+.dopt:not(.off):hover, .dopt:not(.off):focus { border-color: var(--accent); outline: none; background: #222c37; }
+.dopt .n { grid-row: span 2; font: 600 13px var(--font-mono); color: var(--accent); align-self: center; text-align: center; }
+.dopt .l { font-weight: 600; }
+.dopt .d { color: var(--text-dim); font-size: 12px; }
+.dopt.off { opacity: .55; cursor: not-allowed; }
+.dopt.off .n { color: var(--danger); }
+#toasts { position: fixed; right: 14px; bottom: 14px; display: grid; gap: 6px; z-index: 60; width: min(420px, calc(100vw - 28px)); }
+.toast { background: var(--bg-panel); border: 1px solid var(--line); border-left: 4px solid var(--warning); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+.toast.danger, .toast.stop { border-left-color: var(--danger); }
+.progress { height: 4px; background: var(--bg-raise); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+.progress i { display: block; height: 100%; background: var(--accent); width: 0; }
+@media (max-width: 1100px) { .view { grid-template-columns: 1fr; } .layout { grid-template-columns: 1fr; } aside { border-right: none; } .split { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -79,7 +116,7 @@ td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; 
 <aside>
   <fieldset>
     <legend>시나리오</legend>
-    <label>크레인 <select id="crane"><option value="gantry_10t_20m">갠트리 10 t × 20 m</option><option value="overhead_5t_16m">천장 5 t × 16 m</option></select></label>
+    <label>크레인 <select id="crane"><option value="gantry_10t_20m">갠트리 10 t × 20 m</option><option value="overhead_5t_16m">천장 5 t × 16 m</option><option value="rmg_41t_30m">컨테이너 RMG 41 t × 30 m</option><option value="overhead_40t_30m">코일 천장 40 t × 30 m</option><option value="gantry_40t_30m">갠트리 40 t × 30 m</option><option value="goliath_900t_120m">골리앗 900 t × 120 m</option></select></label>
     <label>하중 (kg) <input id="load" type="number" value="8000" step="500"></label>
     <label>흔들림 억제 <select id="mode"><option value="off">없음</option><option value="zv">ZV</option><option value="zvd" selected>ZVD</option><option value="ei">EI</option><option value="closed_loop">각도 궤환 (LQR)</option></select></label>
     <label>평균 풍속 (m/s) <input id="wind" type="number" value="0" step="1"></label>
@@ -97,6 +134,57 @@ td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; 
     <button id="cmp">방식 비교</button>
   </div>
   <fieldset style="margin-top:12px">
+    <legend>현장 운영 · 내구도</legend>
+    <label>현장 프리셋 <select id="siteSel"></select></label>
+    <div class="note" id="siteDesc"></div>
+    <details class="ed" id="siteEd">
+      <summary>프리셋 값 보기 · 바꾸기</summary>
+      <h3>크레인 · 기후</h3>
+      <label>크레인 <select id="e_crane"></select></label>
+      <label>기후 (기상청 지점) <select id="e_climate"></select></label>
+      <h3>물량</h3>
+      <label>시간당 이동 (수요) <input id="e_mph" type="number" step="0.5"></label>
+      <label>교대 수 <input id="e_shifts" type="number" min="1" max="3" step="1"></label>
+      <label>교대 시간 (h) <input id="e_shift_h" type="number" step="0.5"></label>
+      <label>첫 교대 시작 (시) <input id="e_start_h" type="number" min="0" max="23" step="1"></label>
+      <label>주당 운전 일 <input id="e_dpw" type="number" min="1" max="7" step="1"></label>
+      <label>취급 시간 (s/이동) <input id="e_handling" type="number" step="1"></label>
+      <label>주행 · 횡행 · 권상 (m) <input id="e_geom" placeholder="60, 15, 12"></label>
+      <h3>무게 (정격 대비 비율 : 비중)</h3>
+      <label>하중 스펙트럼 <input id="e_spec" placeholder="0.1:0.3, 0.5:0.5, 1.0:0.2"></label>
+      <label>중량물 기준 비율 <input id="e_crit" type="number" step="0.05"></label>
+      <label>정격 초과 섞임 비율 <input id="e_over" type="number" step="0.001"></label>
+      <h3>환경</h3>
+      <label class="chk">실내 <input id="e_indoor" type="checkbox"></label>
+      <label>부식성 (ISO 9223) <select id="e_corr"><option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option><option>CX</option></select></label>
+      <label>분진 (ISO 281) <select id="e_dust"><option value="clean">깨끗</option><option value="normal">보통</option><option value="dusty">오염</option><option value="severe">심한 오염</option></select></label>
+      <label>열원 가산 (K) <input id="e_heat" type="number" step="1"></label>
+      <label>레일 상태 <select id="e_rail"><option value="good">양호</option><option value="fair">보통</option><option value="poor">나쁨</option></select></label>
+      <h3>운영 · 사람 · 정비</h3>
+      <label>운전원 숙련 <select id="e_oper"><option value="novice">초보</option><option value="standard">보통</option><option value="expert">숙련</option></select></label>
+      <label class="chk">지상 작업자 (줄걸이 · 신호) <input id="e_ground" type="checkbox"></label>
+      <label class="chk">운전실 냉방 <input id="e_cab" type="checkbox"></label>
+      <label class="chk">신호수 · 신호 체계 <input id="e_signal" type="checkbox"></label>
+      <label class="chk">작업 반경 출입 통제 <input id="e_excl" type="checkbox"></label>
+      <label>정비 품질 <select id="e_maint"><option value="good">양호</option><option value="average">보통</option><option value="poor">미흡</option></select></label>
+      <label>정기 점검 주기 (일) <input id="e_periodic" type="number" step="1"></label>
+      <label>야간 조도 (lx) <input id="e_lux" type="number" step="10"></label>
+      <h3>새 이름으로 저장</h3>
+      <label>새 id (영문) <input id="e_newid" placeholder="my_site"></label>
+      <label>이름 <input id="e_newname" placeholder="우리 현장"></label>
+      <div class="btnrow"><button id="siteSave">프리셋 저장</button><button id="siteDel">사용자 프리셋 삭제</button></div>
+    </details>
+    <label>자산 이름 (원장) <input id="opAsset" value="crane-01"></label>
+    <label>시작 날짜 (MM-DD) <input id="opStart" value="07-01"></label>
+    <label>기간 (일) <input id="opDays" type="number" value="30" step="1"></label>
+    <label>시드 <input id="opSeed" type="number" value="1" step="1"></label>
+    <label>결정 방식 <select id="opPolicy"><option value="ask">카드마다 묻기</option><option value="recommended">권장 자동</option><option value="conservative">가장 보수적</option><option value="risky">알림 무시 (위험 비교)</option></select></label>
+    <label class="chk">원장 새로 시작 <input id="opFresh" type="checkbox"></label>
+    <div class="btnrow"><button class="primary" id="opRun">현장 운영 실행</button></div>
+    <div class="progress"><i id="opProg"></i></div>
+    <div class="note" id="opStatus">같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.</div>
+  </fieldset>
+  <fieldset>
     <legend>모델 (TTM-R3 · LAYA)</legend>
     <label>폴더 <input id="mroot" placeholder="models 폴더 경로"></label>
     <div class="btnrow"><button id="mload">불러오기</button></div>
@@ -104,7 +192,7 @@ td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; 
   </fieldset>
   <fieldset>
     <legend>결과 파일 열기</legend>
-    <div id="drop">crane_demo pipeline 이 저장한<br><b>pipeline.json</b> (+ compare.json)<br>을 끌어다 놓거나 고르세요<br><input type="file" id="file" accept=".json" multiple style="margin-top:8px"></div>
+    <div id="drop">crane_demo 가 저장한<br><b>pipeline.json</b> · compare.json<br><b>operation.json</b> · fieldcal.json<br>을 끌어다 놓거나 고르세요<br><input type="file" id="file" accept=".json" multiple style="margin-top:8px"></div>
   </fieldset>
   <fieldset>
     <legend>내보내기</legend>
@@ -137,6 +225,8 @@ td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; 
       <button data-t="duty">근무 · 예측</button>
       <button data-t="compare">방식 비교</button>
       <button data-t="xcheck">교차검증</button>
+      <button data-t="op">현장 운영 · 내구도</button>
+      <button data-t="cal">실데이터 보정</button>
     </div>
     <div class="tab on" id="t-sway">
       <div class="charts">
@@ -162,12 +252,56 @@ td.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; 
     </div>
     <div class="tab" id="t-compare"><canvas id="cCmp" style="height:240px"></canvas><table id="cmpTable" style="margin-top:10px"></table></div>
     <div class="tab" id="t-xcheck"><div id="xcheck" class="muted">—</div></div>
+    <div class="tab" id="t-op">
+      <div id="opHead" class="note">현장 운영을 실행하거나 operation.json 을 여세요.</div>
+      <div class="kpis" id="opKpis"></div>
+      <div class="charts" style="margin-top:12px">
+        <div><canvas id="cOpMoves"></canvas><div class="legend" id="lOpMoves"></div></div>
+        <div><canvas id="cOpWx"></canvas><div class="legend" id="lOpWx"></div></div>
+        <div><canvas id="cOpRisk"></canvas><div class="legend" id="lOpRisk"></div></div>
+        <div><canvas id="cOpLife"></canvas><div class="legend" id="lOpLife"></div></div>
+      </div>
+      <h2 style="margin-top:12px">부품 내구도 · 안정성 <span class="muted" id="opLedger"></span></h2>
+      <table id="opHealth"></table>
+      <div class="split">
+        <div><h2>사고 예방 알림 <select id="alertFilter" style="width:auto;margin-left:6px"><option value="1">주의 이상</option><option value="2">경고 이상</option><option value="0">전체</option></select></h2><div id="opAlerts" class="feed"></div></div>
+        <div><h2>결정 기록</h2><div id="opDecisions" class="feed"></div></div>
+      </div>
+      <h2 style="margin-top:12px">사고 · 정지 사유</h2>
+      <div id="opIncidents" class="note"></div>
+    </div>
+    <div class="tab" id="t-cal">
+      <div class="btnrow"><button id="calQuick">빠른 확인 (짧은 표본 · 오차 큼)</button><button id="calFull">전체 보정 다시 계산 (몇 분)</button></div>
+      <div id="calSum" class="note" style="margin-top:8px">조사한 실데이터(기상청 · 제조사 · 현장 사례 · 법규)와 모델 출력의 오차입니다. crane_demo fieldcal 결과(fieldcal.json)도 열 수 있습니다.</div>
+      <table id="calTable" style="margin-top:8px"></table>
+    </div>
   </section>
 </main>
 </div>
+<div id="decOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="decQ">
+  <div class="dcard">
+    <div class="dhead"><span class="chip" id="decHeader"></span><span class="muted" id="decAt"></span><span class="spacer" style="flex:1"></span><span class="muted" id="decRisk"></span></div>
+    <div class="dq" id="decQ"></div>
+    <div class="note" id="decAttn"></div>
+    <div id="decOpts"></div>
+    <div class="note" style="margin-top:8px">숫자 키로 고르고 Enter 는 권장입니다. 막힌 선택지는 안전 기준(게이트)이 고를 수 없게 한 것입니다.</div>
+    <div class="btnrow" style="margin-top:6px"><button id="decAuto">남은 결정은 모두 권장으로</button></div>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
 <script>
 const TAURI = window.__TAURI__ && (window.__TAURI__.invoke || (window.__TAURI__.tauri && window.__TAURI__.tauri.invoke));
-const invoke = TAURI ? (cmd, args) => TAURI(cmd, args) : null;
+// crane_demo serve 로 열면 같은 명령을 /api/<명령> 으로 부른다
+let HTTP = false;
+async function httpCall(cmd, args) {
+  const r = await fetch('/api/' + cmd, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(args || {}) });
+  const j = await r.json();
+  if (!j.ok) throw j.error;
+  return j.data;
+}
+const online = () => !!TAURI || HTTP;
+const invoke = (cmd, args) => TAURI ? TAURI(cmd, args) : HTTP ? httpCall(cmd, args) : Promise.reject('파일 모드');
+const api = (cmd, args) => TAURI ? TAURI('api_call', { cmd, args: args || {} }) : HTTP ? httpCall(cmd, args) : Promise.reject('파일 모드');
 const $ = id => document.getElementById(id);
 const UI = (() => { const cs = getComputedStyle(document.documentElement); const v = n => cs.getPropertyValue(n).trim();
   return { plot: v('--bg-plot'), grid: v('--plot-grid'), gridStrong: v('--plot-grid-strong'), text: v('--text'), dim: v('--text-dim'), muted: v('--text-muted'),
@@ -321,7 +455,7 @@ function renderDecision() {
   }
   $('decision').innerHTML = html;
   $('decision').querySelectorAll('button[data-a]').forEach(b => b.onclick = async () => {
-    if (!invoke) { setStatus('작업자 선택은 데스크톱 앱에서 기록됩니다'); return; }
+    if (!online()) { setStatus('작업자 선택은 데스크톱 앱 · crane_demo serve 에서 기록됩니다'); return; }
     try { REPORT.decision = await invoke('choose_action', { action: b.dataset.a }); renderDecision(); renderKpis(); } catch (e) { setStatus(String(e)); }
   });
 }
@@ -394,8 +528,8 @@ function renderAll() {
   play.t = 0; play.on = false; $('playBtn').textContent = '재생'; drawScene();
   if (REPORT.models) $('mstatus').textContent = (REPORT.models.notes || []).join(' · ') || $('mstatus').textContent;
 }
-$('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 't-' + b.dataset.t)); if (REPORT) { renderSway(); renderMotor(); renderDuty(); renderCompare(); } };
-window.addEventListener('resize', () => { if (REPORT) { drawScene(); renderSway(); renderMotor(); renderDuty(); renderCompare(); } });
+$('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 't-' + b.dataset.t)); if (REPORT) { renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP && b.dataset.t === 'op') renderOp(); };
+window.addEventListener('resize', () => { if (REPORT) { drawScene(); renderSway(); renderMotor(); renderDuty(); renderCompare(); } if (OP) renderOp(); });
 
 // ---------- 실행 · 파일 ----------
 async function buildScenario() {
@@ -405,7 +539,7 @@ async function buildScenario() {
   return sc;
 }
 $('run').onclick = async () => {
-  if (!invoke) { setStatus('파일 모드: crane_demo pipeline 결과를 여세요'); return; }
+  if (!online()) { setStatus('파일 모드: crane_demo pipeline 결과를 여세요'); return; }
   try {
     setStatus('계산 중…'); $('run').disabled = true;
     const scenario = await buildScenario();
@@ -414,17 +548,19 @@ $('run').onclick = async () => {
   } catch (e) { setStatus('오류: ' + e); } finally { $('run').disabled = false; }
 };
 $('cmp').onclick = async () => {
-  if (!invoke) { setStatus('파일 모드: compare.json 을 여세요'); return; }
+  if (!online()) { setStatus('파일 모드: compare.json 을 여세요'); return; }
   try { setStatus('비교 중…'); COMPARE = await invoke('compare', { scenario: await buildScenario() }); renderCompare(); document.querySelector('#tabs button[data-t=compare]').click(); setStatus('완료'); } catch (e) { setStatus('오류: ' + e); }
 };
 $('mload').onclick = async () => {
-  if (!invoke) { setStatus('모델은 데스크톱 앱에서 불러옵니다'); return; }
+  if (!online()) { setStatus('모델은 데스크톱 앱에서 불러옵니다'); return; }
   try { const s = await invoke('models_load', { root: $('mroot').value }); $('mstatus').textContent = `TTM ${s.ttm ? '있음' : '없음'} · LAYA ${s.advisor ? '있음' : '없음'} · ${s.notes.join(' · ')}`; } catch (e) { setStatus('오류: ' + e); }
 };
 async function openFiles(files) {
   for (const f of files) {
     try { const j = JSON.parse(await f.text());
       if (Array.isArray(j) && j.length && 'max_residual_sway_mm' in j[0]) { COMPARE = j; renderCompare(); }
+      else if (j.kpi && j.ledger && j.daily) { OP = j; renderOp(); document.querySelector('#tabs button[data-t=op]').click(); setStatus(`불러옴: ${j.site_name}`); }
+      else if (j.benchmarks && j.fitted) { CAL = j; renderCal(); document.querySelector('#tabs button[data-t=cal]').click(); setStatus('불러옴: 실데이터 보정'); }
       else if (j.cycle && j.decision) { REPORT = j; renderAll(); }
       else if (j.samples && j.moves) { REPORT = { crane: null, cycle: j, decision: { gates: [], rule_reasons: [], final_action: 'continue', final_action_label: '판정 없음', rule_action_label: '—' }, forecasts: [] }; setStatus('cycle.json 은 크레인 제원이 없어 pipeline.json 을 권장합니다'); }
       else setStatus(`${f.name}: 알 수 없는 형식`);
@@ -449,12 +585,256 @@ $('exCsv').onclick = () => REPORT && download('samples.csv', samplesCsv());
 $('exProg').onclick = () => REPORT && download('motion_program.json', JSON.stringify(REPORT.cycle.program, null, 2));
 $('exJson').onclick = () => REPORT && download('pipeline.json', JSON.stringify(REPORT));
 
+// ---------- 현장 운영 · 내구도 ----------
+let SITES = [], SITE = null, OP = null, CAL = null, CRANES = [], CLIMATES = [], AUTO = false, SHOWN_ALERTS = 0;
+const LV = { info: ['안내', 0], caution: ['주의', 1], warning: ['경고', 2], danger: ['위험', 3], stop: ['작업 중지', 4] };
+const ST = { good: '양호', watch: '관찰', plan: '정비 계획', replace: '교체 필요', overdue: '기준 초과' };
+const lvRank = l => (LV[l] || ['', 0])[1];
+
+function setOpStatus(s) { $('opStatus').textContent = s || ''; }
+function doyLabel(doy) { const dim = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; let d = ((doy % 365) + 365) % 365, m = 0; while (d >= dim[m]) { d -= dim[m]; m++; } return `${String(m + 1).padStart(2, '0')}-${String(d + 1).padStart(2, '0')}`; }
+function fillSelect(sel, items, val) { sel.innerHTML = items.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); if (val !== undefined) sel.value = val; }
+
+async function loadSiteList(select) {
+  SITES = await api('sites_list');
+  fillSelect($('siteSel'), SITES.map(s => [s.id, `${s.name}${s.builtin ? '' : ' (사용자)'}`]), select || (SITE && SITE.id) || SITES[0]?.id);
+  await loadSite($('siteSel').value);
+}
+
+async function loadSite(id) {
+  if (!id) return;
+  SITE = await api('site_get', { id });
+  fillEditor();
+}
+
+function spectrumText(sp) { return sp.map(b => `${+b.fraction.toFixed(3)}:${+b.share.toFixed(3)}`).join(', '); }
+function parseSpectrum(t) {
+  const out = t.split(',').map(x => x.trim()).filter(Boolean).map(x => { const [f, s] = x.split(':').map(Number); return { fraction: f, share: s }; });
+  if (!out.length || out.some(b => !isFinite(b.fraction) || !isFinite(b.share))) throw '하중 스펙트럼은 "비율:비중, …" 꼴입니다';
+  return out;
+}
+
+function fillEditor() {
+  const p = SITE; if (!p) return;
+  const t = p.throughput, l = p.loads, e = p.environment, o = p.operations;
+  $('siteDesc').textContent = p.description || '';
+  fillSelect($('e_crane'), CRANES.map(c => [c.name, c.name]), typeof p.crane === 'string' ? p.crane : p.crane.name);
+  fillSelect($('e_climate'), CLIMATES.map(c => [c.id, c.name]), typeof p.climate === 'string' ? p.climate : p.climate.id);
+  $('e_mph').value = t.moves_per_hour; $('e_shifts').value = t.shifts_per_day; $('e_shift_h').value = t.shift_hours; $('e_start_h').value = t.first_shift_start_h;
+  $('e_dpw').value = t.days_per_week; $('e_handling').value = t.handling_overhead_s; $('e_geom').value = `${t.travel_m}, ${t.trolley_m}, ${t.lift_m}`;
+  $('e_spec').value = spectrumText(l.spectrum); $('e_crit').value = l.critical_fraction; $('e_over').value = l.overweight_share;
+  $('e_indoor').checked = e.indoor; $('e_corr').value = e.corrosivity; $('e_dust').value = e.dust; $('e_heat').value = e.heat_source_c; $('e_rail').value = e.rail_condition;
+  $('e_oper').value = o.operator_experience; $('e_ground').checked = o.ground_crew; $('e_cab').checked = o.cab_air_conditioned; $('e_signal').checked = o.signalman;
+  $('e_excl').checked = o.exclusion_zone; $('e_maint').value = o.maintenance_quality; $('e_periodic').value = o.periodic_inspection_days; $('e_lux').value = o.lighting_lux;
+  $('siteDel').disabled = SITES.find(s => s.id === p.id)?.builtin !== false;
+}
+
+function readEditor() {
+  const p = JSON.parse(JSON.stringify(SITE));
+  const num = id => { const v = Number($(id).value); if (!isFinite(v)) throw `${id} 값이 숫자가 아닙니다`; return v; };
+  p.crane = $('e_crane').value; p.climate = $('e_climate').value;
+  Object.assign(p.throughput, { moves_per_hour: num('e_mph'), shifts_per_day: num('e_shifts'), shift_hours: num('e_shift_h'), first_shift_start_h: num('e_start_h'), days_per_week: num('e_dpw'), handling_overhead_s: num('e_handling') });
+  const g = $('e_geom').value.split(',').map(Number);
+  if (g.length !== 3 || g.some(v => !isFinite(v))) throw '주행 · 횡행 · 권상 거리는 "60, 15, 12" 꼴입니다';
+  [p.throughput.travel_m, p.throughput.trolley_m, p.throughput.lift_m] = g;
+  p.loads.spectrum = parseSpectrum($('e_spec').value); p.loads.critical_fraction = num('e_crit'); p.loads.overweight_share = num('e_over');
+  Object.assign(p.environment, { indoor: $('e_indoor').checked, corrosivity: $('e_corr').value, dust: $('e_dust').value, heat_source_c: num('e_heat'), rail_condition: $('e_rail').value });
+  Object.assign(p.operations, { operator_experience: $('e_oper').value, ground_crew: $('e_ground').checked, cab_air_conditioned: $('e_cab').checked, signalman: $('e_signal').checked, exclusion_zone: $('e_excl').checked, maintenance_quality: $('e_maint').value, periodic_inspection_days: num('e_periodic'), lighting_lux: num('e_lux') });
+  return p;
+}
+
+$('siteSel').onchange = e => loadSite(e.target.value).catch(err => setOpStatus('오류: ' + err));
+$('siteSave').onclick = async () => {
+  if (!online()) { setOpStatus('프리셋 저장은 데스크톱 앱 · crane_demo serve 에서 됩니다'); return; }
+  try {
+    const p = readEditor();
+    const id = $('e_newid').value.trim();
+    if (!id) throw '새 id 를 적어 주세요 (영문 · 숫자 · _ · -)';
+    p.id = id; if ($('e_newname').value.trim()) p.name = $('e_newname').value.trim();
+    const r = await api('site_save', { preset: p });
+    await loadSiteList(id);
+    setOpStatus(`저장: ${r.path}`);
+  } catch (e) { setOpStatus('저장 실패: ' + e); }
+};
+$('siteDel').onclick = async () => {
+  try { await api('site_delete', { id: SITE.id }); SITE = null; await loadSiteList(); setOpStatus('삭제했습니다'); } catch (e) { setOpStatus('삭제 실패: ' + e); }
+};
+
+// ---------- 실행 · 결정 카드 ----------
+$('opRun').onclick = async () => {
+  if (!online()) { setOpStatus('파일 모드: crane_demo operate 결과(operation.json)를 열거나, 데스크톱 앱 · crane_demo serve 에서 실행하세요'); return; }
+  try {
+    const preset = readEditor();
+    const [m, d] = ($('opStart').value || '').split('-').map(Number);
+    const config = {
+      asset_id: $('opAsset').value.trim() || 'crane-01',
+      days: Math.max(1, Math.round(Number($('opDays').value) || 30)),
+      start_month: isFinite(m) && m ? m : null, start_day: isFinite(d) && d ? d : null,
+      seed: Math.round(Number($('opSeed').value) || 1),
+      policy: $('opPolicy').value, incidents: true, fresh: $('opFresh').checked,
+    };
+    AUTO = config.policy !== 'ask'; SHOWN_ALERTS = 0;
+    $('opRun').disabled = true; setOpStatus('사이클 증분표 계산 중 (하중 구간마다 동역학)…');
+    const st = await api('op_start', { preset, config });
+    document.querySelector('#tabs button[data-t=op]').click();
+    handleOp(st);
+    await step();
+  } catch (e) { setOpStatus('오류: ' + e); $('opRun').disabled = false; }
+};
+
+async function step() {
+  setOpStatus('진행 중…');
+  const st = await api('op_run', {});
+  handleOp(st);
+}
+
+function handleOp(st) {
+  OP = st.report;
+  renderOp();
+  const frac = st.finished ? 1 : Math.min(1, (st.hour_index || 0) / 24 / Math.max(1, Number($('opDays').value) || 1));
+  $('opProg').style.width = `${(frac * 100).toFixed(1)}%`;
+  toastNew();
+  if (st.pending) {
+    if (AUTO) { decide(st.pending.id, st.pending.prompt.recommended); return; }
+    showDecision(st.pending);
+  } else if (st.finished) {
+    hideDecision(); $('opRun').disabled = false;
+    // 같은 자산으로 다시 돌리면 계절을 이어 가도록 다음 날짜를 채워 둔다
+    if (OP.ledger && OP.ledger.next_doy != null) $('opStart').value = doyLabel(OP.ledger.next_doy);
+    setOpStatus(`끝: ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 결정 ${OP.kpi.decisions} 건 · 원장 누적 ${fmt(OP.ledger.day, 0)} 일`);
+  }
+}
+
+async function decide(id, key) {
+  try { const st = await api('op_decide', { id, key }); handleOp(st); }
+  catch (e) { setOpStatus('선택 오류: ' + e); }
+}
+
+function showDecision(d) {
+  const p = d.prompt;
+  $('decHeader').textContent = p.header;
+  $('decAt').textContent = d.at;
+  $('decRisk').textContent = `위험 지수 ${fmt(d.risk_index, 0)}`;
+  $('decQ').textContent = p.question;
+  $('decAttn').innerHTML = (p.attention || []).map(a => `· ${esc(a)}`).join('<br>');
+  let n = 0;
+  $('decOpts').innerHTML = p.options.map(o => {
+    if (!o.enabled) return `<div class="dopt off" aria-disabled="true"><span class="n">✕</span><span class="l">${esc(o.label)}</span><span class="d">막힘: ${esc(o.blocked_by.join(', '))}</span></div>`;
+    n += 1;
+    return `<button class="dopt ${o.recommended ? 'rec' : ''}" data-k="${esc(o.key)}" data-n="${n}"><span class="n">${n}</span><span class="l">${esc(o.label)}${o.recommended ? ' (권장)' : ''}</span><span class="d">${esc(o.detail)}</span></button>`;
+  }).join('');
+  $('decOpts').querySelectorAll('button[data-k]').forEach(b => b.onclick = () => { hideDecision(); decide(d.id, b.dataset.k); });
+  $('decOverlay').classList.remove('hidden');
+  $('decOverlay').dataset.id = d.id; $('decOverlay').dataset.rec = p.recommended;
+  const first = $('decOpts').querySelector('button.rec') || $('decOpts').querySelector('button');
+  if (first) first.focus();
+  setOpStatus(`결정 대기: ${p.header}`);
+}
+function hideDecision() { $('decOverlay').classList.add('hidden'); }
+$('decAuto').onclick = () => { AUTO = true; const o = $('decOverlay'); hideDecision(); decide(o.dataset.id, o.dataset.rec); };
+window.addEventListener('keydown', e => {
+  const o = $('decOverlay'); if (o.classList.contains('hidden')) return;
+  if (e.key === 'Enter') { e.preventDefault(); hideDecision(); decide(o.dataset.id, o.dataset.rec); return; }
+  const b = $('decOpts').querySelector(`button[data-n="${e.key}"]`);
+  if (b) { e.preventDefault(); hideDecision(); decide(o.dataset.id, b.dataset.k); }
+});
+
+function toastNew() {
+  if (!OP) return;
+  const fresh = OP.alerts.slice(SHOWN_ALERTS).filter(a => lvRank(a.level) >= 2);
+  SHOWN_ALERTS = OP.alerts.length;
+  for (const a of fresh.slice(-3)) {
+    const t = document.createElement('div');
+    t.className = `toast ${a.level}`;
+    t.innerHTML = `<span class="lv lv-${a.level}">${esc(a.level_label)}</span><b>${esc(a.title)}</b> <span class="muted">${esc(a.at)}</span><div>${esc(a.message)}</div><div class="muted">→ ${esc(a.action)}</div>`;
+    $('toasts').appendChild(t);
+    setTimeout(() => t.remove(), 6000);
+  }
+}
+
+// ---------- 그리기 ----------
+function renderOp() {
+  const r = OP; if (!r) return;
+  const k = r.kpi;
+  $('opHead').innerHTML = `<b>${esc(r.site_name)}</b> · 자산 ${esc(r.asset_id)} · 크레인 ${esc(r.crane)} · ${esc(r.start_date)} 시작 ${k.days} 일 · 결정 방식 ${esc(r.policy)}${r.finished ? '' : ' · <span class="muted">진행 중</span>'}`;
+  const kp = (label, value, cls = '') => `<div class="kpi ${cls}"><div class="v">${value}</div><div class="k">${label}</div></div>`;
+  $('opKpis').innerHTML = [
+    kp('가동률 (운전 / 계획)', `${fmt(k.availability * 100, 1)}%`, k.availability < 0.8 ? 'warn' : 'good'),
+    kp('이동 / 수요', `${fmt(k.moves, 0)} / ${fmt(k.demand_moves, 0)}`),
+    kp('운전 시간당 이동', fmt(k.moves_per_op_hour, 1)),
+    kp('에너지 (회생)', `${fmt(k.energy_kwh, 0)} (${fmt(k.regen_kwh, 0)}) kWh`),
+    kp('사고 / 기대', `${k.incidents} / ${fmt(k.expected_incidents, 2)}`, k.incidents > 0 ? 'bad' : ''),
+    kp('위험 지수 평균 · 최대', `${fmt(k.risk_mean, 0)} · ${fmt(k.risk_max, 0)}`, k.risk_max >= 60 ? 'bad' : k.risk_max >= 40 ? 'warn' : ''),
+    kp('결정 (작업자)', `${k.decisions} (${k.decisions_by_operator})`),
+    kp('결정으로 줄인 기대 사고', fmt(k.risk_avoided, 3), 'good'),
+  ].join('');
+  const D = r.daily, x = D.map(d => d.day + 1);
+  chart($('cOpMoves'), { title: '하루 이동 · 수요 · 정지', xLabel: '일', series: [{ name: '이동', x, y: D.map(d => d.moves), color: UI.accent }, { name: '수요', x, y: D.map(d => d.demand), color: UI.muted, dash: [4, 3] }, { name: '정지 h ×10', x, y: D.map(d => d.downtime_h * 10), color: UI.amber }] }, $('lOpMoves'));
+  chart($('cOpWx'), { title: '날씨 (크레인 높이 최대 순간풍속 · 기온)', xLabel: '일', series: [{ name: '최대 순간풍속 m/s', x, y: D.map(d => d.max_gust_mps), color: UI.violet }, { name: '최고 기온 °C', x, y: D.map(d => d.temp_max_c), color: UI.danger }, { name: '최저 기온 °C', x, y: D.map(d => d.temp_min_c), color: UI.teal }, { name: '체감 최고 °C', x, y: D.map(d => d.feels_like_max_c), color: UI.amber, dash: [3, 3], width: 1 }] }, $('lOpWx'));
+  chart($('cOpRisk'), { title: '위험 지수 (하루 최대) · 기대 사고 ×1000', xLabel: '일', series: [{ name: '위험 지수', x, y: D.map(d => d.risk_max), color: UI.danger }, { name: '기대 사고 ×1000', x, y: D.map(d => d.expected_incidents * 1000), color: UI.accent }], hlines: [{ y: 40, label: '경고', color: UI.amber }] }, $('lOpRisk'));
+  const L = r.ledger, H = L.history || [];
+  const order = L.components.map((c, i) => [i, c.life_used]).sort((a, b) => b[1] - a[1]).slice(0, 6).map(v => v[0]);
+  const cols = [UI.danger, UI.amber, UI.violet, UI.accent, UI.teal, UI.success];
+  chart($('cOpLife'), { title: '부품 수명 사용 (원장 누적, %)', xLabel: '누적 일', series: order.map((ci, j) => ({ name: L.components[ci].label, x: H.map(h => h.day), y: H.map(h => (h.life[ci] || 0) * 100), color: cols[j % cols.length] })), hlines: [{ y: 80, label: '정비 계획', color: UI.amber }, { y: 100, label: '교체', color: UI.danger }] }, $('lOpLife'));
+  $('opLedger').textContent = `원장 누적 ${fmt(L.day, 0)} 일 · 운전 ${fmt(L.operating_hours, 0)} h · 이동 ${fmt(L.moves, 0)} · 실행 ${L.runs} 회`;
+  const rows = r.durability.rows.map(c => {
+    const pct = Math.max(0, c.life_used * 100), col = c.status === 'good' ? UI.success : c.status === 'watch' ? UI.accent : c.status === 'plan' ? UI.amber : UI.danger;
+    const m = c.margin == null ? '—' : `${fmt(c.margin, 2)} <span class="muted">(최소 ${fmt(c.margin_min, 2)})</span>`;
+    const rul = c.rul_days == null ? '—' : c.rul_days > 99999 ? '> 10만' : fmt(c.rul_days, 0);
+    return `<tr><td>${esc(c.label)}</td><td><span class="st st-${c.status}">${esc(ST[c.status] || c.status_label)}</span></td><td><div class="bar"><i style="width:${Math.min(100, pct)}%;background:${col}"></i></div></td><td class="num">${fmt(pct, 1)}%</td><td class="num">${rul}</td><td class="num">${c.replacements}</td><td class="num">${m}</td><td class="muted">${esc(c.margin_label || '')}</td><td class="muted">${esc(c.basis)}</td></tr>`;
+  }).join('');
+  $('opHealth').innerHTML = `<tr><th>부품</th><th>상태</th><th>수명 사용</th><th></th><th>남은 일</th><th>교체</th><th>안정성 여유</th><th>여유 기준</th><th>근거</th></tr>${rows}`;
+  renderAlerts();
+  $('opDecisions').innerHTML = r.decisions.slice().reverse().map(d => {
+    const ch = d.prompt.options.find(o => o.chosen);
+    return `<div class="it"><span class="at">${esc(d.at)}</span><span class="chip">${esc(d.prompt.header)}</span> → <b>${esc(ch ? ch.label : d.chosen || '')}</b> <span class="muted">(${esc(d.decided_by === 'operator' ? '작업자' : d.decided_by || '')})</span><div class="muted">${esc(d.outcome || '')}${d.risk_avoided > 0 ? ` · 줄인 기대 사고 ${fmt(d.risk_avoided, 4)}` : ''}</div></div>`;
+  }).join('') || '<div class="it muted">결정이 아직 없습니다</div>';
+  const inc = r.incidents.map(i => `<div>${esc(i.at)} <span class="sev sev${i.severity === '중대' ? 3 : i.severity === '아차사고' ? 1 : 2}">${esc(i.severity)}</span> ${esc(i.kind)} — ${esc(i.detail)} (정지 ${fmt(i.downtime_h, 0)} h)</div>`).join('');
+  const down = (k.downtime_by_reason || []).map(([why, h]) => `${esc(why)} ${fmt(h, 0)} h`).join(' · ');
+  $('opIncidents').innerHTML = `${inc || '<div>사고 없음</div>'}<div class="muted" style="margin-top:6px">정지 · 손실: ${down || '없음'}</div>${(r.notes || []).map(n => `<div class="muted">${esc(n)}</div>`).join('')}`;
+}
+
+function renderAlerts() {
+  if (!OP) return;
+  const min = Number($('alertFilter').value);
+  const items = OP.alerts.filter(a => lvRank(a.level) >= min).slice(-300).reverse();
+  $('opAlerts').innerHTML = items.map(a => `<div class="it"><span class="at">${esc(a.at)}</span><span class="lv lv-${a.level}">${esc(a.level_label)}</span><b>${esc(a.title)}</b>${a.lead_h ? ` <span class="muted">(${a.lead_h} h 전 예보)</span>` : ''}<div>${esc(a.message)}</div><div class="muted">→ ${esc(a.action)} · 근거: ${esc(a.basis)}</div></div>`).join('') || '<div class="it muted">알림이 없습니다</div>';
+}
+$('alertFilter').onchange = renderAlerts;
+
+// ---------- 실데이터 보정 ----------
+const GROUP = { weather: '날씨 (기상청 관측 vs 생성 날씨)', motor: '모터 (제조사 표 vs 열 모델)', throughput: '처리량', durability: '내구도', rule: '법규 확인' };
+function renderCal() {
+  const r = CAL; if (!r) return;
+  $('calSum').innerHTML = `맞춘 항목 평균 절대 오차: 보정 전 <b>${fmt(r.mean_abs_error_before_pct, 1)}%</b> → 보정 뒤 <b>${fmt(r.mean_abs_error_after_pct, 1)}%</b> · 모든 항목 보정 뒤 ${fmt(r.mean_abs_error_all_after_pct, 1)}%<div class="muted">${(r.notes || []).map(esc).join(' · ')}</div>`;
+  let html = '', g = '';
+  const cls = e => Math.abs(e) <= 5 ? 'sev0' : Math.abs(e) <= 15 ? 'sev1' : 'sev2';
+  for (const b of r.benchmarks) {
+    if (b.group !== g) { g = b.group; html += `<tr><th colspan="8" style="padding-top:12px;color:var(--text-dim)">${esc(GROUP[g] || g)}</th></tr><tr><th>항목</th><th>실데이터</th><th>보정 전</th><th>보정 뒤</th><th>전 오차</th><th>뒤 오차</th><th>맞춘 계수</th><th>출처 (신뢰도)</th></tr>`; }
+    html += `<tr><td>${esc(b.label)}</td><td class="num">${fmt(b.reference, 3)} ${esc(b.unit)}</td><td class="num">${fmt(b.before, 3)}</td><td class="num">${fmt(b.after, 3)}</td><td class="num"><span class="sev ${cls(b.error_before_pct)}">${fmt(b.error_before_pct, 1)}%</span></td><td class="num"><span class="sev ${cls(b.error_after_pct)}">${fmt(b.error_after_pct, 1)}%</span></td><td class="muted">${esc(b.knob || '확인만')}</td><td class="muted">${esc(b.source)} (${esc(b.confidence)})</td></tr>`;
+  }
+  $('calTable').innerHTML = html;
+}
+async function runCal(quick) {
+  if (!online()) { $('calSum').textContent = '파일 모드: crane_demo fieldcal 이 저장한 fieldcal.json 을 여세요'; return; }
+  try { $('calSum').textContent = quick ? '빠른 확인 중…' : '전체 보정 계산 중 (몇 분 걸립니다)…'; CAL = await api('fieldcal', { quick }); renderCal(); }
+  catch (e) { $('calSum').textContent = '오류: ' + e; }
+}
+$('calQuick').onclick = () => runCal(true);
+$('calFull').onclick = () => runCal(false);
+
 (async function init() {
-  if (invoke) {
-    $('src').textContent = '데스크톱 (Tauri)';
+  if (!TAURI && location.protocol.startsWith('http')) {
+    try { const r = await fetch('/api/ping', { method: 'POST', body: '{}' }); const j = await r.json(); HTTP = !!(j && j.ok); } catch (_) { HTTP = false; }
+  }
+  if (online()) {
+    $('src').textContent = TAURI ? '데스크톱 (Tauri)' : '브라우저 (crane_demo serve)';
     try { const s = await invoke('models_status'); if (s && (s.ttm || s.advisor)) $('mstatus').textContent = s.notes.join(' · '); } catch (_) {}
+    try { CRANES = await api('cranes'); CLIMATES = await api('climates'); await loadSiteList(); } catch (e) { setOpStatus('프리셋 불러오기 실패: ' + e); }
+    try { CAL = await api('fieldcal_saved'); renderCal(); } catch (_) {}
   } else {
-    $('run').title = '데스크톱 앱에서만 실행됩니다'; $('cmp').title = '데스크톱 앱에서만 실행됩니다';
+    $('run').title = '데스크톱 앱 · crane_demo serve 에서 실행됩니다'; $('cmp').title = $('run').title; $('opRun').title = $('run').title;
+    $('siteDesc').textContent = '파일 모드: 프리셋 편집 · 실행은 데스크톱 앱 또는 crane_demo serve 에서 합니다.';
   }
   drawScene(); renderCompare();
   requestAnimationFrame(tick);

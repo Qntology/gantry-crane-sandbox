@@ -296,12 +296,19 @@ pub struct DesignClass {
     pub design_full_load_hours: f64,
     /// 크레인 사용 등급 설계 작업 사이클 수 (U 등급 상한)
     pub design_cycles: f64,
+    /// 설계 하중 스펙트럼 계수 Kp (Q1–Q4 명목값 0.125 · 0.25 · 0.5 · 1.0) — 구조 피로 설계 기준
+    #[serde(default = "default_kp")]
+    pub spectrum_kp: f64,
+}
+
+fn default_kp() -> f64 {
+    0.25
 }
 
 impl Default for DesignClass {
     fn default() -> Self {
         // ISO 4301-1:2016 Annex B: M5 ↔ 1,600 전부하 시간, U5 = 2.5×10⁵ ~ 5×10⁵ 사이클
-        Self { mechanism_class: "M5".into(), design_full_load_hours: 1600.0, design_cycles: 5.0e5 }
+        Self { mechanism_class: "M5".into(), design_full_load_hours: 1600.0, design_cycles: 5.0e5, spectrum_kp: default_kp() }
     }
 }
 
@@ -336,7 +343,28 @@ pub fn fem_duty_limits(class: &str) -> Option<FemDutyLimits> {
 impl DesignClass {
     /// 기구 등급 이름으로 설계 수명을 채운다
     pub fn for_mechanism(class: &str, design_cycles: f64) -> Option<Self> {
-        Some(Self { mechanism_class: class.to_string(), design_full_load_hours: mechanism_design_hours(class)?, design_cycles })
+        Some(Self { mechanism_class: class.to_string(), design_full_load_hours: mechanism_design_hours(class)?, design_cycles, spectrum_kp: default_kp() })
+    }
+}
+
+/// 바람에 대한 안정성 (옥외 갠트리): 일주(밀림) 방지 · 전도
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StabilityParams {
+    /// 다리 한쪽 바퀴 간격 (주행 방향, m) — 주행 방향 바람의 전도 기준 폭. 0 이면 전도 계산을 하지 않는다 (천장 크레인)
+    pub wheelbase_m: f64,
+    /// 풍압 중심 높이 (m)
+    pub wind_center_height_m: f64,
+    /// 제동 바퀴가 받치는 하중 비율 (점착 견인 · 제동력)
+    pub braked_wheel_fraction: f64,
+    /// 레일 클램프 총 유지력 (kN) — 운전 정지 · 계류 때 체결
+    pub rail_clamp_kn: f64,
+    /// 계류(타이다운 · 앵커) 총 유지력 (kN) — 폭풍 대비 고정
+    pub tie_down_kn: f64,
+}
+
+impl Default for StabilityParams {
+    fn default() -> Self {
+        Self { wheelbase_m: 0.0, wind_center_height_m: 0.0, braked_wheel_fraction: 0.5, rail_clamp_kn: 0.0, tie_down_kn: 0.0 }
     }
 }
 
@@ -353,6 +381,8 @@ pub struct CraneSpec {
     pub limits: Limits,
     #[serde(default)]
     pub class: DesignClass,
+    #[serde(default)]
+    pub stability: StabilityParams,
 }
 
 impl CraneSpec {
@@ -496,6 +526,8 @@ pub fn gantry_10t_20m() -> CraneSpec {
         rope: example_rope(16.0, 178.0, 320.0, 400.0),
         limits: Limits::default(),
         class: DesignClass::default(),
+        // 예시: 제동(젖은 레일) + 클램프로 약 39 m/s, 계류까지 약 77 m/s 순간풍속을 버티도록
+        stability: StabilityParams { wheelbase_m: 8.0, wind_center_height_m: 9.0, braked_wheel_fraction: 0.5, rail_clamp_kn: 40.0, tie_down_kn: 150.0 },
     }
 }
 
@@ -540,11 +572,209 @@ pub fn overhead_5t_16m() -> CraneSpec {
         rope: example_rope(12.0, 100.0, 240.0, 300.0),
         limits,
         class: DesignClass::default(),
+        stability: StabilityParams::default(),
+    }
+}
+
+/// 6×36WS-IWRC 1960 급 최소 파단력 근사 (kN) — MBF ≈ 0.356·d²·R0/1000 (d mm, R0 N/mm²)
+fn mbf_6x36_iwrc(d_mm: f64) -> f64 {
+    0.356 * d_mm * d_mm * 1960.0 / 1000.0
+}
+
+fn rope_for_class(d_mm: f64, sheave_mm: f64, drum_mm: f64, sheaves: u32, class: &str) -> RopeParams {
+    let mut r = example_rope(d_mm, mbf_6x36_iwrc(d_mm), sheave_mm, drum_mm);
+    r.sheave_count = sheaves;
+    // ISO 16625 Zp 와 산업안전보건기준에 관한 규칙 제163조(권상용 와이어로프 안전계수 5 이상) 중 큰 값
+    r.min_safety_factor = crate::rope_data::iso16625_zp(class).unwrap_or(4.5).max(5.0);
+    r
+}
+
+fn class_of(m: &str, cycles: f64, kp: f64) -> DesignClass {
+    DesignClass { mechanism_class: m.into(), design_full_load_hours: mechanism_design_hours(m).unwrap_or(1600.0), design_cycles: cycles, spectrum_kp: kp }
+}
+
+/// 컨테이너 야드 레일식 갠트리 (RMG/ASC) 41 t — Kalmar RMG 데이터시트 범위:
+/// 스프레더 아래 41 t, 권상 35 m/min (빈 스프레더 70), 횡행 70, 주행 120 m/min, 가속 0.3–0.5 m/s², U7/Q2/A7 · 권상 M7.
+/// 스프레더 7.6 t (Bromma YSX40) + 헤드블록 → 훅 질량 9.6 t. 운전 허용 풍속 22 m/s, 정지 제동 · 클램프 40 m/s
+/// (TT Club 야드 장비 최소 안전 기능). 질량 · 풍압 면적 · 모터 · 로프는 예시 제원이다.
+pub fn rmg_41t_30m() -> CraneSpec {
+    let mt = motor::preset("im_37kw_4p").unwrap();
+    let mc = motor::preset("im_18p5kw_4p").unwrap();
+    let mh = motor::preset("im_200kw_4p").unwrap();
+    let (vt, vc, vh) = (120.0 / 60.0, 70.0 / 60.0, 35.0 / 60.0);
+    let it = ratio_for(&mt, 0.4, 1.0, vt);
+    let ic = ratio_for(&mc, 0.315, 1.0, vc);
+    let ih = ratio_for(&mh, 0.4, 8.0, vh);
+    let mut hoist = drive(Axis::Hoist, 2, mh, ih, 0.92, 0.4, 8.0, vh, 0.35, 0.8, 12.0, 2.0);
+    hoist.light_load_speed_factor = 2.0;
+    let limits = Limits { wind_in_service_mps: 22.0, ..Limits::default() };
+    CraneSpec {
+        name: "rmg_41t_30m".into(),
+        description: "컨테이너 야드 레일식 갠트리 (RMG/ASC) 41 t, 스팬 30 m, 양정 18 m (Kalmar RMG 범위의 예시 제원)".into(),
+        structure: StructureParams {
+            span_m: 30.0,
+            runway_m: 300.0,
+            rope_min_m: 2.0,
+            rope_max_m: 20.0,
+            suspension_height_m: 22.0,
+            bridge_mass_kg: 230_000.0,
+            trolley_mass_kg: 35_000.0,
+            hook_mass_kg: 9_600.0,
+            rated_load_kg: 41_000.0,
+            rolling_resistance: 0.006,
+            viscous_travel: 2_000.0,
+            viscous_trolley: 500.0,
+            girder_fn_hz: 2.0,
+            skew_stiffness_n_per_m: 2.0e7,
+            skew_gap_m: 0.015,
+            skew_damping: 2.0e6,
+            bridge_cd_area_m2: 420.0,
+            sway_damping_ratio: 0.01,
+        },
+        travel: drive(Axis::Travel, 8, mt, it, 0.95, 0.4, 1.0, vt, 0.3, 0.6, 4.0, 1.2),
+        trolley: drive(Axis::Trolley, 4, mc, ic, 0.95, 0.315, 1.0, vc, 0.4, 0.8, 6.0, 1.2),
+        hoist,
+        rope: rope_for_class(26.0, 650.0, 800.0, 3, "M7"),
+        limits,
+        class: class_of("M7", 2.0e6, 0.25),
+        // 정지(젖은 · 노후 레일 μ 0.08) 제동 + 클램프로 약 40 m/s, 계류(타이다운)까지 약 55 m/s 순간풍속
+        stability: StabilityParams { wheelbase_m: 14.0, wind_center_height_m: 14.0, braked_wheel_fraction: 0.5, rail_clamp_kn: 320.0, tie_down_kn: 350.0 },
+    }
+}
+
+/// 제철 코일 창고 천장 크레인 40 t (C-훅) — 코일 7–28 t, 코일 크레인 FEM M6–M8 (Konecranes), 시간당 약 14 코일.
+pub fn overhead_40t_30m() -> CraneSpec {
+    let mt = motor::preset("im_55kw_4p").unwrap();
+    let mc = motor::preset("im_18p5kw_4p").unwrap();
+    let mh = motor::preset("im_110kw_4p").unwrap();
+    let (vt, vc, vh) = (100.0 / 60.0, 40.0 / 60.0, 10.0 / 60.0);
+    let it = ratio_for(&mt, 0.315, 1.0, vt);
+    let ic = ratio_for(&mc, 0.25, 1.0, vc);
+    let ih = ratio_for(&mh, 0.35, 8.0, vh);
+    let limits = Limits { wind_in_service_mps: 0.0, ..Limits::default() };
+    CraneSpec {
+        name: "overhead_40t_30m".into(),
+        description: "제철 코일 창고 천장 크레인 40 t (C-훅), 스팬 30 m, 양정 12 m (예시 제원)".into(),
+        structure: StructureParams {
+            span_m: 30.0,
+            runway_m: 200.0,
+            rope_min_m: 2.0,
+            rope_max_m: 14.0,
+            suspension_height_m: 16.0,
+            bridge_mass_kg: 95_000.0,
+            trolley_mass_kg: 25_000.0,
+            hook_mass_kg: 6_000.0,
+            rated_load_kg: 40_000.0,
+            rolling_resistance: 0.006,
+            viscous_travel: 800.0,
+            viscous_trolley: 200.0,
+            girder_fn_hz: 3.0,
+            skew_stiffness_n_per_m: 1.0e7,
+            skew_gap_m: 0.01,
+            skew_damping: 8.0e5,
+            bridge_cd_area_m2: 0.0,
+            sway_damping_ratio: 0.01,
+        },
+        travel: drive(Axis::Travel, 2, mt, it, 0.95, 0.315, 1.0, vt, 0.3, 0.6, 5.0, 1.2),
+        trolley: drive(Axis::Trolley, 1, mc, ic, 0.95, 0.25, 1.0, vc, 0.3, 0.6, 6.0, 1.2),
+        hoist: drive(Axis::Hoist, 1, mh, ih, 0.92, 0.35, 8.0, vh, 0.2, 0.5, 12.0, 2.0),
+        rope: rope_for_class(24.0, 600.0, 700.0, 2, "M7"),
+        limits,
+        class: class_of("M7", 4.0e6, 0.5),
+        stability: StabilityParams::default(),
+    }
+}
+
+/// 프리캐스트 콘크리트 야드 옥외 갠트리 40 t — 40 t 갠트리 (Otto Quast 2025), 중공 슬래브 2–7 t · 더블티 17–35 t.
+pub fn gantry_40t_30m() -> CraneSpec {
+    let mt = motor::preset("im_11kw_4p").unwrap();
+    let mc = motor::preset("im_7p5kw_4p").unwrap();
+    let mh = motor::preset("im_55kw_4p").unwrap();
+    let (vt, vc, vh) = (40.0 / 60.0, 20.0 / 60.0, 6.0 / 60.0);
+    let it = ratio_for(&mt, 0.25, 1.0, vt);
+    let ic = ratio_for(&mc, 0.16, 1.0, vc);
+    let ih = ratio_for(&mh, 0.25, 8.0, vh);
+    CraneSpec {
+        name: "gantry_40t_30m".into(),
+        description: "옥외 갠트리 크레인 40 t, 스팬 30 m, 양정 10 m — 프리캐스트 · 철강 야적 (예시 제원)".into(),
+        structure: StructureParams {
+            span_m: 30.0,
+            runway_m: 150.0,
+            rope_min_m: 2.0,
+            rope_max_m: 12.0,
+            suspension_height_m: 14.0,
+            bridge_mass_kg: 70_000.0,
+            trolley_mass_kg: 9_000.0,
+            hook_mass_kg: 800.0,
+            rated_load_kg: 40_000.0,
+            rolling_resistance: 0.006,
+            viscous_travel: 600.0,
+            viscous_trolley: 150.0,
+            girder_fn_hz: 2.0,
+            skew_stiffness_n_per_m: 6.0e6,
+            skew_gap_m: 0.012,
+            skew_damping: 5.0e5,
+            bridge_cd_area_m2: 144.0,
+            sway_damping_ratio: 0.01,
+        },
+        travel: drive(Axis::Travel, 4, mt, it, 0.95, 0.25, 1.0, vt, 0.15, 0.4, 5.0, 1.2),
+        trolley: drive(Axis::Trolley, 1, mc, ic, 0.95, 0.16, 1.0, vc, 0.2, 0.5, 6.0, 1.2),
+        hoist: drive(Axis::Hoist, 1, mh, ih, 0.92, 0.25, 8.0, vh, 0.15, 0.3, 12.0, 2.0),
+        rope: rope_for_class(20.0, 400.0, 500.0, 2, "M5"),
+        limits: Limits::default(),
+        class: class_of("M5", 5.0e5, 0.25),
+        stability: StabilityParams { wheelbase_m: 10.0, wind_center_height_m: 8.0, braked_wheel_fraction: 0.5, rail_clamp_kn: 110.0, tie_down_kn: 130.0 },
+    }
+}
+
+/// 조선소 골리앗 900 t — Konecranes 조선소 크레인 700–1,200 t 급: 주행 · 횡행 30 m/min, 권상 3–8 (빈 훅 10–20) m/min,
+/// 구조 Q2-U3 (A3) · 기구 M5, 하루 몇 번의 블록 탑재. 스팬 · 질량 · 풍압 면적 · 모터는 예시 제원이다.
+pub fn goliath_900t_120m() -> CraneSpec {
+    let mt = motor::preset("im_37kw_4p").unwrap();
+    let mc = motor::preset("im_37kw_4p").unwrap();
+    let mh = motor::preset("im_200kw_4p").unwrap();
+    let (vt, vc, vh) = (30.0 / 60.0, 30.0 / 60.0, 6.0 / 60.0);
+    let it = ratio_for(&mt, 0.5, 1.0, vt);
+    let ic = ratio_for(&mc, 0.4, 1.0, vc);
+    let ih = ratio_for(&mh, 0.7, 32.0, vh);
+    let mut hoist = drive(Axis::Hoist, 6, mh, ih, 0.92, 0.7, 32.0, vh, 0.05, 0.1, 8.0, 2.0);
+    hoist.light_load_speed_factor = 2.0;
+    CraneSpec {
+        name: "goliath_900t_120m".into(),
+        description: "조선소 골리앗 크레인 900 t, 스팬 120 m, 양정 75 m (Konecranes 700–1,200 t 급 범위의 예시 제원)".into(),
+        structure: StructureParams {
+            span_m: 120.0,
+            runway_m: 400.0,
+            rope_min_m: 8.0,
+            rope_max_m: 85.0,
+            suspension_height_m: 95.0,
+            bridge_mass_kg: 4_500_000.0,
+            trolley_mass_kg: 400_000.0,
+            hook_mass_kg: 60_000.0,
+            rated_load_kg: 900_000.0,
+            rolling_resistance: 0.006,
+            viscous_travel: 5.0e4,
+            viscous_trolley: 1.0e4,
+            girder_fn_hz: 0.8,
+            skew_stiffness_n_per_m: 1.0e8,
+            skew_gap_m: 0.02,
+            skew_damping: 1.0e7,
+            bridge_cd_area_m2: 4_300.0,
+            sway_damping_ratio: 0.01,
+        },
+        travel: drive(Axis::Travel, 16, mt, it, 0.95, 0.5, 1.0, vt, 0.04, 0.1, 3.0, 1.2),
+        trolley: drive(Axis::Trolley, 4, mc, ic, 0.95, 0.4, 1.0, vc, 0.05, 0.1, 3.0, 1.2),
+        hoist,
+        rope: rope_for_class(48.0, 1200.0, 1400.0, 4, "M5"),
+        limits: Limits::default(),
+        class: class_of("M5", 1.25e5, 0.25),
+        // 정지 제동 + 클램프로 약 44 m/s, 계류까지 약 60 m/s 순간풍속
+        stability: StabilityParams { wheelbase_m: 25.0, wind_center_height_m: 50.0, braked_wheel_fraction: 0.5, rail_clamp_kn: 3_200.0, tie_down_kn: 4_400.0 },
     }
 }
 
 pub fn presets() -> Vec<CraneSpec> {
-    vec![gantry_10t_20m(), overhead_5t_16m()]
+    vec![gantry_10t_20m(), overhead_5t_16m(), rmg_41t_30m(), overhead_40t_30m(), gantry_40t_30m(), goliath_900t_120m()]
 }
 
 pub fn preset(name: &str) -> Option<CraneSpec> {

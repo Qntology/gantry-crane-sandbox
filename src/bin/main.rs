@@ -9,9 +9,17 @@ use crane_model::crane_profile;
 use crane_model::cyclesim::{self, CycleReport, Scenario};
 use crane_model::decision::{self, DecisionInput};
 use crane_model::duty::{self, DutyConfig};
+use crane_model::backend::Backend;
+use crane_model::climate_data;
+use crane_model::fieldcal;
+use crane_model::health::{self, HealthStore};
 use crane_model::ingest;
 use crane_model::motor;
+use crane_model::operation::{self, DecisionPolicy, OpSim, OperationConfig, OperationReport, StepOutcome};
+use crane_model::site::{self, SiteStore};
+use crane_model::weather;
 use std::collections::HashMap;
+use std::io::{BufRead, Read, Write as IoWrite};
 use std::path::{Path, PathBuf};
 
 const HELP: &str = "\
@@ -33,17 +41,34 @@ crane_demo — 갠트리 크레인 샌드박스
   crane_demo calibrate s3 [--motor NAME]              SEW S3 출력 배수표 재현 확인
   crane_demo crosscheck [--crane NAME] [--rope M] [--load KG] [--sling M]
 
+현장 프리셋 · 운영 · 내구도:
+  crane_demo site list [--presets DIR]                 내장 · 저장한 현장 프리셋
+  crane_demo site show <id>                           프리셋 JSON
+  crane_demo site save <새 id> --from <id> [--name 이름] [--set 경로=값 ...] [--file preset.json]
+                                                      값을 바꿔 사용자 프리셋으로 저장 (예: --set throughput.moves_per_hour=25)
+  crane_demo site delete <id>
+  crane_demo climate list | show <id> | check <id> [--years N]   기후 프리셋 · 생성 날씨 vs 평년값
+  crane_demo operate --site <id> [--asset 이름] [--days N] [--start MM-DD] [--seed N]
+                     [--policy ask|recommended|conservative|risky] [--ledger DIR] [--fresh] [--no-incidents] [--out DIR]
+                                                      현장 운영 시뮬레이션 (ask: 결정 카드마다 묻는다)
+  crane_demo health list | show <asset> | replace <asset> <부품> | delete <asset> [--ledger DIR]
+  crane_demo fieldcal [--out DIR]                     실데이터 대조 · 오차 표
+  crane_demo serve [--port 8765] [--data DIR]          브라우저 화면 + API (http://localhost:8765)
+
 MODE: off | zv | zvd | ei | closed_loop
 ";
 
 struct Args {
     pos: Vec<String>,
     opt: HashMap<String, String>,
+    /// 같은 옵션을 여러 번 줄 수 있는 것 (--set)
+    multi: Vec<(String, String)>,
 }
 
 fn parse_args() -> Args {
     let mut pos = Vec::new();
     let mut opt = HashMap::new();
+    let mut multi = Vec::new();
     let mut it = std::env::args().skip(1).peekable();
     while let Some(a) = it.next() {
         if let Some(k) = a.strip_prefix("--") {
@@ -51,12 +76,13 @@ fn parse_args() -> Args {
                 Some(n) if !n.starts_with("--") => it.next().unwrap(),
                 _ => "true".into(),
             };
+            multi.push((k.to_string(), v.clone()));
             opt.insert(k.to_string(), v);
         } else {
             pos.push(a);
         }
     }
-    Args { pos, opt }
+    Args { pos, opt, multi }
 }
 
 impl Args {
@@ -339,6 +365,12 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         "calibrate" => cmd_calibrate(&a),
+        "site" => cmd_site(&a),
+        "climate" => cmd_climate(&a),
+        "operate" => cmd_operate(&a, &out),
+        "health" => cmd_health(&a),
+        "fieldcal" => cmd_fieldcal(&a, &out),
+        "serve" => cmd_serve(&a),
         "crosscheck" => {
             let spec = crane_profile::preset(a.s("crane").unwrap_or("gantry_10t_20m")).ok_or("크레인 프리셋이 없습니다")?;
             let c = calib::crosscheck(&spec, a.f("rope").unwrap_or(8.0), a.f("load").unwrap_or(6000.0), a.f("sling").unwrap_or(0.0));
@@ -347,6 +379,447 @@ fn run() -> Result<(), String> {
         }
         other => Err(format!("모르는 명령: {other}\n\n{HELP}")),
     }
+}
+
+fn presets_dir(a: &Args) -> PathBuf {
+    PathBuf::from(a.s("presets").unwrap_or("presets"))
+}
+
+fn ledger_dir(a: &Args) -> PathBuf {
+    PathBuf::from(a.s("ledger").unwrap_or("out/health"))
+}
+
+fn cmd_site(a: &Args) -> Result<(), String> {
+    let store = SiteStore::new(&presets_dir(a));
+    match a.pos.get(1).map(|s| s.as_str()).unwrap_or("list") {
+        "list" => {
+            println!("{:<28} {:<14} {:<6} 이름", "id", "용도", "종류");
+            for s in store.list() {
+                println!("{:<28} {:<14} {:<6} {}", s.id, s.application, if s.builtin { "내장" } else { "사용자" }, s.name);
+            }
+            println!("\n사용자 프리셋 폴더: {}", store.dir().display());
+            Ok(())
+        }
+        "show" => {
+            let id = a.pos.get(2).ok_or("프리셋 id 를 주세요")?;
+            println!("{}", serde_json::to_string_pretty(&store.get(id)?).unwrap());
+            Ok(())
+        }
+        "save" => {
+            let id = a.pos.get(2).ok_or("저장할 새 id 를 주세요")?;
+            let mut p = match a.s("file") {
+                Some(f) => serde_json::from_str(&std::fs::read_to_string(f).map_err(|e| format!("{f}: {e}"))?).map_err(|e| format!("{f}: {e}"))?,
+                None => store.get(a.s("from").ok_or("--from <기존 id> 또는 --file 이 필요합니다")?)?,
+            };
+            let sets: Vec<(String, String)> = a
+                .multi
+                .iter()
+                .filter(|(k, _)| k == "set")
+                .map(|(_, v)| {
+                    let (k, val) = v.split_once('=').ok_or_else(|| format!("--set '{v}' 는 경로=값 꼴이어야 합니다"))?;
+                    Ok((k.trim().to_string(), val.trim().to_string()))
+                })
+                .collect::<Result<_, String>>()?;
+            p = site::with_overrides(&p, &sets)?;
+            p.id = id.clone();
+            if let Some(n) = a.s("name") {
+                p.name = n.to_string();
+            }
+            let path = store.save(&p)?;
+            println!("저장: {} ({} 항목 변경)", path.display(), sets.len());
+            Ok(())
+        }
+        "delete" => {
+            let id = a.pos.get(2).ok_or("지울 프리셋 id 를 주세요")?;
+            store.delete(id)?;
+            println!("삭제: {id}");
+            Ok(())
+        }
+        other => Err(format!("site 다음에 list | show | save | delete 중 하나를 주세요 ({other})")),
+    }
+}
+
+fn cmd_climate(a: &Args) -> Result<(), String> {
+    match a.pos.get(1).map(|s| s.as_str()).unwrap_or("list") {
+        "list" => {
+            for c in climate_data::presets() {
+                println!("{:<14} {:<28} 연평균 {:.1} °C · 출처: {}", c.id, c.name, c.annual_mean_temp(), c.source);
+            }
+            Ok(())
+        }
+        "show" => {
+            let id = a.pos.get(2).ok_or("기후 id 를 주세요")?;
+            let c = climate_data::preset(id).ok_or(format!("기후 '{id}' 가 없습니다"))?;
+            println!("{}", serde_json::to_string_pretty(&c).unwrap());
+            Ok(())
+        }
+        "check" => {
+            let id = a.pos.get(2).ok_or("기후 id 를 주세요")?;
+            let c = climate_data::preset(id).ok_or(format!("기후 '{id}' 가 없습니다"))?;
+            let years = a.f("years").unwrap_or(5.0).max(1.0) as u32;
+            let w = weather::generate(&c, &weather::WeatherOptions { start_doy: 0, days: 365 * years, height_m: 10.0, seed: a.f("seed").unwrap_or(1.0) as u64 });
+            let st = weather::monthly_stats(&w, 10.0, c.alpha);
+            println!("{} — 생성 {} 년 vs 평년값 (괄호)", c.name, years);
+            println!("{:>3} {:>14} {:>14} {:>14} {:>12} {:>12} {:>12}", "월", "기온 °C", "풍속 m/s", "강수 mm", "강수일", "뇌전일", "안개일");
+            for (m, s) in st.iter().enumerate() {
+                let n = &c.months[m];
+                println!(
+                    "{:>3} {:>6.1} ({:>5.1}) {:>6.2} ({:>5.2}) {:>6.0} ({:>5.0}) {:>5.1} ({:>4.1}) {:>5.1} ({:>4.1}) {:>5.1} ({:>4.1})",
+                    m + 1,
+                    s.temp_mean_c,
+                    n.temp_mean_c,
+                    s.wind_mean_10m_mps,
+                    n.wind_mean_mps,
+                    s.precip_mm,
+                    n.precip_mm,
+                    s.rain_days,
+                    n.rain_days,
+                    s.thunder_days,
+                    n.thunder_days,
+                    s.fog_days,
+                    n.fog_days
+                );
+            }
+            Ok(())
+        }
+        other => Err(format!("climate 다음에 list | show | check 중 하나를 주세요 ({other})")),
+    }
+}
+
+fn print_card(d: &operation::OpDecision) {
+    let p = &d.prompt;
+    println!("\n┌─ [{}] {} ───────────────────────────────", p.header, d.at);
+    println!("│ {}", p.question);
+    for a in p.attention.iter() {
+        println!("│  ! {a}");
+    }
+    let mut n = 0;
+    for o in p.options.iter() {
+        if o.enabled {
+            n += 1;
+            println!("│  {}) {}{} — {}", n, o.label, if o.recommended { " (권장)" } else { "" }, o.detail);
+        } else {
+            println!("│  ✕ {} — 막힘: {}", o.label, o.blocked_by.join(", "));
+        }
+    }
+    print!("└─ 번호 [Enter = 권장, a = 남은 결정 모두 권장]: ");
+    let _ = std::io::stdout().flush();
+}
+
+/// 결정 카드를 보여 주고 고른 선택지 key 를 돌려준다. None 이면 남은 결정을 모두 권장으로
+fn ask_card(d: &operation::OpDecision) -> Option<String> {
+    print_card(d);
+    let mut line = String::new();
+    let n = std::io::stdin().lock().read_line(&mut line).unwrap_or(0);
+    let t = line.trim();
+    if n == 0 || t.eq_ignore_ascii_case("a") {
+        println!("(남은 결정은 권장으로 고릅니다)");
+        return None;
+    }
+    if t.is_empty() {
+        return Some(d.prompt.recommended.clone());
+    }
+    let enabled: Vec<&crane_model::choice::ChoiceOption> = d.prompt.options.iter().filter(|o| o.enabled).collect();
+    if let Ok(k) = t.parse::<usize>() {
+        if k >= 1 && k <= enabled.len() {
+            return Some(enabled[k - 1].key.clone());
+        }
+    }
+    if let Some(o) = d.prompt.options.iter().find(|o| o.key == t) {
+        return Some(o.key.clone());
+    }
+    println!("알 수 없는 선택 '{t}' — 권장으로 고릅니다");
+    Some(d.prompt.recommended.clone())
+}
+
+fn print_operation(r: &OperationReport, ledger_path: Option<&Path>) {
+    let k = &r.kpi;
+    println!("\n■ 현장 운영: {} · 자산 {} · 크레인 {} · {} 일 ({} 시작) · 정책 {}", r.site_name, r.asset_id, r.crane, k.days, r.start_date, r.policy);
+    println!(
+        "  계획 {:.0} h · 운전 {:.0} h · 가동률 {:.1}% · 이동 {:.0} / 수요 {:.0} (남은 {:.0}) · 운전 시간당 {:.1} 회 · 에너지 {:.0} kWh (회생 {:.0})",
+        k.scheduled_h,
+        k.operating_h,
+        k.availability * 100.0,
+        k.moves,
+        k.demand_moves,
+        k.backlog_moves,
+        k.moves_per_op_hour,
+        k.energy_kwh,
+        k.regen_kwh
+    );
+    if !k.downtime_by_reason.is_empty() {
+        let d: Vec<String> = k.downtime_by_reason.iter().map(|(r, h)| format!("{r} {h:.0} h")).collect();
+        println!("  정지 · 손실: {}", d.join(" · "));
+    }
+    let al: Vec<String> = k.alerts_by_level.iter().map(|(l, n)| format!("{l} {n}")).collect();
+    println!("  알림 {} 건 ({}) · 결정 {} 건 (작업자 {}) · 결정으로 줄인 기대 사고 {:.3}", r.alerts.len(), al.join(", "), k.decisions, k.decisions_by_operator, k.risk_avoided);
+    println!("  사고 {} 건 (기대 {:.3}) · 위험 지수 평균 {:.0} · 최대 {:.0} · 정격 초과 차단 {:.0} 회", k.incidents, k.expected_incidents, k.risk_mean, k.risk_max, k.refused_overweight);
+    for i in r.incidents.iter().take(5) {
+        println!("    {} [{}] {} — {}", i.at, i.severity, i.kind, i.detail);
+    }
+    let important: Vec<&crane_model::alerts::Alert> = r.alerts.iter().filter(|a| a.level >= crane_model::alerts::AlertLevel::Warning).collect();
+    if !important.is_empty() {
+        println!("  주요 알림 (경고 이상, 최근 8건):");
+        for a in important.iter().rev().take(8).rev() {
+            println!("    {} [{}] {} — {}", a.at, a.level_label, a.title, a.message);
+        }
+    }
+    let d = &r.durability;
+    println!(
+        "■ 부품 내구도 · 안정성 (누적 {:.0} 일 · 운전 {:.0} h · 이동 {:.0}){}",
+        d.days,
+        d.operating_hours,
+        d.moves,
+        ledger_path.map(|p| format!(" — 원장 {}", p.display())).unwrap_or_default()
+    );
+    println!("  {:<24} {:<8} {:>9} {:>9} {:>5} {:>8} {:>8}", "부품", "상태", "수명 사용", "남은 일", "교체", "여유", "최소 여유");
+    for row in d.rows.iter() {
+        println!(
+            "  {:<24} {:<8} {:>8.1}% {:>9} {:>5} {:>8} {:>8}",
+            row.label,
+            row.status_label,
+            row.life_used * 100.0,
+            row.rul_days.map(|v| if v > 99_999.0 { "> 10만".into() } else { format!("{v:.0}") }).unwrap_or_else(|| "—".into()),
+            row.replacements,
+            row.margin.map(|v| format!("{v:.2}")).unwrap_or_else(|| "—".into()),
+            row.margin_min.map(|v| format!("{v:.2}")).unwrap_or_else(|| "—".into())
+        );
+    }
+    for n in r.notes.iter() {
+        println!("  메모: {n}");
+    }
+}
+
+fn cmd_operate(a: &Args, out: &Path) -> Result<(), String> {
+    let id = a.s("site").or(a.pos.get(1).map(|s| s.as_str())).ok_or("--site <id> 가 필요합니다 (crane_demo site list)")?;
+    let preset = SiteStore::new(&presets_dir(a)).get(id)?;
+    let policy = match a.s("policy") {
+        Some(p) => DecisionPolicy::from_key(p).ok_or(format!("모르는 정책: {p}"))?,
+        None => DecisionPolicy::Recommended,
+    };
+    let (start_month, start_day) = match a.s("start") {
+        Some(s) => {
+            let (m, d) = s.split_once('-').ok_or("--start 는 MM-DD 꼴입니다")?;
+            (Some(m.parse().map_err(|_| "--start 월")?), Some(d.parse().map_err(|_| "--start 일")?))
+        }
+        None => (None, None),
+    };
+    let cfg = OperationConfig {
+        asset_id: a.s("asset").map(String::from).unwrap_or_else(|| format!("{}-01", preset.id)),
+        days: a.f("days").unwrap_or(30.0) as u32,
+        start_month,
+        start_day,
+        seed: a.f("seed").unwrap_or(1.0) as u64,
+        policy,
+        incidents: !a.opt.contains_key("no-incidents"),
+        fresh: a.opt.contains_key("fresh"),
+    };
+    let store = HealthStore::new(&ledger_dir(a));
+    let ledger = if cfg.fresh { None } else { store.load(&cfg.asset_id)? };
+    if let Some(l) = &ledger {
+        println!("원장 이어 쓰기: {} (누적 {:.0} 일, 실행 {} 회)", l.asset_id, l.day, l.runs);
+    }
+    println!("사이클 증분표 계산 중 (하중 구간 {} 개 × 정상 · 감속)…", preset.loads.spectrum.len());
+    let mut sim = OpSim::new(preset, cfg, ledger)?;
+    let mut interactive = policy == DecisionPolicy::Ask;
+    loop {
+        match sim.run(usize::MAX / 4) {
+            StepOutcome::Finished => break,
+            StepOutcome::Decision { decision } => {
+                let key = if interactive {
+                    match ask_card(&decision) {
+                        Some(k) => k,
+                        None => {
+                            interactive = false;
+                            decision.prompt.recommended.clone()
+                        }
+                    }
+                } else {
+                    decision.prompt.recommended.clone()
+                };
+                if let Err(e) = sim.decide(&decision.id, &key) {
+                    println!("  {e} — 권장으로 고릅니다");
+                    sim.decide(&decision.id, &decision.prompt.recommended)?;
+                }
+                if let Some(d) = sim.report().decisions.last() {
+                    println!("  → {} : {}", d.prompt.options.iter().find(|o| o.chosen).map(|o| o.label.clone()).unwrap_or_default(), d.outcome.clone().unwrap_or_default());
+                }
+            }
+            StepOutcome::Paused { .. } => {}
+        }
+    }
+    let r = sim.report();
+    let lp = store.save(sim.ledger())?;
+    print_operation(&r, Some(&lp));
+    let p = write(out, "operation.json", &serde_json::to_string(&r).map_err(|e| e.to_string())?)?;
+    println!("저장: {} (화면에서 열 수 있습니다)", p.display());
+    Ok(())
+}
+
+fn cmd_health(a: &Args) -> Result<(), String> {
+    let store = HealthStore::new(&ledger_dir(a));
+    match a.pos.get(1).map(|s| s.as_str()).unwrap_or("list") {
+        "list" => {
+            for id in store.list() {
+                if let Ok(Some(l)) = store.load(&id) {
+                    let worst = l.critical(1).first().map(|c| format!("{} {:.0}%", c.label, c.life_used * 100.0)).unwrap_or_default();
+                    println!("{:<24} {:<18} {:<26} {:>6.0} 일 {:>8.0} 이동 · 가장 닳은 부품: {}", l.asset_id, l.crane, l.site, l.day, l.moves, worst);
+                }
+            }
+            Ok(())
+        }
+        "show" => {
+            let id = a.pos.get(2).ok_or("자산 이름을 주세요")?;
+            let l = store.load(id)?.ok_or(format!("자산 '{id}' 원장이 없습니다"))?;
+            println!("{}", serde_json::to_string_pretty(&health::evaluate(&l)).unwrap());
+            Ok(())
+        }
+        "replace" => {
+            let id = a.pos.get(2).ok_or("자산 이름을 주세요")?;
+            let comp = a.pos.get(3).ok_or("부품 id 를 주세요 (예: rope_hoist)")?;
+            let mut l = store.load(id)?.ok_or(format!("자산 '{id}' 원장이 없습니다"))?;
+            let spec = crane_profile::preset(&l.crane)
+                .or_else(|| SiteStore::new(&presets_dir(a)).get(&l.site).ok().and_then(|s| s.spec().ok()))
+                .ok_or("원장의 크레인 제원을 찾지 못했습니다")?;
+            let day = l.day;
+            l.replace(comp, &spec, day, 0, "수동 교체 (crane_demo health replace)")?;
+            store.save(&l)?;
+            println!("{id}: {comp} 교체 기록");
+            Ok(())
+        }
+        "delete" => {
+            let id = a.pos.get(2).ok_or("자산 이름을 주세요")?;
+            store.delete(id)?;
+            println!("삭제: {id}");
+            Ok(())
+        }
+        other => Err(format!("health 다음에 list | show | replace | delete 중 하나를 주세요 ({other})")),
+    }
+}
+
+fn cmd_fieldcal(a: &Args, out: &Path) -> Result<(), String> {
+    let o = if a.opt.contains_key("quick") { fieldcal::CalOptions::quick() } else { fieldcal::CalOptions::default() };
+    println!("실데이터 대조 · 보정 중 (기후 {} 년 · 운영 {} 일)…", o.climate_years, o.sim_days);
+    let r = fieldcal::run(&o);
+    let mut group = String::new();
+    for b in r.benchmarks.iter() {
+        if b.group != group {
+            group = b.group.clone();
+            println!("\n■ {}", match group.as_str() {
+                "weather" => "날씨 (기상청 관측 vs 생성 날씨)",
+                "motor" => "모터 (제조사 표 vs 열 모델)",
+                "throughput" => "처리량",
+                "durability" => "내구도",
+                _ => "법규 확인",
+            });
+            println!("  {:<40} {:>10} {:>10} {:>10} {:>9} {:>9}  계수 · 출처", "항목", "실데이터", "보정 전", "보정 뒤", "전 오차", "뒤 오차");
+        }
+        println!(
+            "  {:<40} {:>10.3} {:>10.3} {:>10.3} {:>8.1}% {:>8.1}%  {}{}",
+            b.label,
+            b.reference,
+            b.before,
+            b.after,
+            b.error_before_pct,
+            b.error_after_pct,
+            b.knob.as_ref().map(|k| format!("[{k}] ")).unwrap_or_default(),
+            b.source
+        );
+    }
+    println!(
+        "\n맞춘 항목 평균 절대 오차: 보정 전 {:.1}% → 보정 뒤 {:.1}% (모든 항목 보정 뒤 {:.1}%)",
+        r.mean_abs_error_before_pct, r.mean_abs_error_after_pct, r.mean_abs_error_all_after_pct
+    );
+    println!("맞춘 계수: {}", serde_json::to_string(&r.fitted).unwrap());
+    for n in r.notes.iter() {
+        println!("메모: {n}");
+    }
+    let p = write(out, "fieldcal.json", &serde_json::to_string_pretty(&r).unwrap())?;
+    println!("저장: {}", p.display());
+    Ok(())
+}
+
+const INDEX_HTML: &str = include_str!("../../index.html");
+
+fn http_reply(stream: &mut std::net::TcpStream, status: &str, ctype: &str, body: &[u8]) {
+    let head = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: content-type\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(head.as_bytes());
+    let _ = stream.write_all(body);
+}
+
+fn serve_one(stream: &mut std::net::TcpStream, backend: &std::sync::Mutex<Backend>) -> Result<(), String> {
+    // 브라우저가 미리 열어 두고 보내지 않는 연결이 다른 요청을 막지 않게
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+    let mut reader = std::io::BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
+    let mut first = String::new();
+    reader.read_line(&mut first).map_err(|e| e.to_string())?;
+    let mut parts = first.split_whitespace();
+    let method = parts.next().unwrap_or("").to_string();
+    let path = parts.next().unwrap_or("/").to_string();
+    let mut len = 0usize;
+    loop {
+        let mut h = String::new();
+        if reader.read_line(&mut h).map_err(|e| e.to_string())? == 0 || h.trim().is_empty() {
+            break;
+        }
+        if let Some((k, v)) = h.split_once(':') {
+            if k.trim().eq_ignore_ascii_case("content-length") {
+                len = v.trim().parse().unwrap_or(0);
+            }
+        }
+    }
+    let mut body = vec![0u8; len];
+    reader.read_exact(&mut body).map_err(|e| e.to_string())?;
+    match (method.as_str(), path.as_str()) {
+        ("OPTIONS", _) => http_reply(stream, "204 No Content", "text/plain", b""),
+        ("GET", "/") | ("GET", "/index.html") => http_reply(stream, "200 OK", "text/html; charset=utf-8", INDEX_HTML.as_bytes()),
+        ("POST", p) if p.starts_with("/api/") => {
+            let cmd = &p[5..];
+            let args: serde_json::Value = if body.is_empty() { serde_json::json!({}) } else { serde_json::from_slice(&body).map_err(|e| e.to_string())? };
+            let result = match backend.lock() {
+                Ok(mut b) => b.call(cmd, &args),
+                Err(e) => Err(e.to_string()),
+            };
+            let reply = match result {
+                Ok(v) => serde_json::json!({"ok": true, "data": v}),
+                Err(e) => serde_json::json!({"ok": false, "error": e}),
+            };
+            http_reply(stream, "200 OK", "application/json; charset=utf-8", reply.to_string().as_bytes());
+        }
+        _ => http_reply(stream, "404 Not Found", "text/plain", b"not found"),
+    }
+    Ok(())
+}
+
+fn cmd_serve(a: &Args) -> Result<(), String> {
+    let port = a.f("port").unwrap_or(8765.0) as u16;
+    let data = PathBuf::from(a.s("data").unwrap_or("out/app"));
+    let mut backend = Backend::new(&data);
+    if let Some(m) = a.s("models") {
+        backend.models = Models::load(Path::new(m));
+    }
+    let backend = std::sync::Arc::new(std::sync::Mutex::new(backend));
+    let listener = std::net::TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("포트 {port}: {e}"))?;
+    println!("화면: http://localhost:{port}  (데이터 폴더 {}) — 끝내려면 Ctrl+C", data.display());
+    for s in listener.incoming() {
+        match s {
+            Ok(mut stream) => {
+                let b = backend.clone();
+                std::thread::spawn(move || {
+                    if let Err(e) = serve_one(&mut stream, &b) {
+                        if !e.contains("10060") && !e.contains("timed out") && !e.contains("시간") {
+                            eprintln!("요청 오류: {e}");
+                        }
+                    }
+                });
+            }
+            Err(e) => eprintln!("연결 오류: {e}"),
+        }
+    }
+    Ok(())
 }
 
 fn main() {

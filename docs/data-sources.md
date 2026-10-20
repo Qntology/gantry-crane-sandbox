@@ -68,6 +68,74 @@ UCI 'Container Crane Controller' 는 퍼지 규칙 15행뿐이라 보정에 쓸 
 Feyrer 식의 항 배치는 OCR 이 깨진 갱신 자료에서 재구성한 것이라 Feyrer 2015 원서로 확인해야 한다.
 공개 자기 누설(MFL) 로프 신호 데이터셋은 없다.
 
+## 3-1. 현장 운영 · 날씨 · 내구도 · 사고 예방 (2026-10-20 조사)
+
+현장 프리셋 · 날씨 생성기 · 내구도 원장 · 알림 문턱 · 위험 배수 · 실데이터 보정에 쓴 자료다. 모두 조사 중에 열어 확인했다
+(저작권 표준은 공개 미리보기 · 요약 · 2차 자료로 확인). 쓰인 곳과 오차는 [site-operation.md](site-operation.md).
+
+### 물량 · 하중
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| [Productivity Commission 2022](https://assets.pc.gov.au/inquiries/completed/maritime-logistics/report/maritime-logistics-technical-paper.pdf) | STS 총 23–25 · 순 29–35 회/h | 컨테이너 물량 범위 |
+| [Konecranes EAS RTG](https://www.konecranes.com/system/files/2025-03/7750_konecranes_eas_rtg_technical_document_v2.pdf) | RTG 기술 처리 능력 30 boxes/h | 처리량 보정 목표 |
+| [ABB PT47 (2010)](https://library.e.abb.com/public/c5df00a36f92c0ab852577f2006ffc81/2010%20ABB%20Crane%20Systems%20PT47%20Clara%20Holmgren%20and%20Hans%20Cederqvist.pdf) | ASC 기술 능력의 70%, RTG 40% 미만 사용 | 부산 RMG 수요 |
+| [Kalmar RMG data sheet](https://www.kalmarglobal.com/49c3b0/globalassets/media/11038/11038_RMG-Data-sheet-web-singles.pdf) · [Liebherr RTG](https://www-assets.liebherr.com/media/bu-media/lhbu-mcc/downloads-and-brochures/brochures/lcc/liebherr-rtg-cranes-technical-description.pdf) | SWL 41 t, 권상 35/70 · 주행 120 m/min, U7/Q2/A7 · M7 | `rmg_41t_30m` |
+| [Bromma YSX40](https://bromma.com/products/ysx40-ysx45/) · [Eurostat 자중](https://www.era.europa.eu/era-railway-terminology-collection/tareweightofcontainer/term/eu_policy) | 스프레더 7.6 t, 자중 2.3 · 3.7 t | 훅 질량 · 빈 컨테이너 |
+| [Interpave Heavy Duty Pavements](https://paving.org.uk/download/heavy-duty-pavements) · [Drewry (FreightWaves)](https://www.freightwaves.com/?p=352683) | 60:40 혼합 평균 16 t · P90 22 t, 빈 컨테이너 20.5% | 컨테이너 하중 스펙트럼 |
+| [Hoist magazine 2023](https://www.hoistmagazine.com/analysis/running-the-mill-11049595/) · [G Steel](https://www.gsteel.com/en/our-product/coil-mass-dimensions) · [Konecranes 코일 크레인](https://www.konecranes.com/industries/automotive/proven-automotive-lifting-equipment/coil-handling-cranes-for-the-automotive-industry) | 하루 1,000 코일 · 크레인 3대 · 평균 28 t, 코일 7–28 t, M6–M8 | 코일 창고 프리셋 · 처리량 보정 |
+| [Konecranes 조선소](https://www.konecranes.com/system/files/2024-04/shipyard_technical_information_2024_v1.pdf) · [KHL Rosyth](https://www.khl.com/news/giant-carrier-crane-up-for-sale/128710.article) · [Koh et al. 2011](https://koreascience.or.kr/article/JAKO201116450096186.pdf) | 700–1,200 t 급 속도 · A3/M5, 블록 약 100 t | 골리앗 프리셋 |
+| [Hanson 중공 슬래브](https://www.specifiedby.com/hanson-building-products/hollowcore/Hanson_Hollowcore_Technical_DataSheet.pdf) · [PCI 12DT30](https://ems-www.pci.org/PCI_Docs/Design_Resources/Design_Tables/PCI-DH-2017/PretoppedDoubleTees_12DT30and12LDT30.pdf) · [BFT 2025](https://www.bft-international.com/en/artikel/handover-of-a-75-meter-gantry-crane-to-otto-quast-4297397.html) | 슬래브 2.3–7.2 t, 더블티 17–35 t, 40 t 갠트리 | 프리캐스트 프리셋 |
+| [CMAA 등급 (MHI)](https://og.mhi.org/media/members/15194/133620919981313264.pdf) · [CMCO](https://prep.cmco.com/en-us/resources/blog/overhead-crane-classes-what-you-need-to-know) · [Konecranes CXT](https://www.konecranes.com/sites/default/files/download/cxt_uno_tech_specs_a4_en_konecranes_2017.pdf) | C 5–10 회/h, 하중 계수 L2, 속도 | 기계 공장 · 야적장 프리셋 |
+
+### 날씨 · 환경
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| [기상청 평년값 (pgmNo=188)](https://data.kma.go.kr/climate/average30Years/selectAverage30YearsKoreaList.do?pgmNo=188) | 1991–2020 월 기온 · 최고 · 최저 · 강수량 · 풍속 · 습도 (부산 · 인천 · 울산 · 포항 · 여수 · 서산) | 기후 프리셋 |
+| 기상청 일수 ([뇌전 699](https://data.kma.go.kr/climate/thdblt/selectThdbltChart.do?pgmNo=699) · [안개 706](https://data.kma.go.kr/climate/fog/selectFogChart.do?pgmNo=706) · 폭풍 708 · 눈 697 · 한파 733) | 지점별 연 일수 1991–2020 평균 · 월 분포 | 생성 날씨 · 보정 목표 |
+| [기상청 순위값 (pgmNo=103)](https://data.kma.go.kr/climate/extremum/selectExtremumList.do?pgmNo=103) | 지점별 최대 순간풍속 상위 10개 (매미 부산 42.7 · 여수 49.2 m/s) | 강풍 사건 굼벨 꼬리 · 10년 순간풍속 |
+| [기상청 특보 기준](https://www.weather.go.kr/kma/biz/forecast03.jsp) | 강풍경보 순간 26 m/s, 폭염 · 한파 특보 | 계류 문턱 |
+| 위키백과 기후표 ([부산](https://en.wikipedia.org/wiki/Busan) 등, 기상청 평년값 인용) | 월 강수일수 (≥ 0.1 mm) | 기후 프리셋 |
+| EN 13001-2 (비공식 사본, 구매 필요) · [CPA T_CIG 2507](https://cpa.uk.net/wp-content/uploads/2025/08/CPA-T_CIG-2507-Planning-Control-of-Lifting-Operations-in-Wind-V1-July-2025.pdf) | 운전 풍 상태 9.4/14 · 13.3/20 · 18.9/28 m/s, 돌풍 = 1.5 × 평균 | 돌풍 계수 · 운전 문턱 |
+| [NTSB MAB-21/18](https://www.ntsb.gov/investigations/AccidentReports/Reports/MAB2118.pdf) · [Cal/OSHA §3472](https://www.dir.ca.gov/title8/3472.html) | STS 사전 경보 15.6 m/s, 2단 경보 절차 | 경고 문턱 |
+| [Takahashi et al. 2016](https://www.jstage.jst.go.jp/article/mej/3/2/3_15-00679/_article) · [Zhu 2011 (KTH)](https://byv.kth.se/polopoly_fs/1.266908.1600689744!/Menu/general/column-content/attachment/Zhu_licentiate_thesis.pdf) | 젖은 · 노후 레일 정지 마찰 0.081, 점착 건조 0.25–0.30 · 젖음 0.18–0.20 · 이슬 0.09–0.15 · 눈 0.10 | 점착 계수 · 일주 검토 |
+| [ABB The Motor Guide](https://content.voltimum.com/uk/133785/2010043092802010043086575376.pdf) | 주변 온도 · 고도 출력 배수표 | 모터 열 여유 보정 |
+| [Demag DH 환경 사양](https://www.demagcranes.com/en/node/5361) | 표준 옥외 −10–40 °C | 한파 문턱 |
+| [산업안전보건기준에 관한 규칙](https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=273603) | 제140조(30 m/s 이탈방지) · 제143조(강풍 뒤 점검) · 제559 · 560조(폭염 · 휴식) · 제163조(로프 안전계수 5) · 제38 · 40조 · 제8조(조도) | 알림 · 결정 · 안정성 여유 |
+| [고용노동부 2026 폭염 대책 (기사)](https://v.daum.net/v/20260513162103312) | 35 °C 14–17시 · 38 °C 옥외 작업 중지 | 폭염 단계 |
+| [USACE EM 385-1-1 (OSHAcademy)](https://www.oshacademy.com/courses/training/502-em385-1-1-safety-health/502-16-14.php) | 낙뢰 16 km 중지 · 30분 뒤 재개 | 낙뢰 문턱 |
+| [Šmak et al. 2021](https://europepmc.org/article/PMC/PMC8467660) · [Alcántara et al. 2017](https://europepmc.org/article/PMC/PMC5506973) | ISO 9223 첫해 부식 범위, 장기 지수 내륙 0.49 · 해안 0.73 | 도장 · 거더 부식 |
+| [MESYS (ISO 281 ηc)](https://www.mesys.ch/manual/contamination_factor.html) | 오염 계수 범주 | 분진 수명 배수 |
+
+### 내구도 · 점검
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| [안전검사 고시 별표 2](https://www.law.go.kr/행정규칙/안전검사고시) | 라이닝 마모 50%, 디스크 10%, 플랜지 50%, 훅 국부 마모 5%, 과부하 1.1 배 | 폐기 기준 · 근거 |
+| [산업안전보건법 시행규칙](https://www.law.go.kr/법령/산업안전보건법시행규칙) | 안전검사: 설치 후 3년 이내 최초, 그 뒤 2년 (건설현장 6개월) | 법정 검사 일정 |
+| [Pintsch Bubenzer SB 28](https://dukebrakes.com/app/uploads/2014/07/SB-28-Operating-Manual.pdf) | 동적 시험이 없으면 2년마다 패드 교체 | 브레이크 보정 목표 |
+| [UM Surabaya RTG 로프](https://repository.um-surabaya.ac.id/id/eprint/7453/) · [Chesterton CS062](https://chesterton.com/Files/Product%20Assets/Lubricants/EN350514_IL_MRO_CS062_Lubrication_Extends_Wire_Rope_Life.pdf) | RTG 로프 9개월, 윤활로 교체 6배 감소 | 로프 보정 목표 · 부식 배수 범위 |
+| [LEESON (Reliable Plant)](https://www.reliableplant.com/Articles/Print/374) · [Autodesk L10h](https://help.autodesk.com/cloudhelp/2026/ENU/Inventor-Help/files/GUID-D48016B4-90DC-42B2-8D0E-5DA01A36713A.htm) | 10 K 규칙 · 20,000 h, 크레인 L10h 15,000–30,000 h | 모터 절연 · 베어링 |
+| [ISO 12482 미리보기](https://cdn.standards.iteh.ai/samples/57481/7f6d045be4e1468cb407258f94d943c5/ISO-12482-2014.pdf) · [ISO 9927-1 미리보기](https://cdn.standards.iteh.ai/samples/51102/4fd7f5bfe0d141e58a2c32a02d751b90/ISO-9927-1-2013.pdf) | 설계 사용 기간 평가 · 점검 주기 | 정비 계획 문턱 · 정기 점검 |
+| [Nippon Hoist 점검 기준](https://www.nipponhoist.co.jp/HP_main/HPe_download/HOIST_INSPECTION.pdf) · [Jotun (ISO 12944)](https://www.jotun.com/ww-en/industries/energy/power/about/selecting-the-right-system) | 답면 3%, 레일 머리 10%, 거더 부식 10%, 도장 내구성 L · M · H · VH | 차륜 · 거더 · 도장 |
+
+### 사고 · 사람
+
+| 자료 | 담긴 값 | 쓴 곳 |
+| --- | --- | --- |
+| [KOSHA 2014 천장크레인 끼임 연구](https://www.codil.or.kr/filebank/original/RK/OTKCRK180892/OTKCRK180892.pdf) | 2003–2012 동력 크레인 사망 954명(천장 346), 2012년 끼임 · 맞음 67.7%, 무선 조종 67.7%, 주변 작업자 50% | 출입 통제 배수 · 기준율 크기 |
+| [BLS CFOI](https://www.bls.gov/iif/factsheets/fatal-occupational-injuries-cranes-2011-17.htm) · [CPWR](https://www.elcosh.org/record/document/1781/d000823.pdf) | 미국 크레인 사망 연 42명, 원인 분포 | 사고 종류 |
+| [TT Club 야드 장비](https://www.ttclub.com/fileadmin/uploads/tt-club/Documents/files/tt-club/port-equipment-information-papers/recommended-minimum-safety-features-for-container-yard-equipment.pdf) · [TT Club 안벽 크레인](https://www.ttclub.com/media/files/tt-club/port-equipment-information-papers/recommended-minimum-safety-features-for-quay-container-cranes.pdf) | RTG/RMG 운전 22 m/s, 정지 제동 40 m/s, 바람 일주가 예방 가능한 최대 기상 손실 | RMG 제원 · 일주 검토 |
+| [방호장치 인증고시](https://www.law.go.kr/LSW/admRulInfoP.do?admRulSeq=2100000199056) | 정격 1.1 배에서 경보 · 권상 정지 | 정격 초과 차단 |
+| [Folkard, Lombardi & Tucker 2005](https://www.jstage.jst.go.jp/article/indhealth/43/1/43_1_20/_pdf) · [Dembe et al. 2005](https://stacks.cdc.gov/view/cdc/189921) · [IWH 2012](https://www.iwh.on.ca/node/274) | 야간 1.30 · 오후 1.18, 12 h 1.27, 연장 근무 1.61, 입사 첫 달 3배 이상 | 위험 배수 |
+| [Korea JoongAng Daily (매미)](https://www.koreajoongangdaily.com/business/shoddy-work-suspected-in-fallen-port-cranes/11210735) | 부산 크레인 8대 전도 · 3대 손상, 설계 약 50 m/s | 폭풍 일주 사례 |
+| [위험성평가 지침](https://www.law.go.kr/LSW/admRulInfoP.do?admRulSeq=2100000251014) | 위험성 3단계 판단법 | 위험 지수 단계 |
+
+확인하지 못한 것: 국내 크레인 등록 대수 · 운전 시간(노출), 2013년 이후 국내 크레인 종류별 사망 통계, 항만 크레인 가용률 · MTBF,
+부산항 크레인별 생산성, KDS 지역별 기본 풍속, ISO 9224 지수 표, 크레인 시정 중지 기준, 해양 환경의 로프 수명 감소 정량값.
+조사 중 웹 검색 한도에 닿아 더 찾지 못했다.
+
 ## 4. 우선 확보 순서
 
 | 순위 | 자료 | 검증 · 보정할 모듈 | 받는 방법 |

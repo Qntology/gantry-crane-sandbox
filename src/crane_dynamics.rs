@@ -248,13 +248,30 @@ impl<'a> Plant<'a> {
         let fric_r = -st.rolling_resistance * n_right * sgx - 0.5 * st.viscous_travel * vx;
         let wind_bridge = self.env.drag(st.bridge_cd_area_m2, [wind[0] - vx, 0.0])[0];
         let fbx = -u.brake_force[0] * smooth_sign(vx, 0.002);
-        let fx = u.f_travel_left + u.f_travel_right + fric_l + fric_r + wind_bridge + fbx;
+        // 점착 한계: 구동 · 제동력은 μ × 제동(구동) 바퀴 하중을 넘지 못한다 (넘으면 바퀴가 미끄러진다)
+        let grip = |f: f64, normal: f64| -> f64 {
+            match self.env.adhesion_mu {
+                Some(mu) => {
+                    let cap = mu.max(0.0) * self.spec.stability.braked_wheel_fraction.clamp(0.05, 1.0) * normal;
+                    if f.abs() > cap && f.abs() > 1e-9 {
+                        cap / f.abs()
+                    } else {
+                        1.0
+                    }
+                }
+                None => 1.0,
+            }
+        };
+        let kx = grip(u.f_travel_left + u.f_travel_right + fbx, n_left + n_right);
+        let (ftl, ftr, fbx) = (u.f_travel_left * kx, u.f_travel_right * kx, fbx * kx);
+        let fx = ftl + ftr + fric_l + fric_r + wind_bridge + fbx;
 
         // 횡행
         let n_tr = (st.trolley_mass_kg + m) * G;
         let fric_y = -st.rolling_resistance * n_tr * smooth_sign(vy, 0.01) - st.viscous_trolley * vy;
         let fby = -u.brake_force[1] * smooth_sign(vy, 0.002);
-        let fy = u.f_trolley + fric_y + fby;
+        let ky = grip(u.f_trolley + fby, n_tr);
+        let fy = (u.f_trolley + fby) * ky + fric_y;
 
         // 권상: 미끄럼 제동은 l̇ 반대 방향 → 감아올리는 힘과 같은 꼴
         let fh = u.f_hoist + u.brake_force[2] * smooth_sign(vl, 0.002);
@@ -285,7 +302,7 @@ impl<'a> Plant<'a> {
         } else {
             0.0
         };
-        let moment = (u.f_travel_left + fric_l - u.f_travel_right - fric_r) * 0.5 * span + guide * 0.5 * span - st.skew_damping * s[IVPSI];
+        let moment = (ftl + fric_l - ftr - fric_r) * 0.5 * span + guide * 0.5 * span - st.skew_damping * s[IVPSI];
         let apsi = if u.locked[0] { 0.0 } else { moment / iz };
 
         let mut d = [0.0; NS];

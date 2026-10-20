@@ -1334,6 +1334,19 @@ mod tests {
     }
 
     #[test]
+    fn icy_rail_limits_braking_and_lengthens_emergency_stop() {
+        // 같은 비상 정지: 건조(점착 한계 없음) vs 결빙 레일 μ 0.05 — 바퀴가 미끄러져 더 멀리 간다
+        let mut dry = short_move(AntiSwayMode::Off);
+        dry.events = vec![Event { t_s: 15.0, kind: EventKind::EmergencyStop }];
+        let mut icy = dry.clone();
+        icy.env.adhesion_mu = Some(crate::field_constants::ADHESION_ICY);
+        let rd = simulate(&dry).unwrap();
+        let ri = simulate(&icy).unwrap();
+        let stop_x = |r: &CycleReport| *r.samples.x.last().unwrap();
+        assert!(stop_x(&ri) > stop_x(&rd) + 0.1, "icy {} vs dry {}", stop_x(&ri), stop_x(&rd));
+    }
+
+    #[test]
     fn demo_cycle_runs_and_exports_csv() {
         let sc = demo_scenario("overhead_5t_16m", 4000.0, AntiSwayMode::Zvd);
         let r = simulate(&sc).unwrap();
