@@ -115,11 +115,19 @@ pub struct LoadShape {
     /// c = 2.4, A = 0.0005·m_H (m_H: 하중 + 훅 kg, A ≥ 0.8 m²) 을 쓴다.
     #[serde(default)]
     pub cd_area_m2: Option<f64>,
+    /// 빈 훅만 매달렸을 때의 항력 계수 × 면적 (m²). 비우면 c = 2.4, A = 0.0005·m_훅 (최소 면적 없음).
+    /// EN 의 A ≥ 0.8 m² 는 모르는 하중을 위한 값이라 빈 훅에는 쓰지 않는다.
+    #[serde(default)]
+    pub hook_cd_area_m2: Option<f64>,
 }
 
 impl LoadShape {
-    pub fn cd_area(&self, hoisted_mass_kg: f64) -> f64 {
-        self.cd_area_m2.unwrap_or_else(|| 2.4 * (0.0005 * hoisted_mass_kg.max(0.0)).max(0.8))
+    /// `load_kg` 하중(훅 제외)과 `hook_kg` 훅에 걸리는 항력 면적
+    pub fn cd_area(&self, load_kg: f64, hook_kg: f64) -> f64 {
+        if load_kg <= 0.5 {
+            return self.hook_cd_area_m2.unwrap_or(2.4 * 0.0005 * hook_kg.max(0.0));
+        }
+        self.cd_area_m2.unwrap_or_else(|| 2.4 * (0.0005 * (load_kg + hook_kg).max(0.0)).max(0.8))
     }
 }
 
@@ -357,6 +365,9 @@ pub struct CycleReport {
     /// 권상 브레이크 토크 / 최대 하중 정적 토크
     pub hoist_brake_factor: f64,
     pub max_skew_mm: f64,
+    /// 권상 전부하 환산 시간 (h) — 권상이 돈 시간을 매 순간 하중 비의 세제곱으로 가중
+    #[serde(default)]
+    pub hoist_full_load_hours: f64,
     pub max_wind_mps: f64,
     pub slack_events: u32,
     pub estop: bool,
@@ -407,6 +418,12 @@ struct AxisRt {
     last_power_w: f64,
     last_losses: MotorLosses,
     energized: bool,
+    /// 잠긴 축을 붙잡는 힘이 브레이크 용량을 넘었다 → 다음 스텝부터 미끄럼
+    breakaway: bool,
+    /// 이 사이클 시작 때의 브레이크 누적값 (체결 횟수, 미끄럼 정지 횟수, 마찰일)
+    brake_ops0: u64,
+    brake_dyn0: u64,
+    brake_work0: f64,
     stats: AxisStats,
 }
 
@@ -441,7 +458,10 @@ pub struct Sim<'a> {
     axes: Vec<AxisRt>,
     rope: RopeCounter,
     estop: bool,
+    estop_t: Option<f64>,
     estop_events: Vec<f64>,
+    /// 권상 전부하 환산 시간 적분 Σ dt·((m + 훅)/(정격 + 훅))³ (s)
+    hoist_flh_s: f64,
     samples: Samples,
     next_sample_t: f64,
     last_aux: Aux,
@@ -479,7 +499,11 @@ impl<'a> Sim<'a> {
                     .and_then(|c| c.thermal.get(k).cloned())
                     .filter(|v| v.len() == d.motors as usize)
                     .unwrap_or_else(|| vec![MotorThermal::at_ambient(amb); d.motors as usize]);
-                let brake = carry.and_then(|c| c.brakes.get(k).cloned()).unwrap_or_else(|| BrakeState::new(&d.brake, amb));
+                let mut brake = carry.and_then(|c| c.brakes.get(k).cloned()).unwrap_or_else(|| BrakeState::new(&d.brake, amb));
+                // 사이클별 최댓값은 새로 잰다 (누적 마모 · 온도는 이어 간다)
+                brake.max_stop_work_j = 0.0;
+                brake.max_temp_c = brake.temp_c;
+                let (brake_ops0, brake_dyn0, brake_work0) = (brake.operations, brake.dynamic_stops, brake.work_total_j);
                 AxisRt {
                     axis: *a,
                     profile: None,
@@ -501,6 +525,10 @@ impl<'a> Sim<'a> {
                     last_power_w: 0.0,
                     last_losses: MotorLosses::default(),
                     energized: false,
+                    breakaway: false,
+                    brake_ops0,
+                    brake_dyn0,
+                    brake_work0,
                     stats: AxisStats { peak_winding: amb, ..Default::default() },
                 }
             })
@@ -522,7 +550,9 @@ impl<'a> Sim<'a> {
             axes,
             rope,
             estop: false,
+            estop_t: None,
             estop_events,
+            hoist_flh_s: 0.0,
             samples,
             next_sample_t: 0.0,
             last_aux: Aux { tension_n: (load_kg + hook_kg) * G, ..Default::default() },
@@ -570,7 +600,7 @@ impl<'a> Sim<'a> {
     }
 
     fn load_cd_area(&self) -> f64 {
-        self.sc.load.cd_area(self.load_kg + self.spec.structure.hook_mass_kg)
+        self.sc.load.cd_area(self.load_kg, self.spec.structure.hook_mass_kg)
     }
 
     fn plant(&self) -> Plant<'_> {
@@ -595,6 +625,7 @@ impl<'a> Sim<'a> {
             if let Some(te) = self.estop_events.first().cloned() {
                 if t >= te {
                     self.estop = true;
+                    self.estop_t = Some(t);
                     self.estop_events.remove(0);
                     for rt in self.axes.iter_mut() {
                         rt.brake.command_set();
@@ -607,6 +638,7 @@ impl<'a> Sim<'a> {
         }
         let ms = self.plant().masses();
         let tension_meas = self.last_aux.tension_n;
+        let mut zero_now = [false; 3];
         let closed = self.sc.antisway.mode == AntiSwayMode::ClosedLoop;
         let mut inputs = Inputs::default();
         for k in 0..3 {
@@ -720,11 +752,20 @@ impl<'a> Sim<'a> {
                 rt.integ = 0.0;
             }
 
-            // 브레이크: 잡고 있음 + 정지 → 잠금, 잡고 있음 + 움직임 → 미끄럼 마찰
+            // 브레이크: 잡고 있음 + 정지 → 잠금, 잡고 있음 + 움직임 → 미끄럼 마찰.
+            // 정상 정지(속도 제어로 거의 멈춘 뒤 체결)는 체결 순간 잠금으로 보고 미끄럼으로 세지 않는다.
             let engaged = rt.brake.holding();
-            let moving = qd.abs() > 1e-4;
-            inputs.locked[k] = engaged && !moving;
-            if engaged && moving {
+            let mut moving = qd.abs() > 1e-4;
+            if engaged && moving && !estop && qd.abs() < 0.003 && !rt.breakaway {
+                zero_now[k] = true;
+                moving = false;
+            }
+            if !engaged {
+                rt.breakaway = false;
+            }
+            let slip = engaged && (moving || rt.breakaway);
+            inputs.locked[k] = engaged && !slip;
+            if slip {
                 inputs.brake_force[k] = d.motors as f64 * d.brake.holding_torque_nm * d.kin();
                 tau = 0.0;
             }
@@ -754,6 +795,12 @@ impl<'a> Sim<'a> {
             }
         }
 
+        for (k, z) in zero_now.iter().enumerate() {
+            if *z {
+                self.set_q_dot_zero(Axis::all()[k]);
+            }
+        }
+
         // 적분
         let qd_before: Vec<f64> = Axis::all().iter().map(|a| self.q_dot(*a)).collect();
         let aux = {
@@ -763,6 +810,17 @@ impl<'a> Sim<'a> {
             plant.step(t, &mut self.st, &inputs, dt)
         };
         self.last_aux = aux;
+        for k in 0..3 {
+            let landed = k == Axis::Hoist.index() && self.st.l() >= self.spec.structure.rope_max_m - 1e-6;
+            if inputs.locked[k] && !landed {
+                let d = self.spec.drive(Axis::all()[k]);
+                let capacity = d.motors as f64 * d.brake.holding_torque_nm * d.kin();
+                if aux.hold_force[k] > capacity {
+                    self.axes[k].breakaway = true;
+                    self.notes.push(format!("{:.2} s {} 브레이크 미끄러짐: 필요한 힘 {:.1} kN > 용량 {:.1} kN", self.t, Axis::all()[k].key(), aux.hold_force[k] / 1000.0, capacity / 1000.0));
+                }
+            }
+        }
 
         // 미끄럼 제동: 마찰일 누적, 멈추면 잠금
         for k in 0..3 {
@@ -775,7 +833,13 @@ impl<'a> Sim<'a> {
                     let work = inputs.brake_force[k] * v_avg * dt / d.motors as f64;
                     self.axes[k].brake.add_friction_work(&d.brake, work);
                 }
-                if qd_before[k].signum() != after.signum() || after.abs() < 1e-3 {
+                // 용량 부족으로 미끄러지는 중이면 속도가 0 근처여도 멈추지 않는다 (방향이 바뀔 때만 정지).
+                // 권상은 훅이 가장 낮은 위치(로프 최대 길이)에 닿으면 착지로 보고 멈춘다.
+                let landed = axis == Axis::Hoist && self.st.l() >= self.spec.structure.rope_max_m;
+                let flipped = qd_before[k].signum() != after.signum();
+                let stopped = !self.axes[k].breakaway && after.abs() < 1e-3;
+                if flipped || stopped || landed {
+                    self.axes[k].breakaway = false;
                     self.set_q_dot_zero(axis);
                 }
             }
@@ -836,6 +900,16 @@ impl<'a> Sim<'a> {
             rt.brake.cool(&d.brake, amb, dt);
         }
 
+        // 권상 전부하 환산 시간: 권상이 돌고 있는 동안 실제 매단 질량으로 가중 (ISO 4301-1 / FEM 9.511)
+        {
+            let h = &self.axes[Axis::Hoist.index()];
+            if h.energized && self.st.vl().abs() > 1e-3 {
+                let hook = self.spec.structure.hook_mass_kg;
+                let p_max = (self.spec.structure.rated_load_kg + hook).max(1.0);
+                self.hoist_flh_s += dt * ((self.load_kg + hook) / p_max).powi(3);
+            }
+        }
+
         // 로프 · 편행 · 바람 · 느슨함
         let falls = self.spec.hoist.reeving_falls.max(1.0);
         self.rope.step(&self.spec.rope, self.st.vl(), aux.tension_n / falls, dt);
@@ -847,8 +921,17 @@ impl<'a> Sim<'a> {
         }
         self.slack_prev = aux.slack;
 
-        // 이동 지표
-        let sway_m = self.st.sway_offset_m();
+        // 이동 지표: 흔들림 = 준정적 평형점(바람 항력과 중력이 맞는 위치) 둘레의 수평 진동.
+        // 바람에 의한 정적 편향은 위치 결정 게이트가 본다.
+        let sway_m = {
+            let r = self.st.r();
+            let l = self.st.l();
+            let m = (self.load_kg + self.spec.structure.hook_mass_kg).max(1.0);
+            let f = self.sc.env.drag(self.load_cd_area(), [w[0] - self.st.vx(), w[1] - self.st.vy()]);
+            let fn_ = (f[0] * f[0] + f[1] * f[1] + (m * G).powi(2)).sqrt();
+            let eq = [l * f[0] / fn_, l * f[1] / fn_];
+            ((r[0] - eq[0]).powi(2) + (r[1] - eq[1]).powi(2)).sqrt()
+        };
         if self.tracker.active {
             let tr = &mut self.tracker;
             tr.max_sway_m = tr.max_sway_m.max(sway_m);
@@ -1002,7 +1085,6 @@ impl<'a> Sim<'a> {
         if self.estop {
             return;
         }
-        let estop_before = self.estop;
         let s = self.spec.structure.clone();
         let (x0, y0, l0) = (self.st.x(), self.st.y(), self.st.l());
         let xt = wp.x.unwrap_or(x0).clamp(0.0, s.runway_m);
@@ -1019,6 +1101,22 @@ impl<'a> Sim<'a> {
         }
         if (yt - y0).abs() > eps {
             horiz.push((Axis::Trolley, yt));
+        }
+        // 폐루프: 이 경유점 동안 움직이지 않는 주행 · 횡행 축도 제자리 유지 + 각도 궤환으로 흔들림을 잡는다
+        // (권상만 하는 이동에서도 바람 · 돌풍 흔들림을 줄인다)
+        if self.sc.antisway.mode == AntiSwayMode::ClosedLoop {
+            let asw = &self.sc.antisway;
+            let k = antisway::lqr_gain(0.5 * (l0 + lt), asw.lqr_q, asw.lqr_r.max(1e-6), self.sc.sim.dt);
+            for a in [Axis::Travel, Axis::Trolley] {
+                if !horiz.iter().any(|(h, _)| *h == a) {
+                    let q_now = self.q(a);
+                    let rt = &mut self.axes[a.index()];
+                    rt.keep_active = true;
+                    rt.q0 = q_now;
+                    rt.q_target = q_now;
+                    rt.lqr_k = k;
+                }
+            }
         }
         let design_l;
         match wp.mode {
@@ -1045,13 +1143,13 @@ impl<'a> Sim<'a> {
         // 안정 구간: 폐루프는 주행·횡행 제어를 유지한다
         let closed = self.sc.antisway.mode == AntiSwayMode::ClosedLoop && !self.estop;
         if closed {
+            let k = antisway::lqr_gain(self.st.l(), self.sc.antisway.lqr_q, self.sc.antisway.lqr_r.max(1e-6), self.sc.sim.dt);
             for a in [Axis::Travel, Axis::Trolley] {
                 let q_now = self.q(a);
                 let rt = &mut self.axes[a.index()];
-                if horiz.iter().any(|(h, _)| *h == a) {
-                    rt.keep_active = true;
-                    rt.q0 = q_now;
-                }
+                rt.keep_active = true;
+                rt.q0 = q_now;
+                rt.lqr_k = k;
             }
         }
         self.tracker.settling = true;
@@ -1084,7 +1182,8 @@ impl<'a> Sim<'a> {
             settle_time_s: (tr.last_above_tol - tr.settle_start).max(0.0),
             position_error_mm: pos_err * 1000.0,
             load_kg: self.load_kg,
-            aborted: self.estop && !estop_before,
+            // 이동(감기 · 횡이동) 도중 비상 정지가 걸렸을 때만 중단된 이동으로 본다
+            aborted: self.estop_t.map_or(false, |te| te <= end + 1e-9),
         });
         self.program.push(prog);
         self.tracker.active = false;
@@ -1157,13 +1256,13 @@ impl<'a> Sim<'a> {
                     rated_starts_per_hour: d.motor.duty.starts_per_hour,
                     brake_lining_mm: rt.brake.lining_mm,
                     brake_lining_remaining: rt.brake.remaining_fraction(&d.brake),
-                    brake_work_j: rt.brake.work_total_j,
+                    brake_work_j: rt.brake.work_total_j - rt.brake_work0,
                     brake_max_stop_work_j: rt.brake.max_stop_work_j,
-                    brake_max_work_allowed_j: d.brake.permitted_work_per_stop_j((rt.brake.operations as f64 * 3600.0 / cycle).max(1.0)),
+                    brake_max_work_allowed_j: d.brake.permitted_work_per_stop_j(((rt.brake.operations - rt.brake_ops0) as f64 * 3600.0 / cycle).max(1.0)),
                     brake_max_temp_c: rt.brake.max_temp_c,
                     brake_temp_limit_c: d.brake.max_temp_c,
-                    brake_operations: rt.brake.operations,
-                    brake_dynamic_stops: rt.brake.dynamic_stops,
+                    brake_operations: rt.brake.operations - rt.brake_ops0,
+                    brake_dynamic_stops: rt.brake.dynamic_stops - rt.brake_dyn0,
                 }
             })
             .collect();
@@ -1196,6 +1295,7 @@ impl<'a> Sim<'a> {
             },
             hoist_brake_factor: spec.hoist.brake.holding_torque_nm * spec.hoist.motors as f64 / static_t.max(1e-9),
             max_skew_mm: self.max_skew_m * 1000.0,
+            hoist_full_load_hours: self.hoist_flh_s / 3600.0,
             max_wind_mps: self.max_wind,
             slack_events: self.slack_events,
             estop: self.estop,
@@ -1359,5 +1459,66 @@ mod tests {
             assert!(a.cdf > 0.0 && a.cdf <= 1.0);
         }
         assert_eq!(r.slack_events, 0);
+    }
+
+    // ---- 리뷰 지적 회귀 테스트 ----
+
+    #[test]
+    fn normal_stops_are_not_counted_as_brake_slips() {
+        let r = simulate(&demo_scenario("gantry_10t_20m", 8000.0, AntiSwayMode::Zvd)).unwrap();
+        for a in r.axes.iter() {
+            assert_eq!(a.brake_dynamic_stops, 0, "{:?} 정상 정지가 미끄럼으로 셈", a.axis);
+            assert!(a.brake_work_j < 1e-6, "{:?} 마찰일 {}", a.axis, a.brake_work_j);
+        }
+    }
+
+    #[test]
+    fn steady_wind_offset_is_not_counted_as_residual_sway() {
+        // 정격 운전 풍속의 40% (8 m/s) 정상풍: 빈 훅 이동도 잔류 흔들림 허용치 안이어야 한다
+        let mut sc = demo_scenario("gantry_10t_20m", 8000.0, AntiSwayMode::Zvd);
+        sc.env.wind_mean_mps = [8.0, 0.0];
+        let r = simulate(&sc).unwrap();
+        let tol = sc.crane.resolve().unwrap().limits.sway_tolerance_mm;
+        for m in r.moves.iter() {
+            assert!(m.residual_sway_mm < tol, "{} 잔류 {:.0} mm (허용 {tol})", m.label, m.residual_sway_mm);
+        }
+    }
+
+    #[test]
+    fn weak_hoist_brake_slips_instead_of_holding_forever() {
+        let mut spec = crate::crane_profile::preset("gantry_10t_20m").unwrap();
+        spec.hoist.brake.holding_torque_nm *= 0.2;
+        let mut sc = short_move(AntiSwayMode::Zvd);
+        sc.crane = CraneRef::Spec(Box::new(spec));
+        let r = simulate(&sc).unwrap();
+        let l_end = *r.samples.l.last().unwrap();
+        assert!(l_end > 8.0 + 0.05, "브레이크가 약한데 로프가 그대로 {l_end}");
+        assert!(r.axes[Axis::Hoist.index()].brake_dynamic_stops > 0);
+    }
+
+    #[test]
+    fn full_load_hours_weight_only_the_loaded_hoist_time() {
+        // 빈 훅으로만 권상: 전부하 환산 시간 = 권상 시간 × (훅 / (정격 + 훅))³ 근처
+        let mut sc = short_move(AntiSwayMode::Off);
+        sc.start.load_kg = 0.0;
+        sc.waypoints = vec![Waypoint { label: "up".into(), x: None, y: None, l: Some(4.0), mode: MoveMode::Sequential, dwell_s: 0.0, set_load_kg: None }];
+        let r = simulate(&sc).unwrap();
+        let spec = sc.crane.resolve().unwrap();
+        let hook = spec.structure.hook_mass_kg;
+        let k = (hook / (spec.structure.rated_load_kg + hook)).powi(3);
+        let run_h = r.axes[Axis::Hoist.index()].run_time_s / 3600.0;
+        assert!(r.hoist_full_load_hours > 0.0);
+        assert!(r.hoist_full_load_hours <= run_h * k * 1.0001, "{} > {}", r.hoist_full_load_hours, run_h * k);
+    }
+
+    #[test]
+    fn carried_cycles_report_per_cycle_brake_counters() {
+        let sc = demo_scenario("gantry_10t_20m", 8000.0, AntiSwayMode::Zvd);
+        let (r1, c1) = Sim::new(&sc, None).unwrap().run_carry();
+        let (r2, _) = Sim::new(&sc, Some(&c1)).unwrap().run_carry();
+        for (a, b) in r1.axes.iter().zip(r2.axes.iter()) {
+            assert_eq!(a.brake_operations, b.brake_operations, "{:?}", a.axis);
+            assert!((a.brake_max_work_allowed_j - b.brake_max_work_allowed_j).abs() < 1e-6 * a.brake_max_work_allowed_j.max(1.0));
+        }
     }
 }

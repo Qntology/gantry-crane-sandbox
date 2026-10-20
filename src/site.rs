@@ -326,7 +326,7 @@ impl SitePreset {
             antisway: AntiSwayConfig { mode: self.antisway, ..Default::default() },
             env,
             sim: SimConfig { dt, sample_dt: 0.05, settle_s: 3.0, ..Default::default() },
-            load: LoadShape { cd_area_m2: self.loads.cd_area_m2 },
+            load: LoadShape { cd_area_m2: self.loads.cd_area_m2, hook_cd_area_m2: None },
             speed_scale: speed_scale.clamp(0.2, 1.0),
             accel_scale: 1.0,
             events: Vec::new(),

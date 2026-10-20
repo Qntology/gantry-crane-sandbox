@@ -47,7 +47,7 @@ impl BrakeParams {
         Self {
             holding_torque_nm: t,
             // 개폐 시간은 수백 ms 규모: Innomotics CR 81 KFB 63 120 / 342 ms, Hubbell 드럼 브레이크 해제 0.2 s · 체결 0.35–0.45 s
-            set_delay_s: 0.3,
+            set_delay_s: 0.35,
             release_delay_s: 0.2,
             lining_new_mm: 1.0 + usable_mm,
             lining_min_mm: 1.0,
@@ -95,6 +95,13 @@ pub struct BrakeState {
     pub operations: u64,
     /// 움직이는 중에 체결되어 마찰일이 생긴 횟수
     pub dynamic_stops: u64,
+    /// 패드가 실제로 디스크를 누르고 있는가 (명령 단계와 따로 둔다)
+    #[serde(default = "pads_closed_default")]
+    pub pads_closed: bool,
+}
+
+fn pads_closed_default() -> bool {
+    true
 }
 
 impl BrakeState {
@@ -110,12 +117,22 @@ impl BrakeState {
             max_temp_c: ambient_c,
             operations: 0,
             dynamic_stops: 0,
+            pads_closed: true,
         }
     }
 
     pub fn command_release(&mut self) {
         match self.phase {
-            BrakePhase::Set | BrakePhase::Setting => {
+            BrakePhase::Set => {
+                self.phase = BrakePhase::Releasing;
+                self.timer_s = 0.0;
+            }
+            // 패드가 아직 닫히지 않았으면 열린 채로 바로 해제 상태로 돌아간다
+            BrakePhase::Setting if !self.pads_closed => {
+                self.phase = BrakePhase::Released;
+                self.timer_s = 0.0;
+            }
+            BrakePhase::Setting => {
                 self.phase = BrakePhase::Releasing;
                 self.timer_s = 0.0;
             }
@@ -125,6 +142,11 @@ impl BrakeState {
 
     pub fn command_set(&mut self) {
         match self.phase {
+            // 해제 도중(패드가 아직 닫혀 있음)에 체결 명령 → 바로 체결 상태로 돌아간다
+            BrakePhase::Releasing if self.pads_closed => {
+                self.phase = BrakePhase::Set;
+                self.timer_s = 0.0;
+            }
             BrakePhase::Released | BrakePhase::Releasing => {
                 self.phase = BrakePhase::Setting;
                 self.timer_s = 0.0;
@@ -141,12 +163,14 @@ impl BrakeState {
                 self.timer_s += dt;
                 if self.timer_s >= p.release_delay_s {
                     self.phase = BrakePhase::Released;
+                    self.pads_closed = false;
                 }
             }
             BrakePhase::Setting => {
                 self.timer_s += dt;
                 if self.timer_s >= p.set_delay_s {
                     self.phase = BrakePhase::Set;
+                    self.pads_closed = true;
                     self.operations += 1;
                 }
             }
@@ -161,7 +185,7 @@ impl BrakeState {
 
     /// 패드가 디스크를 잡고 있는가 — 체결 완료, 또는 해제 명령 뒤 아직 열리지 않은 동안
     pub fn holding(&self) -> bool {
-        matches!(self.phase, BrakePhase::Set | BrakePhase::Releasing)
+        self.pads_closed
     }
 
     /// 모터가 브레이크에 맞서 토크를 낼 수 있는가 (해제 완료)
@@ -218,9 +242,34 @@ mod tests {
         s.command_set();
         s.update(&p, 0.2);
         assert!(!s.engaged());
-        s.update(&p, 0.1);
+        assert!(!s.holding());
+        s.update(&p, 0.15);
         assert!(s.engaged());
+        assert!(s.holding());
         assert_eq!(s.operations, 1);
+    }
+
+    #[test]
+    fn pad_state_follows_the_pads_not_the_command() {
+        let p = BrakeParams::example(72.0, 2.0);
+        // 체결 중(패드 열림)에 해제 명령 → 패드는 한 번도 닫히지 않았다
+        let mut s = BrakeState::new(&p, 20.0);
+        s.command_release();
+        s.update(&p, 0.3);
+        assert!(s.released());
+        s.command_set();
+        s.update(&p, 0.1);
+        s.command_release();
+        assert!(!s.holding());
+        assert!(s.released());
+        // 해제 중(패드 닫힘)에 체결 명령 → 하중을 놓지 않는다
+        let mut s = BrakeState::new(&p, 20.0);
+        s.command_release();
+        s.update(&p, 0.1);
+        s.command_set();
+        assert!(s.holding());
+        s.update(&p, 0.01);
+        assert!(s.holding() && s.engaged());
     }
 
     #[test]

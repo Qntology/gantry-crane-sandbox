@@ -36,7 +36,7 @@ Rust 샌드박스. [endmill-sandbox](https://github.com/sungu-che/endmill-sandbo
 ## 빠른 시작
 
 ```bash
-# 테스트 (단위 95 + 시나리오 3, 약 15초)
+# 테스트 (단위 103 + 시나리오 3, 약 15초)
 cargo test
 (cd crates/crane_mbd && cargo test --release)
 

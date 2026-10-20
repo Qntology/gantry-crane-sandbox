@@ -208,8 +208,9 @@ pub fn run_pipeline(sc: &Scenario, cfg: &PipelineConfig, models: &Models) -> Res
     };
     let drift: Vec<(String, f64)> = match sds.as_mut() {
         Some(s) => {
-            let items = s.drift_report(&spec.name);
+            // 이번 실행을 먼저 넣어야 이번 이상이 이번 판정에 바로 잡힌다
             s.ingest_cycle(&spec.name, &cycle);
+            let items = s.drift_report(&spec.name);
             items.into_iter().map(|d| (d.key, d.z)).collect()
         }
         None => Vec::new(),
@@ -245,8 +246,18 @@ pub fn run_pipeline(sc: &Scenario, cfg: &PipelineConfig, models: &Models) -> Res
     decision.choice = Some(decision::choice_prompt(&decision, op_rate, rule_rate));
 
     let crosscheck = if cfg.crosscheck {
-        // 횡이동 중 로프 길이의 중앙값 기준
-        let mut ls = cycle.samples.l.clone();
+        // 횡이동(주행 · 횡행 속도 > 0.01 m/s) 중 로프 길이의 중앙값 기준. 횡이동이 없으면 전체 표본
+        let sm = &cycle.samples;
+        let mut ls: Vec<f64> = (0..sm.l.len())
+            .filter(|&i| {
+                sm.axes.first().and_then(|a| a.v.get(i)).map_or(false, |v| v.abs() > 0.01)
+                    || sm.axes.get(1).and_then(|a| a.v.get(i)).map_or(false, |v| v.abs() > 0.01)
+            })
+            .map(|i| sm.l[i])
+            .collect();
+        if ls.is_empty() {
+            ls = sm.l.clone();
+        }
         ls.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let l_mid = ls.get(ls.len() / 2).cloned().unwrap_or(spec.structure.rope_min_m);
         Some(calib::crosscheck(&spec, l_mid, cycle.load_peak_kg.max(1.0), cfg.sling_length_m))
