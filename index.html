@@ -300,6 +300,13 @@ input[type=file]::file-selector-button:hover { background: var(--bg-hover); bord
 .viewport-toolbar select { min-height: 26px; font-size: 0.7rem; }
 .viewport-toolbar input[type=range] { width: 140px; }
 .vt-time { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text); min-width: 112px; padding: 4px 9px; background: var(--bg-card); border: 1px solid var(--border-cell); border-radius: var(--radius); text-align: center; font-variant-numeric: tabular-nums; }
+/* 툴바 아래 영역 — 뷰포트와 화면 전환 오버레이가 겹친다. 툴바(⏵ 재생)는 사이클 해석 · 현장 운영 화면에서 보인다 */
+.center-stage { flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; }
+.app-layout:is([data-view="marine"], [data-view="cal"], [data-view="settings"]) .viewport-toolbar { display: none; }
+.app-layout[data-view="op"] .only-cycle, .app-layout:not([data-view="op"]) .only-op { display: none !important; }
+.app-layout[data-view="op"] .center-overlay { border-radius: 0 0 var(--radius-card) var(--radius-card); }
+.vt-btn.vt-primary.computing { border-color: var(--warning); color: var(--warning); }
+.vt-btn.vt-primary.stale { box-shadow: inset 0 -2px 0 var(--warning); }
 .viewport-canvas-wrap { flex: 1; position: relative; overflow: hidden; background: var(--bg-plot); min-height: 0; border-radius: 0 0 var(--radius-card) var(--radius-card); }
 .viewport-canvas-wrap canvas { width: 100%; height: 100%; display: block; cursor: grab; }
 .vp-hud { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 7; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; flex-wrap: wrap; }
@@ -533,7 +540,7 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
         <button class="menu-btn" data-view="settings" data-tip-title="환경·모델 설정" data-tip="학습 모델(TTM-R3 · LAYA) 다운로드 · 이어받기 · 삭제, 시작할 때 자동으로 받기, 모델 폴더와 저장 위치를 정합니다."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>환경·모델 설정</span><span class="menu-badge" id="menuMdlBadge"></span></button>
       </nav>
 
-      <div class="group-label">사이클 해석 · 한 번의 운반<span class="help" tabindex="0" data-tip="① 크레인 · 하중 · 흔들림 억제 · 바람을 정하고 ② 근무 시간과 예측 수평선을 정한 뒤 '실행'을 누릅니다. '방식 비교'는 흔들림 억제 방식 다섯 가지를 같은 조건으로 돌립니다.">?</span></div>
+      <div class="group-label">사이클 해석 · 한 번의 운반<span class="help" tabindex="0" data-tip="① 크레인 · 하중 · 흔들림 억제 · 바람을 정하고 ② 근무 시간과 예측 수평선을 정한 뒤 가운데 ⏵ 재생을 누릅니다. 재생 버튼이 계산(모델 준비 · 추론 · 다섯 흔들림 억제 방식 비교)까지 맡습니다.">?</span></div>
       <div class="panel-section-header" data-section="secScenario">
         <span class="sec-title"><span class="step-no">1</span><span class="sec-name">시나리오</span></span><span class="step-sum" id="sum-scn"></span><span class="chevron">▼</span>
       </div>
@@ -556,10 +563,10 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
           <div class="form-group"><label>시간당 사이클</label><input id="cph" type="number" value="6" step="1"></div>
           <div class="form-group span-2"><label>예측 수평선 (h)</label><input id="fh" type="number" value="8" step="1"></div>
         </div>
-        <div class="btn-row"><button class="btn" id="run">실행</button><button class="btn btn-outline" id="cmp">방식 비교</button></div>
+        <div class="st-note" style="margin-top:0">가운데 <b>⏵ 재생</b>을 누르면 이 조건으로 계산(모델 준비 → TTM-R3 · LAYA 추론 → 방식 비교)한 뒤 재생합니다. 조건을 바꾸면 다음 재생 때 다시 계산합니다.</div>
       </div>
 
-      <div class="group-label">현장 운영 · 내구도<span class="help" tabindex="0" data-tip="③ 현장 프리셋(크레인 · 기후 · 물량 · 환경 · 사람 · 정비)을 고르거나 바꿔 저장하고, ④ 기간과 결정 방식을 정해 운영합니다. 같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.">?</span></div>
+      <div class="group-label">현장 운영 · 내구도<span class="help" tabindex="0" data-tip="③ 현장 프리셋(크레인 · 기후 · 물량 · 환경 · 사람 · 정비)을 고르거나 바꿔 저장하고, ④ 기간과 결정 방식을 정한 뒤, 현장 운영 · 내구도 화면의 ⏵ 운영 시작으로 돌립니다. 같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.">?</span></div>
       <div class="panel-section-header" data-section="secSite">
         <span class="sec-title"><span class="step-no">3</span><span class="sec-name">현장 프리셋</span></span><span class="step-sum" id="sum-site"></span><span class="chevron">▼</span>
       </div>
@@ -632,7 +639,7 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
         </details>
       </div>
       <div class="panel-section-header" data-section="secOp">
-        <span class="sec-title"><span class="step-no">4</span><span class="sec-name">운영 실행</span><span class="help" tabindex="0" data-tip="결정 방식이 '카드마다 묻기'면 위험한 순간마다 운영이 멈추고 결정 카드가 뜹니다 (숫자 키로 고르고 Enter 는 권장).&#10;날씨는 현장 기후로 만든 합성 날씨나 ERA5 시간별 실제 날씨 재생 중에서 고릅니다.">?</span></span><span class="step-sum" id="sum-op"></span><span class="chevron">▼</span>
+        <span class="sec-title"><span class="step-no">4</span><span class="sec-name">운영 조건</span><span class="help" tabindex="0" data-tip="결정 방식이 '카드마다 묻기'면 위험한 순간마다 운영이 멈추고 결정 카드가 뜹니다 (숫자 키로 고르고 Enter 는 권장).&#10;날씨는 현장 기후로 만든 합성 날씨나 ERA5 시간별 실제 날씨 재생 중에서 고릅니다.&#10;운영은 현장 운영 · 내구도 화면 위의 ⏵ 운영 시작으로 돌립니다 (⏸ 일시정지 · ⏹ 중지).">?</span></span><span class="step-sum" id="sum-op"></span><span class="chevron">▼</span>
       </div>
       <div class="panel-section-body" id="secOp">
         <div class="form-grid">
@@ -647,9 +654,8 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
         <div class="st-note" id="opWeatherNote" style="margin-top:0;margin-bottom:8px"></div>
         <div class="form-group"><label>결정 방식</label><select id="opPolicy"><option value="ask">카드마다 묻기</option><option value="recommended">권장 자동</option><option value="conservative">가장 보수적</option><option value="risky">알림 무시 (위험 비교)</option></select></div>
         <label class="ct-check"><input id="opFresh" type="checkbox"> 원장 새로 시작</label>
-        <button class="btn btn-block" id="opRun">현장 운영 실행</button>
         <div class="progress"><i id="opProg"></i></div>
-        <div class="st-note" id="opStatus" style="margin-top:4px">같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.</div>
+        <div class="st-note" id="opStatus" style="margin-top:4px">메뉴의 <b>현장 운영 · 내구도</b> 화면에서 <b>⏵ 운영 시작</b>을 누르면 이 조건으로 하루씩 진행합니다 (⏸ 일시정지 · ⏹ 중지). 같은 자산 이름으로 다시 돌리면 내구도 원장을 이어서 쌓습니다.</div>
       </div>
 
       <div class="group-label">파일</div>
@@ -673,18 +679,20 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
   <main class="panel-center" id="panelCenter">
     <div class="viewport-toolbar">
       <div class="vt-row">
-        <span class="vt-label">재생</span>
+        <span class="vt-label only-cycle">재생</span>
+        <span class="vt-label only-op">운영</span>
+        <span class="help" tabindex="0" data-tip="재생 버튼 하나가 계산 · 모델 추론 · 재생을 모두 맡습니다.&#10;사이클 해석 — 조건이 바뀌었거나 결과가 없으면 먼저 계산(모델 준비 → TTM-R3 예측 · LAYA 조언 → 다섯 방식 비교)하고 재생, 결과가 최신이면 재생 · 일시정지&#10;현장 운영 — 왼쪽 ③ ④ 조건으로 운영을 시작해 하루씩 진행, 일시정지 · 계속 · 중지&#10;단축키: Space">?</span>
         <button class="vt-btn vt-primary" id="playBtn">⏵ 재생</button>
         <button class="vt-btn" id="stopBtn" title="처음으로">⏹</button>
-        <select id="speed" title="실제 시간 대비 재생 배속"><option value="1">×1</option><option value="5">×5</option><option value="20" selected>×20</option><option value="60">×60</option></select>
-        <input type="range" id="slider" min="0" max="1000" value="0" title="재생 위치">
-        <span class="vt-time" id="tLabel">0.0 / 0.0 s</span>
-        <div class="vt-sep"></div>
-        <button class="vt-btn" id="vtRun" title="왼쪽 ① ② 조건으로 사이클 해석 실행">실행</button>
-        <button class="vt-btn" id="vtCmp" title="흔들림 억제 방식 다섯 가지 비교">방식 비교</button>
-        <button class="vt-btn vt-reopen vt-push" onclick="panelOpen('panelRight')" title="접어 둔 오른쪽 판정 패널 다시 열기">◀ 판정</button>
+        <select id="speed" class="only-cycle" title="실제 시간 대비 재생 배속"><option value="1">×1</option><option value="5">×5</option><option value="20" selected>×20</option><option value="60">×60</option></select>
+        <input type="range" id="slider" class="only-cycle" min="0" max="1000" value="0" title="재생 위치">
+        <span class="vt-time only-cycle" id="tLabel">0.0 / 0.0 s</span>
+        <span class="vt-time only-op" id="opClock">대기</span>
+        <span class="vt-info only-op" id="opInfo"></span>
+        <span class="vt-info only-cycle" id="playInfo"></span>
+        <button class="vt-btn vt-reopen vt-push only-cycle" onclick="panelOpen('panelRight')" title="접어 둔 오른쪽 판정 패널 다시 열기">◀ 판정</button>
       </div>
-      <div class="vt-row">
+      <div class="vt-row only-cycle">
         <span class="vt-label">표시</span>
         <span class="help" tabindex="0" data-tip="궤적 — 지금까지 하중이 지나간 길&#10;격자 — 바닥 격자와 주행 레일&#10;로프 — 트롤리에서 하중까지 로프&#10;시점 — 드래그로 회전, 휠로 확대, 더블클릭 또는 '리셋'으로 기본 각도">?</span>
         <button class="vt-btn active" id="tg-trail" data-show="trail">궤적</button>
@@ -697,6 +705,7 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
         <span class="vt-info" id="sceneInfo"></span>
       </div>
     </div>
+    <div class="center-stage">
     <div class="viewport-canvas-wrap" id="vpWrap">
       <canvas id="scene"></canvas>
       <div class="vp-hud">
@@ -720,7 +729,13 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
         <div class="prep-steps" id="vpWaitSteps"></div>
         <div class="prep-row" id="vpWaitBtns"></div>
       </div>
-      <div class="vp-empty" id="vpEmpty"><b>결과 없음</b>왼쪽 ① ② 를 정하고 '실행'을 누르거나<br>⑤ 에서 pipeline.json 을 여세요</div>
+      <div class="vp-prep hidden" id="vpPrep">
+        <div class="prep-title">사이클 해석 — 계산 후 재생</div>
+        <div class="prep-stage" id="vpPrepStage"></div>
+        <div class="prep-bar"><span id="vpPrepBar"></span></div>
+        <div class="prep-steps" id="vpPrepSteps"></div>
+      </div>
+      <div class="vp-empty" id="vpEmpty"><b>결과 없음</b>왼쪽 ① ② 를 정하고 위의 ⏵ 재생을 누르면<br>계산(모델 추론 포함)한 뒤 재생합니다 · ⑤ 에서 pipeline.json 열기</div>
       <div class="vp-legend"><div><i style="background:var(--accent)"></i>트롤리</div><div><i style="background:var(--warning)"></i>하중 (매달림)</div><div><i style="background:var(--violet)"></i>하중 궤적</div></div>
       <div class="viewport-hint">드래그 회전 · 휠 확대 · 더블클릭 리셋</div>
     </div>
@@ -728,7 +743,7 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
     <!-- 현장 운영 · 내구도 -->
     <section class="center-overlay" id="view-op">
       <div class="ov-head">
-        <div><div class="section-title">현장 운영 · 내구도</div><div class="st-note" id="opHead">왼쪽 ③ ④ 에서 현장 운영을 실행하거나 ⑤ 에서 operation.json 을 여세요.</div></div>
+        <div><div class="section-title">현장 운영 · 내구도</div><div class="st-note" id="opHead">왼쪽 ③ ④ 에서 조건을 정하고 위의 <b>⏵ 운영 시작</b>을 누르세요. ⑤ 에서 operation.json 을 열 수도 있습니다.</div></div>
       </div>
       <div class="pv-head" id="opKpis"></div>
       <div class="ctx-box" id="opMarine"></div>
@@ -820,7 +835,7 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
           <div class="st-note">
             <b>TTM-R3</b> (5.9 MB) 는 근무 시계열(권선 온도 · 로프 손상 · 라이닝)의 잔차를 예측합니다. 없으면 Holt 감쇠 추세 + 물리 사전값을 씁니다.
             <b>LAYA</b> (843 MB) 는 판정을 상향만 할 수 있는 조언 모델이고 작업자 선택 카드에 확률을 붙입니다. 없으면 결정적 안전 게이트만 씁니다.
-            모델이 받아지는 동안 '실행'을 누르면 아래 대기 작업으로 기다렸다가 준비되면 자동으로 이어서 실행합니다 ('모델 없이 진행'도 가능).
+            모델이 받아지는 동안 ⏵ 재생을 누르면 아래 대기 작업으로 기다렸다가 준비되면 자동으로 이어서 계산 · 재생합니다 ('모델 없이 진행'도 가능).
           </div>
         </div>
       </div>
@@ -829,6 +844,7 @@ th.group { background: var(--bg-panel); color: var(--text-dim); padding-top: 12p
         <div id="mq-list"></div>
       </div>
     </section>
+    </div>
   </main>
 
   <div class="resizer resizer-v right" id="resizerRight"></div>
@@ -965,6 +981,8 @@ let REPORT = null, COMPARE = null, play = { on: false, t: 0, last: 0 };
 let view = { yaw: -0.65, pitch: 0.42, dist: 1.0, dragging: false, px: 0, py: 0 };
 const SHOW = { trail: true, grid: true, rope: true };
 let VIEW = 'cycle';
+// 현장 운영 재생 상태 — idle · starting · running · paused · deciding · finished (⏵ 하나로 시작 · 일시정지 · 계속)
+let OPRUN = { state: 'idle', token: 0, chunk: 24, days: 0 };
 
 function fmt(v, d = 1) { return (v === null || v === undefined || !isFinite(v)) ? '—' : Number(v).toFixed(d); }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -995,6 +1013,7 @@ function switchView(v) {
   document.querySelectorAll('.menu-btn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === v));
   document.querySelectorAll('.center-overlay').forEach(o => o.classList.toggle('visible', o.id === 'view-' + v));
   if (v === 'settings') stEnter();
+  updatePlayBtn();
   scheduleRedraw();
 }
 document.querySelectorAll('.menu-btn[data-view]').forEach(b => b.onclick = () => switchView(b.dataset.view));
@@ -1205,7 +1224,7 @@ function drawScene() {
   $('tLabel').textContent = `${fmt(S.t[i], 1)} / ${fmt(S.t[n - 1], 1)} s`;
 }
 function idxAt(t) { const S = REPORT.cycle.samples; if (!S.t.length) return 0; const dt = (S.t[S.t.length - 1] - S.t[0]) / Math.max(1, S.t.length - 1); return Math.round((t - S.t[0]) / Math.max(dt, 1e-9)); }
-function setPlaying(on) { play.on = on; $('playBtn').textContent = on ? '⏸ 일시정지' : '⏵ 재생'; setHud(on ? 'PLAYING' : REPORT ? (play.t > 0 && play.t < REPORT.cycle.samples.t.at(-1) ? 'PAUSED' : play.t > 0 ? 'COMPLETE' : 'READY') : 'READY'); }
+function setPlaying(on) { play.on = on; updatePlayBtn(); setHud(on ? 'PLAYING' : REPORT ? (play.t > 0 && play.t < REPORT.cycle.samples.t.at(-1) ? 'PAUSED' : play.t > 0 ? 'COMPLETE' : 'READY') : 'READY'); }
 function tick(ts) {
   if (play.on && REPORT) {
     const S = REPORT.cycle.samples, T = S.t[S.t.length - 1];
@@ -1216,8 +1235,18 @@ function tick(ts) {
   }
   play.last = ts; requestAnimationFrame(tick);
 }
-$('playBtn').onclick = () => { if (!REPORT) return; const T = REPORT.cycle.samples.t.at(-1); if (play.t >= T) play.t = 0; setPlaying(!play.on); };
-$('stopBtn').onclick = () => { if (!REPORT) return; play.t = 0; $('slider').value = 0; setPlaying(false); drawScene(); };
+// ⏵ 하나가 계산 · 모델 추론 · 재생을 맡는다 — 사이클 해석 화면은 cyclePlay, 현장 운영 화면은 opPlay
+$('playBtn').onclick = () => VIEW === 'op' ? opPlay() : cyclePlay();
+$('stopBtn').onclick = () => {
+  if (VIEW === 'op') { opStop(); return; }
+  if (!REPORT) return; play.t = 0; $('slider').value = 0; setPlaying(false); drawScene();
+};
+window.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || !$('decOverlay').classList.contains('hidden')) return;
+  if (e.target && e.target.closest && e.target.closest('input, select, textarea, button, [contenteditable]')) return;
+  if (VIEW !== 'cycle' && VIEW !== 'op') return;
+  e.preventDefault(); $('playBtn').click();
+});
 $('slider').oninput = e => { if (!REPORT) return; play.t = e.target.value / 1000 * REPORT.cycle.samples.t.at(-1); if (!play.on) setHud('PAUSED'); drawScene(); };
 document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { const k = b.dataset.show; SHOW[k] = !SHOW[k]; b.classList.toggle('active', SHOW[k]); drawScene(); });
 function resetView() { Object.assign(view, { yaw: -0.65, pitch: 0.42, dist: 1.0 }); drawScene(); }
@@ -1317,7 +1346,7 @@ function renderDuty() {
 }
 function renderCompare() {
   const rows = COMPARE;
-  if (!rows || !rows.length) { $('cmpTable').innerHTML = '<tr><td class="muted">방식 비교를 실행하거나 compare.json 을 여세요.</td></tr>'; prep($('cCmp')); return; }
+  if (!rows || !rows.length) { $('cmpTable').innerHTML = '<tr><td class="muted">⏵ 재생으로 계산하면 흔들림 억제 다섯 방식을 같은 조건으로 함께 비교합니다 (compare.json 도 열 수 있음).</td></tr>'; prep($('cCmp')); return; }
   const P = prep($('cCmp')); if (P) {
     const { ctx, w, h } = P, m = { l: 50, r: 12, t: 28, b: 30 }, max = Math.max(1, ...rows.map(r => r.max_residual_sway_mm)), bw = (w - m.l - m.r) / rows.length;
     ctx.fillStyle = UI.label; ctx.font = `600 11px ${UI.sans}`; ctx.textAlign = 'left'; ctx.fillText('방식별 최대 잔류 흔들림 (mm) — 막대 위: 사이클 시간', 10, 16);
@@ -1358,31 +1387,78 @@ async function buildScenario() {
   for (const wp of sc.waypoints) wp.mode = $('movemode').value;
   return sc;
 }
-async function runCycle() {
-  if (!online()) { setStatus('파일 모드: crane_demo pipeline 결과를 여세요'); return; }
+// ---------- ⏵ 재생 = (조건이 바뀌었으면) 계산 → 재생 ----------
+// 계산 단계: 모델 준비(endmill 의 모델 대기 작업) → 동역학 · 근무 · TTM-R3 예측 · 게이트 · LAYA 조언 → 다섯 방식 비교 → 재생
+const CYCLE_INPUTS = ['crane', 'load', 'mode', 'wind', 'gust', 'movemode', 'hours', 'cph', 'fh'];
+const cycleSig = () => CYCLE_INPUTS.map(id => $(id).value).join('|');
+let REPORT_SIG = null, COMPUTING = false;
+const needsCompute = () => online() && (!REPORT || REPORT_SIG !== cycleSig());
+const PREP_STEPS = ['모델 준비 (TTM-R3 · LAYA)', '동역학 · 근무 · 예측 · 판정', '방식 비교 (흔들림 억제 다섯 가지)', '재생'];
+function prepRender(i, stage) {
+  $('vpPrep').classList.remove('hidden');
+  $('vpPrepStage').textContent = stage;
+  $('vpPrepBar').style.width = `${(i / PREP_STEPS.length * 100).toFixed(0)}%`;
+  $('vpPrepSteps').innerHTML = PREP_STEPS.map((s, k) => `<div class="${k < i ? 'sev-0' : k === i ? 'sev-1' : ''}">${k < i ? '✓' : k === i ? '…' : '·'} ${k + 1}. ${esc(s)}</div>`).join('');
+}
+function updatePlayBtn() {
+  const b = $('playBtn'), stop = $('stopBtn');
+  let txt, stale = false;
+  if (VIEW === 'op') {
+    const s = OPRUN.state;
+    txt = { running: '⏸ 일시정지', paused: '⏵ 계속', deciding: '⏸ 결정 대기', starting: '⏳ 준비 중', finished: '⏵ 다시 운영' }[s] || '⏵ 운영 시작';
+    b.disabled = !online() || s === 'starting' || s === 'deciding';
+    stop.disabled = !['running', 'paused', 'deciding'].includes(s); stop.title = '운영 중지 (다음 ⏵ 는 처음부터)';
+    b.title = online() ? '왼쪽 ③ ④ 조건으로 현장 운영을 하루씩 진행합니다 (Space)' : '데스크톱 앱 · crane_demo serve 에서 실행됩니다';
+  } else {
+    stale = needsCompute();
+    txt = COMPUTING ? '⏳ 계산 중' : play.on ? '⏸ 일시정지' : stale ? '⏵ 계산 · 재생' : '⏵ 재생';
+    b.disabled = COMPUTING || (!online() && !REPORT);
+    stop.disabled = !REPORT || COMPUTING; stop.title = '처음으로';
+    b.title = stale ? '왼쪽 ① ② 조건으로 계산(모델 추론 포함)한 뒤 재생합니다 (Space)' : '재생 · 일시정지 (Space)';
+    $('playInfo').textContent = !COMPUTING && stale && REPORT ? '조건이 바뀜 — ⏵ 를 누르면 다시 계산' : '';
+  }
+  if (b.textContent !== txt) b.textContent = txt;
+  b.classList.toggle('computing', VIEW !== 'op' && COMPUTING);
+  b.classList.toggle('stale', stale && !COMPUTING);
+}
+async function computeCycle() {
+  COMPUTING = true; updatePlayBtn(); setHud('RUNNING');
   try {
-    $('run').disabled = $('vtRun').disabled = true; setHud('RUNNING');
     // 시계열 예측(TTM-R3) · 판정 조언(LAYA) 이 받는 중 · 불러오는 중이면 준비될 때까지 기다린다 (endmill 의 모델 대기 작업)
+    prepRender(0, '모델 준비 확인 중…');
     const g = await requireModels(['ttm', 'laya'], '사이클 해석 — 시계열 예측 · 판정 조언', { optional: true });
-    if (g.cancelled) { setStatus('사이클 해석을 취소했습니다', 'warn'); setHud(REPORT ? 'COMPLETE' : 'READY'); return; }
+    if (g.cancelled) { setStatus('사이클 해석을 취소했습니다', 'warn'); setHud(REPORT ? 'COMPLETE' : 'READY'); return false; }
     if (g.fallback) appendLog('모델 없이 진행 — 받은 모델만 쓰고 나머지는 Holt 예측 · 규칙 판정', 'warn');
     // LAYA(ModernBERT-large) 는 CPU 에서 한 번 묻는 데 20초 안팎 걸린다 — 기다리는 이유를 보여 준다
-    const laya = MDL.cat && MDL.cat.entries.find(m => m.key === 'laya' && m.loaded);
-    setStatus(laya ? `계산 중… (LAYA 조언 포함${/CPU/.test(MDL.cat.device) ? ' · CPU 에서 20초 안팎' : ''})` : '계산 중…');
+    const ready = k => MDL.cat && MDL.cat.entries.some(m => m.key === k && m.loaded);
+    const used = [ready('ttm') ? 'TTM-R3 예측' : 'Holt 예측', ready('laya') ? `LAYA 조언${/CPU/.test(MDL.cat.device) ? ' (CPU 에서 20초 안팎)' : ''}` : '규칙 판정'];
+    prepRender(1, `계산 중 — ${used.join(' · ')}`); setStatus(`계산 중… (${used.join(' · ')})`);
+    const sig = cycleSig();
     const scenario = await buildScenario();
     const config = { duty: { cycles_per_hour: Number($('cph').value), hours: Number($('hours').value), spectrum: [{ fraction: 1.0, share: 0.1 }, { fraction: 0.6, share: 0.3 }, { fraction: 0.3, share: 0.4 }, { fraction: 0.1, share: 0.2 }] }, forecast_hours: Number($('fh').value) };
-    REPORT = await invoke('run_pipeline', { scenario, config }); renderAll();
+    const rep = await invoke('run_pipeline', { scenario, config });
+    prepRender(2, '방식 비교 중…');
+    try { COMPARE = await invoke('compare', { scenario }); } catch (e) { appendLog('방식 비교 실패: ' + e, 'warn'); }
+    REPORT = rep; REPORT_SIG = sig; renderAll();
+    prepRender(3, '재생');
     setStatus(`완료: ${REPORT.cycle.scenario} · ${REPORT.decision.final_action_label}`, 'ok');
     for (const n of REPORT.notes || []) appendLog(n);
     mdlRefresh().then(cat => cat && mdlEnsurePoll());
-  } catch (e) { setHud('ERROR'); setStatus('오류: ' + e); } finally { $('run').disabled = $('vtRun').disabled = false; }
+    return true;
+  } catch (e) { setHud('ERROR'); setStatus('오류: ' + e); return false; }
+  finally { COMPUTING = false; $('vpPrep').classList.add('hidden'); updatePlayBtn(); }
 }
-async function runCompare() {
-  if (!online()) { setStatus('파일 모드: compare.json 을 여세요'); return; }
-  try { setStatus('비교 중…'); setHud('RUNNING'); COMPARE = await invoke('compare', { scenario: await buildScenario() }); showTab('compare'); renderCompare(); setHud(REPORT ? 'COMPLETE' : 'READY'); setStatus('방식 비교 완료', 'ok'); } catch (e) { setHud('ERROR'); setStatus('오류: ' + e); }
+async function cyclePlay() {
+  if (COMPUTING) return;
+  if (play.on) { setPlaying(false); return; }
+  if (needsCompute()) {
+    if (!await computeCycle()) return;
+    play.t = 0;
+  }
+  if (!REPORT) { setStatus('파일 모드: ⑤ 에서 pipeline.json 을 여세요 (계산은 데스크톱 앱 · crane_demo serve)', 'warn'); return; }
+  if (play.t >= REPORT.cycle.samples.t.at(-1)) play.t = 0;
+  setPlaying(true);
 }
-$('run').onclick = runCycle; $('vtRun').onclick = runCycle;
-$('cmp').onclick = runCompare; $('vtCmp').onclick = runCompare;
 async function openFiles(files) {
   for (const f of files) {
     try { const j = JSON.parse(await f.text());
@@ -1391,7 +1467,7 @@ async function openFiles(files) {
       else if (j.benchmarks && j.fitted) { CAL = j; renderCal(); switchView('cal'); setStatus('불러옴: 실데이터 보정', 'ok'); }
       else if (j.overall && j.folds && j.by_kind) { PG = j; switchView('marine'); document.querySelector('#mrTabs .pv-tab[data-pane=mrPaneProg]').click(); setStatus('불러옴: 예측 점수', 'ok'); }
       else if (Array.isArray(j) && j.length && j[0].protection && j[0].rows) { MR = j; switchView('marine'); document.querySelector('#mrTabs .pv-tab[data-pane=mrPaneSalt]').click(); setStatus('불러옴: 염해 진행', 'ok'); }
-      else if (j.cycle && j.decision) { REPORT = j; switchView('cycle'); renderAll(); setStatus(`불러옴: ${j.cycle.scenario}`, 'ok'); }
+      else if (j.cycle && j.decision) { REPORT = j; REPORT_SIG = cycleSig(); switchView('cycle'); renderAll(); setStatus(`불러옴: ${j.cycle.scenario}`, 'ok'); }
       else if (j.samples && j.moves) { setStatus(`${f.name}: cycle.json 에는 크레인 제원이 없어 그릴 수 없습니다. crane_demo pipeline 이 저장한 pipeline.json 을 여세요`, 'warn'); }
       else setStatus(`${f.name}: 알 수 없는 형식`, 'warn');
     } catch (e) { setStatus(`${f.name}: ${e}`, 'err'); }
@@ -1424,6 +1500,8 @@ function updateSums() {
   $('sum-op').textContent = `${$('opAsset').value} · ${$('opDays').value}일 · ${$('opPolicy').selectedOptions[0]?.textContent || ''}`;
 }
 ['crane', 'load', 'mode', 'hours', 'cph', 'fh', 'opAsset', 'opDays', 'opPolicy'].forEach(id => $(id).addEventListener('input', updateSums));
+// 조건을 바꾸면 ⏵ 가 '계산 · 재생'으로 바뀐다 (다음 재생 때 다시 계산)
+CYCLE_INPUTS.forEach(id => { $(id).addEventListener('input', updatePlayBtn); $(id).addEventListener('change', updatePlayBtn); });
 
 // ---------- 현장 운영 · 내구도 ----------
 let SITES = [], SITE = null, OP = null, CAL = null, CRANES = [], CLIMATES = [], AUTO = false, SHOWN_ALERTS = 0;
@@ -1531,28 +1609,83 @@ $('siteDel').onclick = async () => {
   try { await api('site_delete', { id: SITE.id }); SITE = null; await loadSiteList(); setOpStatus('삭제했습니다'); } catch (e) { setOpStatus('삭제 실패: ' + e); }
 };
 
-// ---------- 실행 · 결정 카드 ----------
-$('opRun').onclick = async () => {
+// ---------- 현장 운영 — ⏵ 운영 시작 · ⏸ 일시정지 · ⏵ 계속 · ⏹ 중지 · 결정 카드 ----------
+// 운영은 시간 묶음(op_run hours)으로 끊어 진행하며 화면을 갱신하고, 결정 카드가 생기면 그 자리에서 멈춘다.
+// 원장 · SDS 는 묶음마다 백엔드가 저장하므로 중지해도 그때까지 쌓인 내구도는 남는다.
+function opConfig() {
+  const [m, d] = ($('opStart').value || '').split('-').map(Number);
+  return {
+    asset_id: $('opAsset').value.trim() || 'crane-01',
+    days: Math.max(1, Math.round(Number($('opDays').value) || 30)),
+    start_month: isFinite(m) && m ? m : null, start_day: isFinite(d) && d ? d : null,
+    seed: Math.round(Number($('opSeed').value) || 1),
+    policy: $('opPolicy').value, incidents: true, fresh: $('opFresh').checked,
+    weather: $('opWeather').value ? { era5: $('opWeather').value, from: $('opWeatherFrom').value || null, offline: $('opWeatherOff').checked } : null,
+  };
+}
+function opClockText() {
+  if (!OPRUN.days) return '대기';
+  const h = OPRUN.hour || 0, pct = Math.min(100, h / (OPRUN.days * 24) * 100);
+  return `D${Math.min(OPRUN.days, Math.floor(h / 24) + 1)} / ${OPRUN.days}일 · ${fmt(pct, 0)}%`;
+}
+function setOpState(s) {
+  OPRUN.state = s;
+  $('menuOpBadge').textContent = { starting: '준비', running: '진행', paused: '멈춤', deciding: '결정' }[s] || '';
+  $('opClock').textContent = s === 'finished' ? `${OPRUN.days}일 끝` : opClockText();
+  updatePlayBtn();
+}
+async function opPlay() {
+  const s = OPRUN.state;
+  if (s === 'running') { setOpState('paused'); setOpStatus(`일시정지 (${opClockText()}) — ⏵ 계속으로 이어서 진행`); return; }
+  if (s === 'paused') { setOpState('running'); opLoop(OPRUN.token); return; }
+  if (s === 'starting' || s === 'deciding') return;
+  await opStartRun();
+}
+async function opStartRun() {
   if (!online()) { setOpStatus('파일 모드: crane_demo operate 결과(operation.json)를 열거나, 데스크톱 앱 · crane_demo serve 에서 실행하세요'); return; }
+  let preset, config;
+  try { preset = readEditor(); config = opConfig(); } catch (e) { setOpStatus('오류: ' + e); return; }
+  AUTO = config.policy !== 'ask'; SHOWN_ALERTS = 0;
+  const token = ++OPRUN.token;
+  // 화면 갱신은 40번 안팎 — 짧은 운영은 하루씩, 긴 운영은 며칠씩 묶는다
+  Object.assign(OPRUN, { days: config.days, hour: 0, chunk: 24 * Math.max(1, Math.ceil(config.days / 40)) });
+  $('opInfo').textContent = `${SITE ? SITE.name : ''} · ${config.asset_id} · ${$('opPolicy').selectedOptions[0]?.textContent || ''} · ${OPRUN.chunk / 24}일씩`;
+  setOpState('starting'); setOpStatus('사이클 증분표 계산 중 (하중 구간마다 동역학)…');
   try {
-    const preset = readEditor();
-    const [m, d] = ($('opStart').value || '').split('-').map(Number);
-    const config = {
-      asset_id: $('opAsset').value.trim() || 'crane-01',
-      days: Math.max(1, Math.round(Number($('opDays').value) || 30)),
-      start_month: isFinite(m) && m ? m : null, start_day: isFinite(d) && d ? d : null,
-      seed: Math.round(Number($('opSeed').value) || 1),
-      policy: $('opPolicy').value, incidents: true, fresh: $('opFresh').checked,
-      weather: $('opWeather').value ? { era5: $('opWeather').value, from: $('opWeatherFrom').value || null, offline: $('opWeatherOff').checked } : null,
-    };
-    AUTO = config.policy !== 'ask'; SHOWN_ALERTS = 0;
-    $('opRun').disabled = true; $('menuOpBadge').textContent = '진행'; setOpStatus('사이클 증분표 계산 중 (하중 구간마다 동역학)…');
     const st = await api('op_start', { preset, config });
-    switchView('op');
-    handleOp(st);
-    await step();
-  } catch (e) { setOpStatus('오류: ' + e); $('opRun').disabled = false; $('menuOpBadge').textContent = ''; }
-};
+    if (token !== OPRUN.token) return;
+    applyOp(st);
+    setOpState('running');
+    opLoop(token);
+  } catch (e) { if (token === OPRUN.token) { setOpStatus('오류: ' + e); setOpState('idle'); } }
+}
+async function opLoop(token) {
+  try {
+    while (OPRUN.state === 'running' && token === OPRUN.token) {
+      setOpStatus(`진행 중… ${opClockText()}`);
+      const st = await api('op_run', { hours: OPRUN.chunk });
+      if (token !== OPRUN.token) return;
+      if (opAfter(st, token)) return;
+    }
+  } catch (e) { if (token === OPRUN.token) { setOpStatus('오류: ' + e); setOpState('idle'); } }
+}
+// 묶음 하나를 돌린 뒤 — 끝났거나 결정을 기다리면 true (반복을 멈춘다)
+function opAfter(st, token) {
+  applyOp(st);
+  if (st.finished) { opFinished(); return true; }
+  if (st.pending) {
+    if (AUTO) { decide(st.pending.id, st.pending.prompt.recommended, token); return true; }
+    // 일시정지를 누른 뒤에 카드가 떴으면 고른 다음에도 멈춰 있는다
+    OPRUN.resumeTo = OPRUN.state === 'paused' ? 'paused' : 'running';
+    setOpState('deciding'); showDecision(st.pending); return true;
+  }
+  return false;
+}
+function opStop() {
+  if (!['starting', 'running', 'paused', 'deciding'].includes(OPRUN.state)) return;
+  OPRUN.token++; hideDecision(); setOpState('idle');
+  setOpStatus('운영을 중지했습니다 — 그때까지 쌓인 내구도 원장은 저장되어 있고, 다음 ⏵ 는 처음부터 시작합니다');
+}
 
 // ---------- 날씨 출처 (합성 · ERA5 재생) ----------
 let WSRC = [];
@@ -1580,37 +1713,38 @@ function weatherNote() {
 }
 $('opWeather').onchange = weatherNote;
 
-async function step() {
-  setOpStatus('진행 중…');
-  const st = await api('op_run', {});
-  handleOp(st);
-}
-
-function handleOp(st) {
+// 운영 상태를 화면에 반영한다 (보고서 · 진행률 · 상태 바 · 알림)
+function applyOp(st) {
   OP = st.report;
+  OPRUN.hour = st.finished ? OPRUN.days * 24 : (st.hour_index || 0);
   if (VIEW === 'op') renderOp();
-  const frac = st.finished ? 1 : Math.min(1, (st.hour_index || 0) / 24 / Math.max(1, Number($('opDays').value) || 1));
+  const frac = st.finished ? 1 : Math.min(1, OPRUN.hour / 24 / Math.max(1, OPRUN.days || 1));
   $('opProg').style.width = `${(frac * 100).toFixed(1)}%`;
+  $('opClock').textContent = opClockText();
   $('sb-op').textContent = `${OP.asset_id} · ${fmt(frac * 100, 0)}%`;
   toastNew();
-  if (st.pending) {
-    if (AUTO) { decide(st.pending.id, st.pending.prompt.recommended); return; }
-    showDecision(st.pending);
-  } else if (st.finished) {
-    hideDecision(); $('opRun').disabled = false; $('menuOpBadge').textContent = '';
-    // 같은 자산으로 다시 돌리면 계절을 이어 가도록 다음 날짜를 채워 둔다
-    if (OP.ledger && OP.ledger.next_doy != null) $('opStart').value = doyLabel(OP.ledger.next_doy);
-    // ERA5 재생이면 다음 실행이 실제 날짜로 이어지도록 시작 날짜를 기간만큼 넘긴다
-    if ($('opWeather').value && $('opWeatherFrom').value) { const t = new Date($('opWeatherFrom').value + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + OP.kpi.days); $('opWeatherFrom').value = t.toISOString().slice(0, 10); }
-    setOpStatus(`끝: ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 결정 ${OP.kpi.decisions} 건 · 원장 누적 ${fmt(OP.ledger.day, 0)} 일`);
-    $('sb-op').textContent = `${OP.asset_id} · ${OP.kpi.days}일 끝 · 가동률 ${fmt(OP.kpi.availability * 100, 0)}%`;
-    toast('현장 운영 끝', `${esc(OP.site_name)} · ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 사고 ${OP.kpi.incidents}`, OP.kpi.incidents > 0 ? 'warn' : 'ok');
-  }
+}
+function opFinished() {
+  hideDecision(); setOpState('finished');
+  // 같은 자산으로 다시 돌리면 계절을 이어 가도록 다음 날짜를 채워 둔다
+  if (OP.ledger && OP.ledger.next_doy != null) $('opStart').value = doyLabel(OP.ledger.next_doy);
+  // ERA5 재생이면 다음 실행이 실제 날짜로 이어지도록 시작 날짜를 기간만큼 넘긴다
+  if ($('opWeather').value && $('opWeatherFrom').value) { const t = new Date($('opWeatherFrom').value + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + OP.kpi.days); $('opWeatherFrom').value = t.toISOString().slice(0, 10); }
+  setOpStatus(`끝: ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 결정 ${OP.kpi.decisions} 건 · 원장 누적 ${fmt(OP.ledger.day, 0)} 일`);
+  $('sb-op').textContent = `${OP.asset_id} · ${OP.kpi.days}일 끝 · 가동률 ${fmt(OP.kpi.availability * 100, 0)}%`;
+  toast('현장 운영 끝', `${esc(OP.site_name)} · ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 사고 ${OP.kpi.incidents}`, OP.kpi.incidents > 0 ? 'warn' : 'ok');
 }
 
-async function decide(id, key) {
-  try { const st = await api('op_decide', { id, key }); handleOp(st); }
-  catch (e) { setOpStatus('선택 오류: ' + e); $('opRun').disabled = false; }
+// 결정을 반영하고, 운영 중이었으면(일시정지가 아니면) 이어서 진행한다
+async function decide(id, key, token = OPRUN.token) {
+  try {
+    const st = await api('op_decide', { id, key, then_hours: 1 });
+    if (token !== OPRUN.token) return;
+    if (opAfter(st, token)) return;
+    if (OPRUN.state === 'deciding') setOpState(OPRUN.resumeTo || 'running');
+    if (OPRUN.state === 'running') opLoop(token);
+    else if (OPRUN.state === 'paused') setOpStatus(`일시정지 (${opClockText()}) — ⏵ 계속으로 이어서 진행`);
+  } catch (e) { setOpStatus('선택 오류: ' + e); setOpState('paused'); }
 }
 
 function showDecision(d) {
@@ -2068,6 +2202,8 @@ function mqRender() {
   // 뷰포트 카드 — 열려 있는 첫 작업
   const t = MQ.tasks.find(mqOpen) || MQ.tasks.find(x => x.state === 'done');
   $('vpWait').classList.toggle('hidden', !t);
+  // 모델을 기다리는 동안에는 계산 단계 카드 대신 대기 카드만 보인다
+  $('vpPrep').style.visibility = t && mqOpen(t) ? 'hidden' : '';
   if (t) {
     $('vpWaitMsg').textContent = t.msg || '';
     $('vpWaitBar').style.width = `${t.pct == null ? 0 : Math.min(100, t.pct).toFixed(1)}%`;
@@ -2097,13 +2233,12 @@ document.addEventListener('click', e => {
     try { PG = await api('prognostics_saved'); renderProg(); } catch (_) {}
     try { CAL = await api('fieldcal_saved'); renderCal(); } catch (_) {}
   } else {
-    const t = '데스크톱 앱 · crane_demo serve 에서 실행됩니다';
-    for (const id of ['run', 'cmp', 'vtRun', 'vtCmp', 'opRun']) $(id).title = t;
     $('siteDesc').textContent = '파일 모드: 프리셋 편집 · 실행은 데스크톱 앱 또는 crane_demo serve 에서 합니다.';
     $('sb-models').textContent = '파일 모드'; $('sum-mdl').textContent = '파일 모드';
     appendLog('파일 모드 — 왼쪽 ⑤ 에서 crane_demo 결과 JSON 을 여세요');
   }
   setHud('READY');
+  updatePlayBtn();
   scheduleRedraw();
   requestAnimationFrame(tick);
 })();
