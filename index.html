@@ -196,6 +196,10 @@ label.chk input { width: auto; }
     <label>시작 날짜 (MM-DD) <input id="opStart" value="07-01"></label>
     <label>기간 (일) <input id="opDays" type="number" value="30" step="1"></label>
     <label>시드 <input id="opSeed" type="number" value="1" step="1"></label>
+    <label>날씨 <select id="opWeather"><option value="">합성 (현장 기후로 생성)</option></select></label>
+    <label id="opWeatherFromRow" style="display:none">ERA5 시작 날짜 <input id="opWeatherFrom" type="date"></label>
+    <label id="opWeatherOffRow" class="chk" style="display:none">캐시만 (인터넷 요청 안 함) <input id="opWeatherOff" type="checkbox"></label>
+    <div class="note" id="opWeatherNote"></div>
     <label>결정 방식 <select id="opPolicy"><option value="ask">카드마다 묻기</option><option value="recommended">권장 자동</option><option value="conservative">가장 보수적</option><option value="risky">알림 무시 (위험 비교)</option></select></label>
     <label class="chk">원장 새로 시작 <input id="opFresh" type="checkbox"></label>
     <div class="btnrow"><button class="primary" id="opRun">현장 운영 실행</button></div>
@@ -750,6 +754,7 @@ $('opRun').onclick = async () => {
       start_month: isFinite(m) && m ? m : null, start_day: isFinite(d) && d ? d : null,
       seed: Math.round(Number($('opSeed').value) || 1),
       policy: $('opPolicy').value, incidents: true, fresh: $('opFresh').checked,
+      weather: $('opWeather').value ? { era5: $('opWeather').value, from: $('opWeatherFrom').value || null, offline: $('opWeatherOff').checked } : null,
     };
     AUTO = config.policy !== 'ask'; SHOWN_ALERTS = 0;
     $('opRun').disabled = true; setOpStatus('사이클 증분표 계산 중 (하중 구간마다 동역학)…');
@@ -759,6 +764,31 @@ $('opRun').onclick = async () => {
     await step();
   } catch (e) { setOpStatus('오류: ' + e); $('opRun').disabled = false; }
 };
+
+// ---------- 날씨 출처 (합성 · ERA5 재생) ----------
+let WSRC = [];
+async function loadWeatherSources() {
+  const r = await api('weather_sources');
+  WSRC = r.sites || [];
+  const sel = $('opWeather'), kind = k => k === 'kma_station' ? '기상청 지점' : '항만';
+  sel.innerHTML = '<option value="">합성 (현장 기후로 생성)</option>' + WSRC.map(s => `<option value="${esc(s.id)}">ERA5 재생 · ${esc(s.name)} (${kind(s.kind)} ${esc(s.from.slice(0, 4))}${s.to.slice(0, 4) !== s.from.slice(0, 4) ? '–' + esc(s.to.slice(0, 4)) : ''})${s.cached ? '' : ' — 받기 필요'}</option>`).join('');
+  sel.dataset.cache = r.cache_dir || '';
+  weatherNote();
+}
+function weatherNote() {
+  const s = WSRC.find(x => x.id === $('opWeather').value);
+  for (const id of ['opWeatherFromRow', 'opWeatherOffRow']) $(id).style.display = s ? '' : 'none';
+  if (!s) { $('opWeatherNote').textContent = ''; return; }
+  const f = $('opWeatherFrom');
+  f.min = s.from; f.max = s.to;
+  if (!f.value || f.value < s.from || f.value > s.to) {
+    // 시작 날짜(MM-DD)를 자료 첫해에 맞춘다
+    const md = ($('opStart').value || '').match(/^(\d{1,2})-(\d{1,2})$/);
+    f.value = md ? `${s.from.slice(0, 4)}-${md[1].padStart(2, '0')}-${md[2].padStart(2, '0')}` : s.from;
+  }
+  $('opWeatherNote').innerHTML = `시간별 실제 날씨(Open-Meteo ERA5, 기상청 6개 지점 보정)를 ${esc(s.from)} – ${esc(s.to)} 안에서 그대로 재생합니다. 기간이 자료 끝을 넘으면 오류. 예보는 재생 날씨에 오차를 더해 만듭니다.<br><span class="muted">${s.cached ? '캐시에 있음' : '캐시에 없음 — 실행하면 한 번 받아 저장합니다 (curl 필요)'} · ${esc($('opWeather').dataset.cache || '')}</span>`;
+}
+$('opWeather').onchange = weatherNote;
 
 async function step() {
   setOpStatus('진행 중…');
@@ -779,6 +809,8 @@ function handleOp(st) {
     hideDecision(); $('opRun').disabled = false;
     // 같은 자산으로 다시 돌리면 계절을 이어 가도록 다음 날짜를 채워 둔다
     if (OP.ledger && OP.ledger.next_doy != null) $('opStart').value = doyLabel(OP.ledger.next_doy);
+    // ERA5 재생이면 다음 실행이 실제 날짜로 이어지도록 시작 날짜를 기간만큼 넘긴다
+    if ($('opWeather').value && $('opWeatherFrom').value) { const t = new Date($('opWeatherFrom').value + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + OP.kpi.days); $('opWeatherFrom').value = t.toISOString().slice(0, 10); }
     setOpStatus(`끝: ${OP.kpi.days} 일 · 이동 ${fmt(OP.kpi.moves, 0)} · 결정 ${OP.kpi.decisions} 건 · 원장 누적 ${fmt(OP.ledger.day, 0)} 일`);
   }
 }
@@ -977,6 +1009,7 @@ $('calFull').onclick = () => runCal(false);
     try { const s = await invoke('models_status'); if (s && (s.ttm || s.advisor)) $('mstatus').textContent = s.notes.join(' · '); } catch (_) {}
     try { const mr = await api('marine_refs'); PROTS = mr.protections; SALT_AREAS = mr.salt_areas; const cs = await api('cargo_scenarios'); CARGOS = cs.scenarios; window.CARGO_TYPES = cs.types; } catch (e) { setOpStatus('염해 · 화물 프리셋 불러오기 실패: ' + e); }
     try { CRANES = await api('cranes'); CLIMATES = await api('climates'); await loadSiteList(); } catch (e) { setOpStatus('프리셋 불러오기 실패: ' + e); }
+    try { await loadWeatherSources(); } catch (e) { setOpStatus('ERA5 위치 불러오기 실패: ' + e); }
     try { PG = await api('prognostics_saved'); renderProg(); } catch (_) {}
     try { CAL = await api('fieldcal_saved'); renderCal(); } catch (_) {}
   } else {

@@ -59,6 +59,8 @@ cargo test --no-default-features --lib
 cargo run --release --bin crane_demo -- site list
 cargo run --release --bin crane_demo -- operate --site busan_newport_rmg --days 90 --start 07-01 --asset RMG-01 --policy ask
 cargo run --release --bin crane_demo -- health show RMG-01
+# 같은 운전을 ERA5 시간별 실제 날씨로 (부산 신항 2023년 8월, 캐시 먼저 · 없으면 Open-Meteo 에서 한 번 받음)
+cargo run --release --bin crane_demo -- operate --site busan_newport_rmg --days 30 --weather era5:busan_newport@2023-08-01 --asset RMG-E5 --fresh
 # 값을 바꿔 내 현장으로 저장
 cargo run --release --bin crane_demo -- site save my_yard --from incheon_steel_stockyard --set throughput.moves_per_hour=10
 # 실데이터 대조 · 보정 표 (약 4분, --quick 은 짧은 표본)

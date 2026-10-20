@@ -15,7 +15,7 @@ use crate::era5cal;
 use crate::fieldcal;
 use crate::health::{self, HealthStore};
 use crate::marine;
-use crate::operation::{DecisionPolicy, OpSim, OperationConfig, StepOutcome};
+use crate::operation::{self, DecisionPolicy, OpSim, OperationConfig, StepOutcome, WeatherSource};
 use crate::prognostics;
 use crate::sds::{Scope, SdsStore};
 use crate::site::{self, SitePreset, SiteStore};
@@ -66,6 +66,16 @@ impl Backend {
 
     fn sds_dir(&self) -> PathBuf {
         self.data_dir.join("sds")
+    }
+
+    /// ERA5 시간별 캐시 — 저장소에서 띄웠으면 `out/weather_cache` (weather build 와 같은 곳), 아니면 `data_dir/weather_cache`
+    fn weather_cache(&self) -> PathBuf {
+        let repo = Path::new(operation::DEFAULT_WEATHER_CACHE);
+        if repo.is_dir() {
+            repo.to_path_buf()
+        } else {
+            self.data_dir.join("weather_cache")
+        }
     }
 
     /// 진행 중인 운영 시뮬레이션의 상태 (진행 · 기다리는 결정 · 보고서)
@@ -174,9 +184,19 @@ impl Backend {
                     Some(p) => p,
                     None => self.sites().get(&arg::<String>(args, "site")?)?,
                 };
-                let mut cfg: OperationConfig = arg(args, "config")?;
+                // 날씨 출처는 객체 {era5, from, offline} 나 CLI 와 같은 글자 "era5:<위치>[@YYYY-MM-DD]" 로 줄 수 있다
+                let mut cv = args.get("config").cloned().unwrap_or(Value::Null);
+                if let Some(Value::String(w)) = cv.get("weather").cloned() {
+                    cv["weather"] = to_value(&WeatherSource::parse(&w)?)?;
+                }
+                let mut cfg: OperationConfig = serde_json::from_value(cv).map_err(|e| format!("인자 'config': {e}"))?;
                 if let Some(p) = opt_arg::<String>(args, "policy")? {
                     cfg.policy = DecisionPolicy::from_key(&p).ok_or_else(|| format!("모르는 정책: {p}"))?;
+                }
+                if let Some(w) = cfg.weather.as_mut() {
+                    if w.cache_dir.is_none() {
+                        w.cache_dir = Some(self.weather_cache().to_string_lossy().into_owned());
+                    }
                 }
                 let ledger = if cfg.fresh { None } else { self.health_store().load(&cfg.asset_id)? };
                 self.op = Some(OpSim::new(preset, cfg, ledger)?);
@@ -270,6 +290,20 @@ impl Backend {
                 to_value(&prognostics::run(&sites, days, replicas, every, seed)?)
             }
             "weather_check" => to_value(&era5cal::run()),
+            // 운영 재생에 쓸 수 있는 ERA5 위치 · 시간별 기간 · 캐시에 있는가
+            "weather_sources" => {
+                let mut f = crate::weather_api::Fetcher::new(&self.weather_cache());
+                f.offline = true;
+                let list: Vec<Value> = crate::ports::sites()
+                    .iter()
+                    .map(|s| {
+                        let (h0, h1) = crate::ports::hourly_period(s);
+                        let cached = f.cache_path("hourly-era5", s.lat, s.lon, h0, h1).is_file();
+                        json!({"id": s.id, "name": s.name, "kind": s.kind, "country": s.country, "from": h0, "to": h1, "cached": cached})
+                    })
+                    .collect();
+                Ok(json!({"cache_dir": f.cache_dir.to_string_lossy(), "sites": list}))
+            }
             other => Err(format!("모르는 명령: {other}")),
         }
     }
@@ -302,6 +336,23 @@ mod tests {
         let h = b.call("health_get", &json!({"asset": "B-1"})).unwrap();
         assert_eq!(h["ledger"]["day"].as_f64().unwrap(), 3.0);
         assert!(b.call("nope", &json!({})).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn op_start_takes_era5_weather_source() {
+        let dir = std::env::temp_dir().join(format!("crane_backend_w_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut b = Backend::new(&dir);
+        let ws = b.call("weather_sources", &json!({})).unwrap();
+        assert_eq!(ws["sites"].as_array().unwrap().len(), crate::ports::sites().len());
+        // 글자 꼴 · 객체 꼴 모두 받고, 빈 캐시 + 오프라인이면 분명한 오류
+        let cache = dir.join("empty_cache").to_string_lossy().into_owned();
+        for w in [json!({"era5": "kma_busan", "from": "2022-07-01", "offline": true, "cache_dir": cache}), json!("era5:nowhere@2023-01-01")] {
+            let e = b.call("op_start", &json!({"site": "busan_newport_rmg", "config": {"asset_id": "W", "days": 2, "fresh": true, "weather": w}})).unwrap_err();
+            assert!(e.contains("ERA5"), "{e}");
+        }
+        assert!(b.call("op_start", &json!({"site": "busan_newport_rmg", "config": {"asset_id": "W", "days": 2, "weather": "kma:busan"}})).is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -65,7 +65,9 @@ crane_demo — 갠트리 크레인 샌드박스
                                                       위치 목록의 ERA5 일별 · 시간별 · SO₂ · 파고 → 통계 파일
   crane_demo operate --site <id> [--asset 이름] [--days N] [--start MM-DD] [--seed N]
                      [--policy ask|recommended|conservative|risky] [--ledger DIR] [--fresh] [--no-incidents] [--deterministic] [--out DIR]
+                     [--weather synthetic|era5:<위치>[@YYYY-MM-DD]] [--offline] [--cache DIR]
                                                       현장 운영 시뮬레이션 (ask: 결정 카드마다 묻는다)
+                                                      era5: ERA5 시간별 실제 날씨 재생 (위치: crane_demo weather ports, 캐시 먼저)
   crane_demo health list | show <asset> | replace <asset> <부품> | delete <asset> [--ledger DIR]
   crane_demo fieldcal [--out DIR]                     실데이터 대조 · 오차 표
   crane_demo serve [--port 8765] [--data DIR]          브라우저 화면 + API (http://localhost:8765)
@@ -951,7 +953,18 @@ fn cmd_operate(a: &Args, out: &Path) -> Result<(), String> {
         incidents: !a.opt.contains_key("no-incidents"),
         fresh: a.opt.contains_key("fresh"),
         stochastic: !a.opt.contains_key("deterministic"),
+        weather: match a.s("weather") {
+            Some(w) => operation::WeatherSource::parse(w)?.map(|mut w| {
+                w.offline = a.opt.contains_key("offline");
+                w.cache_dir = a.s("cache").map(String::from);
+                w
+            }),
+            None => None,
+        },
     };
+    if let Some(w) = &cfg.weather {
+        println!("날씨: {}{}", w.label(), if w.offline { " (캐시만)" } else { "" });
+    }
     let store = HealthStore::new(&ledger_dir(a));
     let ledger = if cfg.fresh { None } else { store.load(&cfg.asset_id)? };
     if let Some(l) = &ledger {
