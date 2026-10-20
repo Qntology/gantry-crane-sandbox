@@ -15,6 +15,7 @@ use crane_model::fieldcal;
 use crane_model::health::{self, HealthStore};
 use crane_model::ingest;
 use crane_model::marine;
+use crane_model::model_service::ModelService;
 use crane_model::motor;
 use crane_model::operation::{self, DecisionPolicy, OpSim, OperationConfig, OperationReport, StepOutcome};
 use crane_model::site::{self, SiteStore};
@@ -70,7 +71,9 @@ crane_demo — 갠트리 크레인 샌드박스
                                                       era5: ERA5 시간별 실제 날씨 재생 (위치: crane_demo weather ports, 캐시 먼저)
   crane_demo health list | show <asset> | replace <asset> <부품> | delete <asset> [--ledger DIR]
   crane_demo fieldcal [--out DIR]                     실데이터 대조 · 오차 표
-  crane_demo serve [--port 8765] [--data DIR]          브라우저 화면 + API (http://localhost:8765)
+  crane_demo serve [--port 8765] [--data DIR] [--models DIR] [--no-download] [--html index.html]
+                                                      브라우저 화면 + API (http://localhost:8765)
+                                                      없는 모델(TTM-R3 · LAYA)은 시작할 때 받기 시작 (설정 → 모델)
 
 MODE: off | zv | zvd | ei | closed_loop
 ";
@@ -1105,7 +1108,14 @@ fn http_reply(stream: &mut std::net::TcpStream, status: &str, ctype: &str, body:
     let _ = stream.write_all(body);
 }
 
-fn serve_one(stream: &mut std::net::TcpStream, backend: &std::sync::Mutex<Backend>) -> Result<(), String> {
+struct Served {
+    backend: std::sync::Mutex<Backend>,
+    svc: std::sync::Arc<ModelService>,
+    /// 화면 파일을 요청마다 디스크에서 읽는다 (--html, 화면 고칠 때 다시 빌드하지 않게)
+    html: Option<PathBuf>,
+}
+
+fn serve_one(stream: &mut std::net::TcpStream, served: &Served) -> Result<(), String> {
     // 브라우저가 미리 열어 두고 보내지 않는 연결이 다른 요청을 막지 않게
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
     let mut reader = std::io::BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
@@ -1130,13 +1140,20 @@ fn serve_one(stream: &mut std::net::TcpStream, backend: &std::sync::Mutex<Backen
     reader.read_exact(&mut body).map_err(|e| e.to_string())?;
     match (method.as_str(), path.as_str()) {
         ("OPTIONS", _) => http_reply(stream, "204 No Content", "text/plain", b""),
-        ("GET", "/") | ("GET", "/index.html") => http_reply(stream, "200 OK", "text/html; charset=utf-8", INDEX_HTML.as_bytes()),
+        ("GET", "/") | ("GET", "/index.html") => {
+            let page = served.html.as_ref().and_then(|p| std::fs::read(p).ok());
+            http_reply(stream, "200 OK", "text/html; charset=utf-8", page.as_deref().unwrap_or(INDEX_HTML.as_bytes()))
+        }
         ("POST", p) if p.starts_with("/api/") => {
             let cmd = &p[5..];
             let args: serde_json::Value = if body.is_empty() { serde_json::json!({}) } else { serde_json::from_slice(&body).map_err(|e| e.to_string())? };
-            let result = match backend.lock() {
-                Ok(mut b) => b.call(cmd, &args),
-                Err(e) => Err(e.to_string()),
+            // 모델 · 설정 명령은 계산 중인 Backend 를 기다리지 않는다 (내려받기 진행률)
+            let result = match served.svc.call(cmd, &args) {
+                Some(r) => r,
+                None => match served.backend.lock() {
+                    Ok(mut b) => b.call(cmd, &args),
+                    Err(e) => Err(e.to_string()),
+                },
             };
             let reply = match result {
                 Ok(v) => serde_json::json!({"ok": true, "data": v}),
@@ -1152,17 +1169,21 @@ fn serve_one(stream: &mut std::net::TcpStream, backend: &std::sync::Mutex<Backen
 fn cmd_serve(a: &Args) -> Result<(), String> {
     let port = a.f("port").unwrap_or(8765.0) as u16;
     let data = PathBuf::from(a.s("data").unwrap_or("out/app"));
-    let mut backend = Backend::new(&data);
+    let backend = Backend::new(&data);
+    let svc = backend.svc.clone();
+    // --models DIR: 이번 실행만 그 폴더를 쓴다 (설정의 모델 폴더는 그대로)
     if let Some(m) = a.s("models") {
-        backend.models = Models::load(Path::new(m));
+        svc.set_root(Path::new(m), false)?;
     }
-    let backend = std::sync::Arc::new(std::sync::Mutex::new(backend));
+    // 데스크톱 앱처럼 없는 모델을 받기 시작하고 받은 모델을 불러온다 (--no-download: 받지 않고 있는 것만 불러옴)
+    svc.start(a.s("no-download").is_none());
     let listener = std::net::TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("포트 {port}: {e}"))?;
-    println!("화면: http://localhost:{port}  (데이터 폴더 {}) — 끝내려면 Ctrl+C", data.display());
+    println!("화면: http://localhost:{port}  (데이터 폴더 {} · 모델 폴더 {}) — 끝내려면 Ctrl+C", data.display(), svc.root().display());
+    let served = std::sync::Arc::new(Served { backend: std::sync::Mutex::new(backend), svc, html: a.s("html").map(PathBuf::from) });
     for s in listener.incoming() {
         match s {
             Ok(mut stream) => {
-                let b = backend.clone();
+                let b = served.clone();
                 std::thread::spawn(move || {
                     if let Err(e) = serve_one(&mut stream, &b) {
                         if !e.contains("10060") && !e.contains("timed out") && !e.contains("시간") {

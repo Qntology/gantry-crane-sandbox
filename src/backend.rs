@@ -1,10 +1,11 @@
 //! 화면(데스크톱 · 브라우저)이 부르는 명령을 한곳에서 처리한다.
 //!
-//! Tauri 명령과 `crane_demo serve` 의 `/api/<명령>` 이 같은 `Backend::call` 을 쓴다. 상태(불러온 모델, 마지막 파이프라인 결과,
+//! Tauri 명령과 `crane_demo serve` 의 `/api/<명령>` 이 같은 `Backend::call` 을 쓴다. 상태(마지막 파이프라인 결과,
 //! 진행 중인 현장 운영 시뮬레이션)는 여기에 있고, 현장 프리셋 · 내구도 원장 · SDS 원장은 `data_dir` 아래에 저장한다.
+//! 모델 · 설정 명령은 `ModelService` 가 맡는다 (셸은 Backend 를 잠그기 전에 `svc.call` 을 먼저 불러 긴 계산 중에도 답한다).
 
 use crate::antisway::AntiSwayMode;
-use crate::api::{self, Models, PipelineConfig, PipelineReport};
+use crate::api::{self, PipelineConfig, PipelineReport};
 use crate::calib;
 use crate::cargo;
 use crate::climate_data;
@@ -15,6 +16,7 @@ use crate::era5cal;
 use crate::fieldcal;
 use crate::health::{self, HealthStore};
 use crate::marine;
+use crate::model_service::ModelService;
 use crate::operation::{self, DecisionPolicy, OpSim, OperationConfig, StepOutcome, WeatherSource};
 use crate::prognostics;
 use crate::sds::{Scope, SdsStore};
@@ -22,9 +24,10 @@ use crate::site::{self, SitePreset, SiteStore};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 pub struct Backend {
-    pub models: Models,
+    pub svc: Arc<ModelService>,
     pub last: Option<PipelineReport>,
     pub op: Option<OpSim>,
     pub data_dir: PathBuf,
@@ -53,7 +56,7 @@ fn to_value<T: serde::Serialize>(v: &T) -> Result<Value, String> {
 impl Backend {
     pub fn new(data_dir: &Path) -> Self {
         let _ = std::fs::create_dir_all(data_dir);
-        Self { models: Models::none(), last: None, op: None, data_dir: data_dir.to_path_buf() }
+        Self { svc: ModelService::open(data_dir), last: None, op: None, data_dir: data_dir.to_path_buf() }
     }
 
     pub fn sites(&self) -> SiteStore {
@@ -98,6 +101,9 @@ impl Backend {
     }
 
     pub fn call(&mut self, cmd: &str, args: &Value) -> Result<Value, String> {
+        if let Some(r) = self.svc.call(cmd, args) {
+            return r;
+        }
         match cmd {
             "ping" => Ok(json!({"ok": true, "ml_feature": cfg!(feature = "ml")})),
             "presets" => Ok(api::presets_json()),
@@ -113,7 +119,10 @@ impl Backend {
                 if cfg.sds_dir.is_none() {
                     cfg.sds_dir = Some(self.sds_dir().to_string_lossy().into_owned());
                 }
-                let rep = api::run_pipeline(&scenario, &cfg, &self.models)?;
+                let waiting = self.svc.ensure_for_run();
+                let mut rep = self.svc.with_models(|m| api::run_pipeline(&scenario, &cfg, m))?;
+                rep.notes.extend(waiting);
+                rep.models = self.svc.status();
                 let v = to_value(&rep)?;
                 self.last = Some(rep);
                 Ok(v)
@@ -127,12 +136,6 @@ impl Backend {
                 let spec = crane_profile::preset(&crane).ok_or_else(|| format!("크레인 프리셋 {crane} 이 없습니다"))?;
                 to_value(&calib::crosscheck(&spec, arg(args, "rope")?, arg(args, "load")?, arg(args, "sling")?))
             }
-            "models_load" => {
-                let root: String = arg(args, "root")?;
-                self.models = Models::load(Path::new(&root));
-                to_value(&self.models.status())
-            }
-            "models_status" => to_value(&self.models.status()),
             "choose_action" => {
                 let action: String = arg(args, "action")?;
                 let a = Action::from_key(&action).ok_or_else(|| format!("모르는 조치: {action}"))?;
